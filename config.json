@@ -1,0 +1,25 @@
+{
+    "data_path": "/home/icb/alessandro.palma/data/dataset00_resized",
+    "num_epochs": 500,
+    "eval": true,
+    "eval_every": 5,
+    "plot": true,
+    "normalize_imgs": true,
+    "batch_size": 64,
+    "shuffle": true,
+    "n_workers_loader": 2,
+    "model_name": "SigmaVAE",
+    "model_config": {
+        "in_channels": 5,
+        "latent_dim": 256,
+        "hidden_dims": null,
+        "residual_blocks":10,
+        "in_width": 64,
+        "in_height":64
+    },
+    "checkpoint_path": "/home/icb/alessandro.palma/imCPA/checkpoint.pt",
+    "lr": 1e-03,
+    "wd" : 1e-06,
+    "step_size": 50,
+    "variational": true
+  }
