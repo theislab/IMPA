@@ -68,8 +68,11 @@ class CellPaintingDataset(Dataset):
         Generate one example datapoint 
         """
         img_file = self.file_names[idx]
+        sample = img_file.split('-')[0]
+        well = img_file.split('-')[1].split('-')[0]
         # Load image 
-        with np.load(os.path.join(self.data_path, f'{img_file}.npz'), allow_pickle = True) as f:
+        #with np.load(os.path.join(self.data_path, sample, well, f'{img_file}.npz'), allow_pickle = True) as f:
+        with np.load(os.path.join(self.data_path, sample, well, f'{img_file}.npz'), allow_pickle = True) as f:
             #img = f['sample']
             img = f['arr_0']
         img = torch.from_numpy(img).to(torch.float)

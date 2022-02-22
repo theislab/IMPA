@@ -4,13 +4,48 @@ from torch.nn import functional as F
 import json
 from tqdm import tqdm
 import numpy as np
+from training_utils import *
+from metrics import *
 
+# Gaussian negative log-likelihood
 def gaussian_nll(mu, log_sigma, x):
     """
-    Implement Gaussian nll loss
+    Compute the Gaussian negative log-likelihood loss
+    
+    mu: mean
+    log_sigma: log standard deviation
+    x: observation
     """
     return 0.5 * torch.pow((x - mu) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
 
+# Softclip
+def softclip(tensor, min):
+    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
+    result_tensor = min + F.softplus(tensor - min)
+
+    return result_tensor
+
+"""
+Layers 
+"""
+
+# Flatten and unflatten layers
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
+
+
+class UnFlatten(nn.Module):
+    def __init__(self, n_channels):
+        super(UnFlatten, self).__init__()
+        self.n_channels = n_channels
+    
+    def forward(self, input):
+        size = int((input.size(1) // self.n_channels) ** 0.5)
+        return input.view(input.size(0), self.n_channels, size, size)
+
+
+# Convolutional layer with residual connection 
 class ResidualLayer(nn.Module):
     """
     Simple residual block 
@@ -25,17 +60,17 @@ class ResidualLayer(nn.Module):
             )
         self.activation_out = nn.LeakyReLU()
 
-    def forward(self, x):
-        out = self.resblock(x)
-        out += x  # Residual connection 
+    def forward(self, X):
+        out = self.resblock(X)
+        out += X  # Residual connection 
         out = self.activation_out(out)
         return out
 
+"""
+Encoder and Decoder classes 
+"""
 
 class Encoder(nn.Module):
-    """
-    The encoder module
-    """
     def __init__(self,
                 in_channels: int = 5,
                 latent_dim: int = 128,
@@ -51,6 +86,9 @@ class Encoder(nn.Module):
         self.hidden_dims = hidden_dims
         self.n_residual_blocks = n_residual_blocks
         self.in_width, self.in_height = in_width, in_height
+
+        # Setup metrics 
+        self.metrics = Metrics()
 
         # Convolutional structure
         self.modules = []
@@ -72,7 +110,7 @@ class Encoder(nn.Module):
         self.modules.append(
             nn.Sequential(
                 nn.Conv2d(self.hidden_dims[-1], self.hidden_dims[-1],
-                            kernel_size=3, stride=2, padding=1),
+                            kernel_size=3, stride=1, padding=1),
                 nn.LeakyReLU())
                 )    
         
@@ -83,8 +121,9 @@ class Encoder(nn.Module):
         self.encoder = nn.Sequential(*self.modules)
 
         # Add bottleneck
-        downsampling_factor_width = self.in_width//2**(len(self.hidden_dims) + 1)
-        downsampling_factor_height = self.in_height//2**(len(self.hidden_dims) + 1)
+        downsampling_factor_width = self.in_width//2**(len(self.hidden_dims))
+        downsampling_factor_height = self.in_height//2**(len(self.hidden_dims))
+
         self.flattened_dim = self.hidden_dims[-1]*downsampling_factor_width*downsampling_factor_height
         self.flatten = nn.Flatten()
         self.fc_mu = nn.Linear(self.flattened_dim, latent_dim)  # Mean encoding
@@ -100,9 +139,6 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """
-    The decoder module
-    """
     def __init__(self,
                 out_channels: int = 5,
                 latent_dim: int = 128,
@@ -127,8 +163,8 @@ class Decoder(nn.Module):
         self.hidden_dims = hidden_dims
 
         # Layer to upscale latent sample 
-        self.upsampling_factor_width = self.out_width//2**(len(self.hidden_dims) + 1)
-        self.upsampling_factor_height = self.out_height//2**(len(self.hidden_dims) + 1)
+        self.upsampling_factor_width = self.out_width//2**(len(self.hidden_dims))
+        self.upsampling_factor_height = self.out_height//2**(len(self.hidden_dims))
         self.flattened_dim = self.hidden_dims[0]*self.upsampling_factor_width*self.upsampling_factor_height
         self.upsample_fc = nn.Linear(self.latent_dim, self.flattened_dim)
 
@@ -140,7 +176,7 @@ class Decoder(nn.Module):
         self.modules.append(
             nn.Sequential(
                 nn.ConvTranspose2d(self.hidden_dims[0], self.hidden_dims[0],
-                            kernel_size=3, stride=2, padding=1),
+                            kernel_size=4, stride=1, padding=1),
                 nn.LeakyReLU())
                 )          
 
@@ -151,7 +187,7 @@ class Decoder(nn.Module):
                     nn.ConvTranspose2d(self.hidden_dims[i],
                                        self.hidden_dims[i + 1],
                                        kernel_size=4,
-                                       stride=2),
+                                       stride=2, padding=2),
                     nn.LeakyReLU())
             )
 
@@ -174,26 +210,32 @@ class Decoder(nn.Module):
         return X 
 
 
-class ResidConvVAE(nn.Module):
-    """
-    Basic convolutional autoencoder with resnet blocks 
-    """
+"""
+The default AE/VAE class 
+"""
+
+class BasicVAE(nn.Module):
     def __init__(self,
-                in_channels: int = 5,
-                latent_dim: int = 128,
-                hidden_dims: list = None,
-                n_residual_blocks: int = 6, 
-                in_width: int = 64,
-                in_height: int = 64,
-                **kwargs) -> None:
-        super(ResidConvVAE, self).__init__()      
+            in_channels: int = 5,
+            latent_dim: int = 128,
+            hidden_dims: list = None,
+            n_residual_blocks: int = 6, 
+            in_width: int = 64,
+            in_height: int = 64,
+            resnet = True,
+            device = 'cuda',
+            **kwargs) -> None:
+
+        super(BasicVAE, self).__init__()      
 
         self.in_channels = in_channels  # Image channels (5 in this case)
-        self.latent_dim = latent_dim  
+        self.latent_dim = latent_dim   
         self.hidden_dims = hidden_dims
         self.n_residual_blocks = n_residual_blocks
         self.in_width = in_width
         self.in_height = in_height
+        self.resnet = resnet
+        self.device = device
 
         self.encoder = Encoder(
             in_channels = self.in_channels,
@@ -213,9 +255,7 @@ class ResidConvVAE(nn.Module):
             out_height = self.in_height,
         ) 
 
-        # Log-scale for the likelihood
-        self.log_scale = nn.Parameter(torch.Tensor([0.0]))
-        
+    # Forward pass    
     def forward(self, X):
         mu, log_sigma = self.encoder(X)
         # Apply reparametrization trick
@@ -223,8 +263,7 @@ class ResidConvVAE(nn.Module):
         out = self.decoder(z)
         loss, recon_loss, kld = self.loss_function(X, out, mu, log_sigma).values()
         return  dict(out=out, loss=loss, recon_loss=recon_loss, kld=kld)
-
-
+    
     def reparameterize(self, mu, log_sigma, **kwargs):
         """
         Perform the reparametrization trick to allow for gradient descent. 
@@ -234,54 +273,20 @@ class ResidConvVAE(nn.Module):
         std = torch.exp(0.5 * log_sigma)
         eps = torch.randn_like(std)
         return eps * std + mu
-
-    def reconstruction_loss(self, x_hat, x):
-        """ 
-        Computes the likelihood of the data given the latent variable,
-        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 
-        """
-        # Gaussian log lik
-        #rec = gaussian_nll(x_hat, 0, x).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
-        rec = gaussian_nll(x_hat, self.log_scale, x).sum((1,2,3)).mean()
-        return rec
-
-    
-    def loss_function(self, X, X_hat, mu, log_sigma, **kwargs) -> dict:
-        """
-        Computes the VAE loss 
-        X: The input data 
-        X_hat: The reconstucted input 
-        mu: the mean encodings
-        log_sigma: the log variance encodings 
-        """
-        # Reconstruction loss between the input and the prediction
-        recons_loss = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()
-
-        # KL divergence 
-        #kld_loss = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu ** 2 - log_sigma.exp(), dim = 1), dim = 0)  # Canonical form of the analytic KL but inverted in sign 
-        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim=1), dim=0)
-        
-        # Total loss 
-        loss = recons_loss + kld_loss
-        # Zero out the gradient of the losses 
-        return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
-        
     
     def sample(self,
-               num_samples:int,
-               device: int, seed:int=42, **kwargs):
+               num_samples:int, temperature:int, **kwargs):
         """
         Samples from the latent space and return the corresponding
         image space map.
         num_samples: Number of samples
         device: Device to run the model
         """
-        torch.manual_seed(seed)
         # Sample random vector
         z = torch.randn(num_samples,
                         self.latent_dim)
-        z = z.to(device)
-        samples = self.decode(z)
+        z = z.to(self.device)
+        samples = self.decoder(z)
         return samples
 
     def generate(self, x, **kwargs):
@@ -291,7 +296,12 @@ class ResidConvVAE(nn.Module):
         """
         return self.forward(x)['out']
 
+    def reconstruction_loss(self):
+        pass
 
+    def loss_function(self):
+        pass
+        
     def update_model(self, train_loader, epoch, optimizer, device):
         """
         Compute a forward step and returns the losses 
@@ -303,6 +313,7 @@ class ResidConvVAE(nn.Module):
             batch = batch.to(device) # Load batch
             res = self.forward(batch)  # Predict and compute the loss on the model
             out, loss, recon_loss, kl_loss = res.values()  # Collect the losses 
+
             training_loss += loss.item()
             tot_recons_loss += recon_loss.item()
             tot_kl_loss += kl_loss.item()
@@ -332,12 +343,16 @@ class ResidConvVAE(nn.Module):
         val_loss = 0
         val_recon_loss = 0 
         val_kl_loss = 0 
+        # Zero out the metrics for the next step
+        self.metrics.reset()
+
         for val_batch in loader:
             val_batch = val_batch.to(device) # Load batch
             with torch.no_grad():
                 val_res = self.forward(val_batch)
             # Gather components of the output
             out_val, loss_val, recon_loss, kld_loss = val_res.values()
+            self.metrics.metrics_update(val_batch, out_val)
 
             # Accumulate the validation loss 
             val_loss += loss_val.item()
@@ -350,4 +365,7 @@ class ResidConvVAE(nn.Module):
         print(f'Average validation loss: {avg_validation_loss}')
         print(f'Average validation reconstruction loss: {avg_validation_recon_loss}')
         print(f'Average kld reconstruction loss: {avg_validation_kld_loss}')
-        return dict(loss=avg_validation_loss, recon_loss=avg_validation_recon_loss, kld_loss=avg_validation_kld_loss)
+        self.metrics.print_metrics()
+        return dict(loss=avg_validation_loss, recon_loss=avg_validation_recon_loss, kld_loss=avg_validation_kld_loss), self.metrics.metrics
+
+

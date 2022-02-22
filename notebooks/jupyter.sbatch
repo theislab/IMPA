@@ -1,20 +1,20 @@
 #!/bin/bash
 
-#SBATCH -o /home/icb/%u/slurm_jupyter_%j.job
+#SBATCH -o /home/icb/%u/slurm_folder/slurm_jupyter.job
 
-#SBATCH -e /home/icb/%u/slurm_jupyter_%j.job
+#SBATCH -e /home/icb/%u/slurm_folder/slurm_jupyter.job
 
 #SBATCH -J jupyter
 
 #SBATCH -p gpu_p
 
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 
 #SBATCH --qos=gpu
 
 #SBATCH -c 4
 
-#SBATCH --mem=90G
+#BATCH --mem=90G
 
 #SBATCH -t 10:00:00
 

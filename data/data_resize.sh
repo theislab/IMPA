@@ -15,4 +15,4 @@ source $HOME/.bashrc
 
 conda activate imgCPA
 
-python3 resize_ds.py --data_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_untar2 --out_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_64 --width 64 --height 64 --interp cubic
+python3 resize_ds.py --data_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_untar2 --out_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_100 --width 100 --height 100 --interp cubic

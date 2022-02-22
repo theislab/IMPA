@@ -1,10 +1,11 @@
 import os 
 import torch
 
-from models.vae.AE import *
-from models.vae.sigmaVAE import *
-from models.vae.VAE import *
-from models.flow.glow import *
+from models.convVAE import *
+from models.convAE import *
+from models.sigmaVAE import *
+from models.residconvVAE import *
+from models.glow import *
 
 from data.dataset import *
 from utils import *
@@ -56,8 +57,6 @@ class Trainer:
         self.model_config = config.model_config
         self.generate = config.generate
         self.temperature = config.temperature
-        self.resume = config.resume 
-        self.resume_checkpoint = config.resume_checkpoint
 
         # Plot decisions
         self.experiment_name = config.experiment_name
@@ -76,12 +75,6 @@ class Trainer:
         print(f'Working on device: {self.device}')
 
         self.model =  self.load_model().to(self.device)
-        
-        # If training is resumed from a checkpoint
-        if self.resume:
-            self.model.load_checkpoint(self.resume_checkpoint)
-        self.model.device = self.device
-
         self.model = nn.DataParallel(self.model)
 
         # Prepare the data
@@ -144,7 +137,7 @@ class Trainer:
             print(f'Running epoch {epoch}')
             self.model.train()
             # Losses from the epoch
-            losses = self.model.module.update_model(self.loader_train, epoch, self.optimizer) # Update run 
+            losses = self.model.module.update_model(self.loader_train, epoch, self.optimizer, self.device) # Update run 
             for key in losses:
                 self.writer.add_scalar(tag=f'train/{key}', scalar_value=losses[key], global_step=epoch)
 
@@ -171,7 +164,8 @@ class Trainer:
                     
                 # Plot generation of sampled images 
                 if self.generate:
-                    sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
+                    sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature,
+                                                                           self.device))
                     self.plotter.plot_channel_panel(sampled_img, epoch, self.img_save, self.img_plot)
                 
                 # Save the model if it is the best performing one 
@@ -185,11 +179,10 @@ class Trainer:
             # Scheduler step at the end of the epoch 
             if epoch < self.warmup_steps:
                 self.optimizer.param_groups[0]["lr"] = self.lr * min(1., self.warmup_steps/epoch)
-
-            elif epoch == self.warmup_steps:
+            if epoch == self.warmup_steps-1:
                 self.lr_scheduling = torch.optim.lr_scheduler.StepLR(self.optimizer,
                                                                      step_size=self.step_size)
-            else:
+            elif epoch > self.warmup_steps-1:
                 self.lr_scheduling.step()
 
 
@@ -204,8 +197,8 @@ class Trainer:
         """
         Load the model from the dedicated library
         """
-        models = {'AE':AE, 
-        'VAE':VAE,'SigmaVAE': SigmaVAE,
+        models = {'ConvVAE':ConvVAE, 'ConvAE':ConvAE, 
+        'ResidConvVAE':ResidConvVAE,'SigmaVAE': SigmaVAE,
         'Glow': Glow}
         model = models[self.model_name]
         return model(**self.model_config)
@@ -217,14 +210,4 @@ class Trainer:
         checkpoint = 'checkpoint.pt'
         torch.save(self.model.state_dict(), os.path.join(self.dest_dir, checkpoint))
         
-def gaussian_nll(mu, log_sigma, x):
-    """
-    Implement Gaussian nll loss
-    """
-    return 0.5 * torch.pow((x - mu) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
 
-def softclip(tensor, min):
-    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
-    result_tensor = min + F.softplus(tensor - min)
-
-    return result_tensor

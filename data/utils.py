@@ -59,8 +59,7 @@ def resize_images(data_dir:str, outdir:str, width=64, height=64, interpolation='
         # Save final object
         np.savez(os.path.join(outdir, filename), resized_img)
 
-
-def extract_filenames_and_molecules(fold_dataset:pd.DataFrame, data_path:str, fold :['train', 'val', 'test'], save=True): 
+def extract_filenames_and_molecules(index_path:str, data_path:str, split:[1,2,3], fold :['train', 'val', 'test'], save=True): 
     """
     From a subset of the dataset, extract the filenames and the molecules that associate
     to a data fold (train, test, validation)
@@ -70,12 +69,21 @@ def extract_filenames_and_molecules(fold_dataset:pd.DataFrame, data_path:str, fo
     fold: the fold between train, test and val
     save: True if the filename, the molecule names and the smiles should be saved to datapath
     """
+    # Read the fold dataset 
+    fold_dataset== pd.read_csv(os.path.join(index_path, f'datasplit{str(split)}-{fold}.csv'))
+    # Extract the sample names, molecule names and the molecule smiles 
     sample_names = fold_dataset.SAMPLE_KEY.values
     molecule_names = fold_dataset.CPD_NAME.values
     molecule_SMILE = fold_dataset.SMILES.values
+    # Only keep the sample names and molecules that are present in the folder 
+    index = np.arange(len(sample_names))
+    filenames = os.listdir(data_path)
+    idx_to_keep = [i for i in index if sample_names[i]+'.npz' in filenames]
+    # Filter the sample names, molecule names and SMILE names 
+    filenames, mol_names, SMILES =  sample_names[idx_to_keep], molecule_names[idx_to_keep], molecule_SMILE[idx_to_keep]
     if save:
-        np.savez(os.path.join(data_path, f'{fold}_data_index'), filenames = sample_names, mol_names = molecule_names, mol_smiles = molecule_SMILE)
-    return  sample_names, molecule_names, molecule_SMILE
+        np.savez(os.path.join(data_path, f'{fold}_data_index'), filenames = filenames, mol_names = mol_names, mol_smiles = SMILES)
+    return  filenames, mol_names, SMILES
 
 
 def get_files_and_mols_from_path(data_index_path): 

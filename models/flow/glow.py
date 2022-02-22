@@ -4,9 +4,11 @@ from torch.nn import functional as F
 from math import log, pi, exp
 import numpy as np
 from scipy import linalg as la
+from tqdm import tqdm
+from metrics import *
 
 
-def log_abs(x):
+def logabs(x):
     """
     Compute the absolute value of the logarithm of the input 
     """
@@ -62,14 +64,14 @@ class ActNorm(nn.Module):
             self.initialized.fill_(1)
 
         # Take log-absolute value of the scale parameter of the layer 
-        log_abs = log_abs(self.scale)
+        log_abs = logabs(self.scale)
         
         # Log-determinant: dependent on the scale parameter
         logdet = height * width * torch.sum(log_abs)
 
         # Return actnorm transform of the input and (if required) the logdet as well 
         if self.logdet:
-            return self.scale * (input + self.loc), logdet
+            return self.scale * (input + self.loc), logdet  # Plus because we computed the - mean 
 
         else:
             return self.scale * (input + self.loc)
@@ -130,15 +132,15 @@ class InvConv2dLU(nn.Module):
         l_mask = u_mask.T  # Lower diagonal mastrix of ones 
 
         # Convert to numpy 
-        w_p = torch.from_numpy(w_p)
-        w_l = torch.from_numpy(w_l)
-        w_s = torch.from_numpy(w_s)
-        w_u = torch.from_numpy(w_u)
+        w_p = torch.from_numpy(np.array(w_p))
+        w_l = torch.from_numpy(np.array(w_l))
+        w_s = torch.from_numpy(np.array(w_s))
+        w_u = torch.from_numpy(np.array(w_u))
 
         # Untrainable elements
         self.register_buffer("w_p", w_p)
-        self.register_buffer("u_mask", torch.from_numpy(u_mask))
-        self.register_buffer("l_mask", torch.from_numpy(l_mask))
+        self.register_buffer("u_mask", torch.from_numpy(np.array(u_mask)))
+        self.register_buffer("l_mask", torch.from_numpy(np.array(l_mask)))
         self.register_buffer("s_sign", torch.sign(w_s))
         self.register_buffer("l_eye", torch.eye(l_mask.shape[0]))  # Diagonal matrix of ones 
         # Trainable elements
@@ -224,18 +226,17 @@ class AffineCoupling(nn.Module):
             log_s, t = self.net(in_a).chunk(2, 1)  # NB. In case of odd channels the first element takes an extra dimension 
 
             #s = torch.exp(log_s)  # Paper 
-            s = F.sigmoid(log_s + 2)  # New solution 
+            s = torch.sigmoid(log_s + 2)  # New solution 
             
             #out_a = s * in_a + t
             out_b = (in_b + t) * s 
 
             # The log det here is not averaged 
             logdet = torch.sum(torch.log(s).view(input.shape[0], -1), 1)  # B x C*W*H
-
+            
         else:
             net_out = self.net(in_a)
             in_b = in_b + net_out
-            out_a = in_a
             logdet = None
 
         return torch.cat([in_a, out_b], 1), logdet  # Reconcatenate on the channel dimension  
@@ -248,7 +249,7 @@ class AffineCoupling(nn.Module):
             log_s, t = self.net(out_a).chunk(2, 1)
             
             # s = torch.exp(log_s)
-            s = F.sigmoid(log_s + 2)
+            s = torch.sigmoid(log_s + 2)
             
             # in_a = (out_a - t) / s
             in_b = out_b/ s - t  
@@ -277,7 +278,7 @@ class Flow(nn.Module):
     def forward(self, input):
         out, logdet = self.actnorm(input)
         out, det1 = self.invconv(out)
-        out, det2 = self.coupling(out)
+        out, det2 = self.coupling(out) 
 
         logdet = logdet + det1
         if det2 is not None:
@@ -357,7 +358,7 @@ class Block(nn.Module):
             log_p = gaussian_log_p(out, mean, log_sd)
             log_p = log_p.view(b_size, -1).sum(1)
             z_new = out
-
+        
         return out, logdet, log_p, z_new
 
     def reverse(self, output, eps=None, reconstruct=False):
@@ -389,8 +390,8 @@ class Block(nn.Module):
         # Apply the flow in reverse 
         for flow in self.flows[::-1]:
             input = flow.reverse(input)
-
-        b_size, n_channel, height, width = input.shape
+            
+        b_size, n_channel, height, width = input.shape    
 
         # Reverse the squeezing transformation 
         unsqueezed = input.view(b_size, n_channel // 4, 2, 2, height, width)
@@ -403,19 +404,36 @@ class Block(nn.Module):
 
 class Glow(nn.Module):
     def __init__(
-        self, in_channel, n_flow, n_block, affine=True, conv_lu=True,
-        in_width=64, in_height=64):
+        self, in_channels, n_flow, n_block, affine=True, conv_lu=True,
+        in_width=64, in_height=64, n_bits = 8, device = 'cuda'):
         super().__init__()
 
+        # The number of bits is used to compute the loss
+        self.n_bits = n_bits 
+        self.n_bins = 2**n_bits
+        self.n_pixels = in_width * in_height * in_channels
+        self.n_block = n_block
+        self.n_flow = n_flow
+        self.device = device
+
+        # Fix the rest of the variables
         self.in_width = in_width
         self.in_height = in_height 
         self.blocks = nn.ModuleList()
-        n_channel = in_channel
+        self.in_channels = in_channels
+        n_channel = self.in_channels
+
+        # Setup metrics 
+        self.metrics = Metrics()
+        
         # Append a series of blocks on top of each other
         for i in range(n_block - 1):
             self.blocks.append(Block(n_channel, n_flow, affine=affine, conv_lu=conv_lu))
             n_channel *= 2  # The number of channels is augmented by two each time due to the concatenation of z with output 
         self.blocks.append(Block(n_channel, n_flow, split=False, affine=affine))
+
+        # z-shapes calculation
+        self.z_shapes = self.calc_z_shapes()
 
     def forward(self, input):
         log_p_sum = 0
@@ -442,7 +460,6 @@ class Glow(nn.Module):
 
             else:
                 input = block.reverse(input, z_list[-(i + 1)], reconstruct=reconstruct)
-
         return input
 
     def calc_z_shapes(self):
@@ -452,7 +469,7 @@ class Glow(nn.Module):
         # Shapes of z on all layers 
         z_shapes = []
         input_size = self.in_width 
-        n_channel = self.in_channel
+        n_channel = self.in_channels
 
         for i in range(self.n_block - 1):
             # For each block, the image size decreases and the number of channels goes up
@@ -464,6 +481,21 @@ class Glow(nn.Module):
         z_shapes.append((n_channel * 4, input_size, input_size))
         return z_shapes
     
+    def sample(self, n_samples, temperature):
+        """
+        Sample z embeddings from normal distributions 
+        """
+        z_sample = []
+        
+        for z in self.z_shapes:
+            z_new = torch.randn(n_samples, *z) * temperature 
+            z_sample.append(z_new.to(self.device))
+        
+        with torch.no_grad():
+            generated_img = self.reverse(z_sample)
+        return generated_img
+        
+    
     def generate(self, input):
         """
         Given an input, it calls the Glow model in forward and backward directions 
@@ -471,24 +503,26 @@ class Glow(nn.Module):
         # Forward encoding of the input 
         _, _, z_list = self.forward(input)
         # backward image decoding 
-        output = self.reverse(z_list)
+        output = self.reverse(z_list, reconstruct=True)
         return output 
 
 
-    def update_model(self, train_loader, epoch, optimizer, device):
+    def update_model(self, train_loader, epoch, optimizer):
         """
         Compute a forward step and returns the losses 
         """
         # Total loss
         training_loss = 0
-        z_shapes = self.calc_z_shapes()
-
         for batch in tqdm(train_loader): 
             # Collect batch 
-            batch = batch.to(device) # Load batch
-            log_det, log_p, z_outs = self.forward(batch)
-            log_p = log_p.mean()  # Averahge the log-determinant across batch
-            loss = -(log_det + log_p)
+            batch = batch.to(self.device) # Load batch
+            log_p, log_det, z_outs = self.forward(batch)
+
+            # Compute the loss
+            loss = -log(self.n_bins) * self.n_pixels
+            log_det = log_det.mean()  # Average the log-determinant across batch
+            loss = loss + log_det + log_p
+            loss = (-loss / (log(2) * self.n_pixels)).mean()
 
             # Optimizer step  
             optimizer.zero_grad()
@@ -502,7 +536,7 @@ class Glow(nn.Module):
         return dict(loss=avg_loss) 
 
 
-    def evaluate(self, loader, dataset, device, checkpoint_path='', fold = 'val'):
+    def evaluate(self, loader, dataset, checkpoint_path='', fold = 'val'):
         """
         Validation loop 
         """
@@ -511,16 +545,29 @@ class Glow(nn.Module):
             self.load_state_dict(torch.load(checkpoint_path))
 
         val_loss = 0
+        # Zero out the metrics for the next step
+        self.metrics.reset()
+        
         for val_batch in loader:
-            val_batch = val_batch.to(device) # Load batch
+            val_batch = val_batch.to(self.device) # Load batch
             with torch.no_grad():
-                log_det, log_p, z_outs = self.forward(val_batch)
+                log_p, log_det, z_outs = self.forward(val_batch)
 
             # Accumulate the validation loss 
-            val_loss += log_det.item() + log_p.item()
+            loss = -log(self.n_bins) * self.n_pixels
+            log_det = log_det.mean()  # Average the log-determinant across batch
+            loss = loss + log_det + log_p
+            loss = (-loss / (log(2) * self.n_pixels)).mean()
 
-        
-        avg_validation_loss = val_loss/len(loader)
+            val_loss += loss
 
+            # Update the image metrics
+            with torch.no_grad():
+                val_batch_reconstruct = self.reverse(z_outs, reconstruct=True)
+            self.metrics.metrics_update(val_batch, val_batch_reconstruct)
+
+
+        avg_validation_loss = val_loss/len(loader) 
         print(f'Average validation loss: {avg_validation_loss}')
-        return dict(loss=avg_validation_loss)
+        self.metrics.print_metrics()
+        return dict(loss=avg_validation_loss), self.metrics.metrics

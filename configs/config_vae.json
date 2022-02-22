@@ -1,0 +1,35 @@
+{
+    "experiment_name":"Run_VAE",
+    "data_path": "/home/icb/alessandro.palma/data/cellpainting_64",
+    "result_path": "/home/icb/alessandro.palma/imCPA/VAE_res",
+
+    "num_epochs": 150,
+    "eval": true,
+    "eval_every": 1,
+    "img_plot": true,
+    "img_save": true, 
+    "normalize_imgs": true,
+    "batch_size": 256,
+    "shuffle": true,
+    "n_workers_loader": 4,
+    "generate": true,
+    "model_name": "SigmaVAE",
+    "temperature": 0.8,
+
+    "model_config": {
+        "in_channels": 5,
+        "latent_dim": 512,
+        "hidden_dims": null,
+        "residual_blocks":10,
+        "in_width": 64,
+        "in_height":64
+    },
+
+    "lr": 1e-03,
+    "wd" : 1e-06,
+    "step_size": 50,
+    "warmup_steps": 1,
+
+    "resume": false,
+    "resume_checkpoint": ""
+}
