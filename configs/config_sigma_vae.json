@@ -1,6 +1,6 @@
 {   "experiment_name":"vae_resid10_dim100",
 
-    "data_path": "/home/icb/alessandro.palma/data/cellpainting_64",
+    "data_path": "/home/icb/alessandro.palma/data/cellpainting_100",
     "result_path": "/home/icb/alessandro.palma/imCPA/results/vae_resid10_dim100",
     
     "checkpoint_path": "/home/icb/alessandro.palma/checkpoints/vae_resid10_dim100",
@@ -13,11 +13,11 @@
     "eval_every": 1,
     "img_plot": true,
     "img_save": true, 
-    "batch_size": 128,
+    "batch_size": 512,
     "shuffle": true,
     "n_workers_loader": 4,
     "generate": true,
-    "model_name": "VAE",
+    "model_name": "SigmaVAE",
     "temperature": 0.8,
     "augment_train":false,
 
@@ -33,5 +33,5 @@
     "lr": 1e-04,
     "wd" : 1e-06,
     "step_size": 50,
-    "warmup_steps": 5
+    "warmup_steps": 1
 }

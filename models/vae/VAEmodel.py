@@ -5,7 +5,8 @@ import json
 from tqdm import tqdm
 import numpy as np
 from training_utils import *
-from metrics import *
+from models.model import TemplateModel
+from metrics.metrics import *
 
 # Gaussian negative log-likelihood
 def gaussian_nll(mu, log_sigma, x):
@@ -88,13 +89,10 @@ class Encoder(nn.Module):
         self.in_width, self.in_height = in_width, in_height
         self.kernel_size = 3
 
-        # Setup metrics 
-        self.metrics = Metrics()
-
         # If not pre-specified, convolutional layers have 32, 64 and 128 feature maps
         self.modules = []
         if self.hidden_dims is None:
-            self.hidden_dims = [32, 64, 128]
+            self.hidden_dims = [64, 128, 256]
         
         # First layer - no downsizing 
         self.modules.append(
@@ -167,7 +165,7 @@ class Decoder(nn.Module):
         # Build convolutional dimensions
         self.modules = []
         if hidden_dims is None:
-            hidden_dims = [128, 64, 32]
+            hidden_dims = [256, 128, 64]
         self.hidden_dims = hidden_dims
 
         # Layer to upscale latent sample 
@@ -223,29 +221,29 @@ class Decoder(nn.Module):
 The default AE/VAE class 
 """
 
-class BasicVAE(nn.Module):
+class BasicVAE(TemplateModel):
     def __init__(self,
-            in_channels: int = 5,
-            latent_dim: int = 512,
-            hidden_dims: list = None,
-            n_residual_blocks: int = 6, 
-            in_width: int = 64,
-            in_height: int = 64,
-            resnet = True,
-            device = 'cuda',
-            **kwargs) -> None:
+            in_channels,
+            latent_dim,
+            hidden_dims,
+            n_residual_blocks, 
+            in_width,
+            in_height,
+            device,
+            **kwargs) -> None:     
 
-        super(BasicVAE, self).__init__()      
-
+        super(BasicVAE, self).__init__() 
         self.in_channels = in_channels  # Image channels (5 in this case)
         self.latent_dim = latent_dim   
         self.hidden_dims = hidden_dims
         self.n_residual_blocks = n_residual_blocks
         self.in_width = in_width
         self.in_height = in_height
-        self.resnet = resnet
         self.device = device
 
+        # Setup metrics 
+        self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.latent_dim, device = self.device)
+        
         self.encoder = Encoder(
             in_channels = self.in_channels,
             latent_dim = self.latent_dim,
@@ -271,8 +269,8 @@ class BasicVAE(nn.Module):
         z = self.reparameterize(mu, log_sigma)
         out = self.decoder(z)
         loss, recon_loss, kld = self.loss_function(X, out, mu, log_sigma).values()
-        return  dict(out=out, loss=loss, recon_loss=recon_loss, kld=kld)
-    
+        return  dict(out=out, z=z, loss=loss, recon_loss=recon_loss, kld=-kld)
+        
     def reparameterize(self, mu, log_sigma, **kwargs):
         """
         Perform the reparametrization trick to allow for gradient descent. 
@@ -293,7 +291,7 @@ class BasicVAE(nn.Module):
         """
         # Sample random vector
         z = torch.randn(num_samples,
-                        self.latent_dim)
+                        self.latent_dim)*temperature
         z = z.to(self.device)
         samples = self.decoder(z)
         return samples
@@ -304,6 +302,13 @@ class BasicVAE(nn.Module):
         x: input image
         """
         return self.forward(x)['out']
+    
+    def get_latent_representation(self, X, **kwargs):
+        """
+        Given an input X, it returns a latent encoding for it 
+        """
+        mu, log_sigma = self.encoder(X)
+        return dict(z=self.reparameterize(mu, log_sigma), mu=mu, log_sigma=log_sigma)
 
     def reconstruction_loss(self):
         pass
@@ -318,10 +323,12 @@ class BasicVAE(nn.Module):
         training_loss = 0
         tot_recons_loss = 0 
         tot_kl_loss = 0  
-        for batch in tqdm(train_loader): 
-            batch = batch.to(self.device) # Load batch
-            res = self.forward(batch)  # Predict and compute the loss on the model
-            out, loss, recon_loss, kl_loss = res.values()  # Collect the losses 
+
+        self.metrics.reset()
+        for batch in tqdm(train_loader):
+            X_batch = batch['X'].to(self.device) # Load batch
+            res = self.forward(X_batch)  # Predict and compute the loss on the model
+            out, z, loss, recon_loss, kl_loss = res.values()  # Collect the losses 
 
             training_loss += loss.item()
             tot_recons_loss += recon_loss.item()
@@ -332,13 +339,17 @@ class BasicVAE(nn.Module):
             loss.backward()
             optimizer.step()
 
+            self.metrics.update_rmse(X_batch, out)
+
         avg_loss = training_loss/len(train_loader)
         avg_recon_loss = tot_recons_loss/len(train_loader)
+        self.metrics.update_bpd(avg_recon_loss)
         avg_kl_loss = tot_kl_loss/len(train_loader)
         print(f'Mean loss after epoch {epoch}: {avg_loss}')
         print(f'Mean reconstruction loss after epoch {epoch}: {avg_recon_loss}')
         print(f'Mean kl divergence after epoch {epoch}: {avg_kl_loss}')
-        return dict(loss=avg_loss, recon_loss=avg_loss, kl_loss=avg_kl_loss)
+        self.metrics.print_metrics()
+        return dict(loss=avg_loss, recon_loss=avg_loss, kl_loss=avg_kl_loss), self.metrics.metrics
 
     
     def evaluate(self, loader, dataset, checkpoint_path='', fold = 'val'):
@@ -356,20 +367,22 @@ class BasicVAE(nn.Module):
         self.metrics.reset()
 
         for val_batch in loader:
-            val_batch = val_batch.to(self.device) # Load batch
+            X_val_batch = val_batch['X'].to(self.device) # Load batch
             with torch.no_grad():
-                val_res = self.forward(val_batch)
+                val_res = self.forward(X_val_batch)
             # Gather components of the output
-            out_val, loss_val, recon_loss, kld_loss = val_res.values()
-            self.metrics.metrics_update(val_batch, out_val)
+            out_val, z, loss_val, recon_loss, kld_loss = val_res.values()
+            self.metrics.update_rmse(X_val_batch, out_val)
 
             # Accumulate the validation loss 
             val_loss += loss_val.item()
-            val_recon_loss += recon_loss
-            val_kl_loss += kld_loss
+            val_recon_loss += recon_loss.item()
+            val_kl_loss += kld_loss.item()
         
+        # Print loss results
         avg_validation_loss = val_loss/len(loader)
         avg_validation_recon_loss = val_recon_loss/len(loader)
+        self.metrics.update_bpd(avg_validation_recon_loss)
         avg_validation_kld_loss = val_kl_loss/len(loader)
         print(f'Average validation loss: {avg_validation_loss}')
         print(f'Average validation reconstruction loss: {avg_validation_recon_loss}')
@@ -377,5 +390,3 @@ class BasicVAE(nn.Module):
         self.metrics.print_metrics()
         return dict(loss=avg_validation_loss, recon_loss=avg_validation_recon_loss, kld_loss=avg_validation_kld_loss), self.metrics.metrics
         
-
-

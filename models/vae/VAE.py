@@ -21,10 +21,9 @@ class VAE(BasicVAE):
                 device = 'cuda',
                 **kwargs) -> None:
 
-        super(VAE, self).__init__()   
+        super(VAE, self).__init__(in_channels, latent_dim, hidden_dims, n_residual_blocks, in_width, in_height, device)   
 
         # Log-scale for the likelihood
-        self.metrics = Metrics()
         self.log_scale = nn.Parameter(torch.Tensor([0.0]))
 
 

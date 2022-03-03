@@ -1,0 +1,1 @@
+slurmstepd: error: *** JOB 5380669 ON supergpu03pxe CANCELLED AT 2022-02-28T17:27:52 ***

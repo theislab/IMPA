@@ -1,0 +1,27 @@
+#!/bin/bash
+
+#SBATCH -o /home/icb/%u/slurm_folder/slurm_jupyter.job
+
+#SBATCH -e /home/icb/%u/slurm_folder/slurm_jupyter.job
+
+#SBATCH -J jupyter
+
+#SBATCH -p gpu_p
+
+#SBATCH -w supergpu08
+
+#SBATCH --gres=gpu:1
+
+#SBATCH --gpus=1
+
+#SBATCH --qos=gpu
+
+#SBATCH -c 4
+
+#BATCH --mem=90G
+
+#SBATCH --nice=10000
+
+
+source ./run_jupyter.sh
+

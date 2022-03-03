@@ -5,7 +5,8 @@ from math import log, pi, exp
 import numpy as np
 from scipy import linalg as la
 from tqdm import tqdm
-from metrics import *
+from metrics.metrics import *
+from models.model import TemplateModel
 
 
 def logabs(x):
@@ -402,7 +403,7 @@ class Block(nn.Module):
         return unsqueezed
 
 
-class Glow(nn.Module):
+class Glow(TemplateModel):
     def __init__(
         self, in_channels, n_flow, n_block, affine=True, conv_lu=True,
         in_width=64, in_height=64, n_bits = 8, device = 'cuda'):
@@ -422,9 +423,6 @@ class Glow(nn.Module):
         self.blocks = nn.ModuleList()
         self.in_channels = in_channels
         n_channel = self.in_channels
-
-        # Setup metrics 
-        self.metrics = Metrics()
         
         # Append a series of blocks on top of each other
         for i in range(n_block - 1):
@@ -434,6 +432,9 @@ class Glow(nn.Module):
 
         # z-shapes calculation
         self.z_shapes = self.calc_z_shapes()
+
+        # Setup metrics 
+        self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.z_shapes, flow=True, device = self.device)
 
     def forward(self, input):
         log_p_sum = 0
@@ -513,10 +514,11 @@ class Glow(nn.Module):
         """
         # Total loss
         training_loss = 0
+        self.metrics.reset()
         for batch in tqdm(train_loader): 
             # Collect batch 
-            batch = batch.to(self.device) # Load batch
-            log_p, log_det, z_outs = self.forward(batch)
+            X_batch = batch['X'].to(self.device) # Load batch
+            log_p, log_det, z_outs = self.forward(X_batch)
 
             # Compute the loss
             loss = -log(self.n_bins) * self.n_pixels
@@ -533,7 +535,8 @@ class Glow(nn.Module):
 
         avg_loss = training_loss/len(train_loader)
         print(f'Mean loss after epoch {epoch}: {avg_loss}')
-        return dict(loss=avg_loss) 
+        self.metrics.print_metrics()
+        return dict(loss=avg_loss), self.metrics.metrics
 
 
     def evaluate(self, loader, dataset, checkpoint_path='', fold = 'val'):
@@ -549,9 +552,9 @@ class Glow(nn.Module):
         self.metrics.reset()
         
         for val_batch in loader:
-            val_batch = val_batch.to(self.device) # Load batch
+            X_val_batch = val_batch['X'].to(self.device) # Load batch
             with torch.no_grad():
-                log_p, log_det, z_outs = self.forward(val_batch)
+                log_p, log_det, z_outs = self.forward(X_val_batch)
 
             # Accumulate the validation loss 
             loss = -log(self.n_bins) * self.n_pixels
@@ -564,10 +567,8 @@ class Glow(nn.Module):
             # Update the image metrics
             with torch.no_grad():
                 val_batch_reconstruct = self.reverse(z_outs, reconstruct=True)
-            self.metrics.metrics_update(val_batch, val_batch_reconstruct)
-
 
         avg_validation_loss = val_loss/len(loader) 
         print(f'Average validation loss: {avg_validation_loss}')
-        self.metrics.print_metrics()
+        self.metrics.print_metrics(flow=True)
         return dict(loss=avg_validation_loss), self.metrics.metrics

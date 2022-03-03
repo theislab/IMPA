@@ -59,8 +59,8 @@ def resize_images(data_dir:str, outdir:str, width=64, height=64, interpolation='
         # Save final object
         np.savez(os.path.join(outdir, filename), resized_img)
 
-
-def extract_filenames_and_molecules(fold_dataset:pd.DataFrame, data_path:str, fold :['train', 'val', 'test'], save=True): 
+        
+def extract_filenames_and_molecules(input_path:str, labels_path:str, data_path:str, fold:list, save=True): 
     """
     From a subset of the dataset, extract the filenames and the molecules that associate
     to a data fold (train, test, validation)
@@ -70,25 +70,20 @@ def extract_filenames_and_molecules(fold_dataset:pd.DataFrame, data_path:str, fo
     fold: the fold between train, test and val
     save: True if the filename, the molecule names and the smiles should be saved to datapath
     """
+    # Load data matrices
+    fold_dataset = pd.read_csv(input_path)  # Load the data matrix
+    labels = np.load(labels_path, allow_pickle=True)  # Load the assay labels 
+
     sample_names = fold_dataset.SAMPLE_KEY.values
     molecule_names = fold_dataset.CPD_NAME.values
     molecule_SMILE = fold_dataset.SMILES.values
+
     if save:
-        np.savez(os.path.join(data_path, f'{fold}_data_index'), filenames = sample_names, mol_names = molecule_names, mol_smiles = molecule_SMILE)
-    return  sample_names, molecule_names, molecule_SMILE
+        np.savez(os.path.join(data_path, f'{fold}_data_index'), filenames = sample_names, mol_names = molecule_names, mol_smiles = molecule_SMILE, 
+                    assay_labels=labels['assay_labs'])
+    
+    return  sample_names, molecule_names, molecule_SMILE, labels
 
-
-def get_files_and_mols_from_path(data_index_path): 
-    """
-    Load object with image names, molecule names and smiles 
-    -------------------
-    data_index_path: The path to the data index with information about molecules and sample names
-    """
-    assert os.path.exists(data_index_path), 'The data index file does not exist'
-    # Load the index file 
-    file = np.load(data_index_path, allow_pickle= True)
-    file_names, mol_names, mol_smiles = file['filenames'], file['mol_names'], file['mol_smiles']
-    return file_names, mol_names, mol_smiles
     
 def tensor_to_image(tensor, batch_first = True):
     """
@@ -99,7 +94,8 @@ def tensor_to_image(tensor, batch_first = True):
     tensor = tensor.permute(1,2,0).to('cpu').detach()
     return tensor.numpy()
 
-def make_dirs(path, experiment_name):
+
+def make_dirs(path, experiment_name, img_save):
     """
     Creates result directories for the models
     --------------------
@@ -111,8 +107,9 @@ def make_dirs(path, experiment_name):
         os.mkdir(path)
     dest_dir = os.path.join(path, experiment_name+'_'+timestamp)
     os.mkdir(dest_dir)
-    os.mkdir(os.path.join(dest_dir, 'reconstructions'))
-    os.mkdir(os.path.join(dest_dir, 'generations'))
+    if img_save:
+        os.mkdir(os.path.join(dest_dir, 'reconstructions'))
+        os.mkdir(os.path.join(dest_dir, 'generations'))
     os.mkdir(os.path.join(dest_dir, 'logs'))
     return dest_dir
 
