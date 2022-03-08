@@ -1,37 +1,54 @@
 {   "experiment_name":"vae_resid10_dim100",
-
-    "data_path": "/home/icb/alessandro.palma/data/cellpainting_100",
-    "result_path": "/home/icb/alessandro.palma/imCPA/results/vae_resid10_dim100",
     
+    "image_path": "/home/icb/alessandro.palma/data/cellpainting_100",
+    "data_index_path": "/home/icb/alessandro.palma/data/data_index/integrated/200k",
+    "embedding_path":"/home/icb/alessandro.palma/data/metadata_processed/original/embeddings/rdkit/rdkit2D_embedding_cellpainting.csv",
+    "result_path": "/home/icb/alessandro.palma/results/try_200k", 
     "checkpoint_path": "/home/icb/alessandro.palma/checkpoints/vae_resid10_dim100",
+    
     "resume": false,
     "resume_checkpoint": "/home/icb/alessandro.palma/checkpoints/vae_resid10_dim100",
     "resume_epoch": 1, 
 
+    "img_plot": true,
+    "img_save": true, 
+
     "num_epochs": 100,
     "eval": true,
     "eval_every": 1,
-    "img_plot": true,
-    "img_save": true, 
-    "batch_size": 512,
-    "shuffle": true,
+
     "n_workers_loader": 4,
     "generate": true,
-    "model_name": "SigmaVAE",
+    "model_name": "compertVAE",
     "temperature": 0.8,
-    "augment_train":false,
+    "augment_train":true,
+    "in_width": 100,
+    "in_height":100,
+    "in_channels": 5,
+    "adversarial": true,
+    "binary_task": false,
+    "append_layer_width": null, 
 
-    "model_config": {
-        "in_channels": 5,
+    "seed": 42,
+
+    "hparams": {
+        "batch_size": 128,
         "latent_dim": 512,
-        "hidden_dims": null,
-        "n_residual_blocks":6,
-        "in_width": 100,
-        "in_height":100
-    },
-
-    "lr": 1e-04,
-    "wd" : 1e-06,
-    "step_size": 50,
-    "warmup_steps": 1
+        "hidden_dim": 64,
+        "depth": 3,
+        "n_residual_blocks":12,
+        "adversary_width":128,
+        "adversary_depth": 3,
+        "reg_adversary": 5, 
+        "penalty_adversary": 3, 
+        "autoencoder_lr": 1e-4, 
+        "adversary_lr": 3e-4,
+        "autoencoder_wd": 1e-6, 
+        "adversary_wd": 1e-4, 
+        "adversary_steps": 3, 
+        "step_size_lr": 45, 
+        "embedding_encoder_width": 512,
+        "embedding_encoder_depth": 0,
+        "warmup_steps": 1
+    }
 }
