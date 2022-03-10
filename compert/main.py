@@ -1,5 +1,5 @@
 import argparse
-from training_utils import *
+from compert.training_utils import *
 import json
 
 if __name__ == "__main__":

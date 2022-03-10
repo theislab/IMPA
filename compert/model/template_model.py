@@ -4,7 +4,7 @@ from torch.nn import functional as F
 import json
 from tqdm import tqdm
 import numpy as np
-from training_utils import *
+from compert.training_utils import *
 from metrics import *
 import os
 

@@ -1,16 +1,20 @@
+from curses import use_default_colors
 import os
 from random import sample 
 import torch
+import pandas as pd
 
-from compert.vae.AE import *
-from compert.vae.sigmaVAE import *
-from compert.vae.VAE import *
-from compert.flow.glow import *
-from compert.vae_compert.VAEcompert import *
+from compert.model.modules import *
+from compert.model.sigma_VAE import *
+from compert.model.template_model import *
+from compert.model.CPA import *
+
 
 from data.dataset import *
-from utils import *
-from plot_utils import Plotter 
+from compert.utils import *
+from compert.plot_utils import Plotter 
+from compert.evaluate import *
+
 from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -22,7 +26,7 @@ import time
 
 #TODO: implement early stopping 
 #TODO: write description of the parameters
- 
+
 
 class Config:
     """
@@ -52,6 +56,8 @@ class Trainer:
         self.image_path = config.image_path  # Path to the images 
         self.data_index_path = config.data_index_path  # Path to the image metadata
         self.embeddings_path = config.embedding_path  # The path to the molecular embedding csv
+        self.use_embeddings = config.use_embeddings  # Whether to use embeddings or not
+
         self.result_path = config.result_path
         self.checkpoint_path = config.checkpoint_path
 
@@ -61,7 +67,7 @@ class Trainer:
         self.resume_epoch = 1
 
         self.img_plot = config.img_plot
-        self.img_save = config.img_save  # If the images has to be saved to the result folder
+        self.save_results = config.save_results  # If the images has to be saved to the result folder
 
         self.num_epochs = config.num_epochs  # Number of epochs for training
         self.eval = config.eval  # Whether evaluation should occur
@@ -78,30 +84,34 @@ class Trainer:
         self.adversarial = config.adversarial 
         self.binary_task = config.binary_task 
         self.append_layer_width = config.append_layer_width
+
+        self.patience = config.patience
         self.seed = config.seed 
     
-        self.hparams = config.model_config  # Dictionary with model hyperparameters 
+        self.hparams = config.hparams  # Dictionary with model hyperparameters 
 
         # Set device
         self.device = self.set_device() 
         print(f'Working on device: {self.device}')
 
-        self.model =  self.load_model().to(self.device)
-        self.model = nn.DataParallel(self.model)
         
         # Prepare the data
         print('Lodading the data...') 
-        self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
-        self.num_drugs = len(self.training_set.drug_encoder.categories_[0])
+        self.drug_embeddings, self.num_drugs, self.n_seen_drugs, self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
+
+        
+        # Initialize model 
+        self.model =  self.load_model().to(self.device)
+        self.model = torch.nn.DataParallel(self.model)
         
         # Create data loaders 
-        self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, 
+        self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.hparams["batch_size"], shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
-        self.loader_val = torch.utils.data.DataLoader(self.validation_set, batch_size=self.batch_size, shuffle=True, 
+        self.loader_val = torch.utils.data.DataLoader(self.validation_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
-        self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=self.batch_size, shuffle=True, 
+        self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
-        self.loader_ood = torch.utils.data.DataLoader(self.ood_set, batch_size=self.batch_size, shuffle=True, 
+        self.loader_ood = torch.utils.data.DataLoader(self.ood_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
         print('Successfully loaded the data')
 
@@ -116,9 +126,15 @@ class Trainer:
         """
         # Create dataset objects for the three data folds
         cellpainting_ds = CellPaintingDataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
-                                                return_labels=True, augment_train=self.augment_train)
+                                                return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train)
+        if self.use_embeddings:
+            drug_embeddings = cellpainting_ds.drug_embeddings
+        else:
+            drug_embeddings = None
+        num_drugs = cellpainting_ds.num_drugs
+        n_seen_drugs = cellpainting_ds.n_seen_drugs
         training_set, validation_set, test_set, ood_set = cellpainting_ds.fold_datasets.values()
-        return training_set, validation_set, test_set, ood_set
+        return drug_embeddings, num_drugs, n_seen_drugs, training_set, validation_set, test_set, ood_set
 
     
     def train(self):
@@ -126,66 +142,75 @@ class Trainer:
         Full training 
         """
         # Create result folder
-        if not self.resume and self.img_save:
+        if self.save_results and not self.resume:
             print('Create output directories for the experiment')
-            self.dest_dir = make_dirs(self.result_path, self.experiment_name, self.img_save)
-        
-        # Setup plotter and writer 
-        self.plotter = Plotter(self.dest_dir)
+            self.dest_dir = make_dirs(self.result_path, self.experiment_name, self.save_results)
 
-        # Setup logger
-        self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
-        
+        if self.img_plot:
+            # Setup plotter and writer 
+            self.plotter = Plotter(self.dest_dir)
+
         print(f'Beginning training with epochs {self.num_epochs}')
         min_loss = np.inf  # Will be updated at each step
 
         for epoch in range(self.resume_epoch, self.num_epochs+1):
+            # Flag to decide when to perform ending evaluation
+            if epoch == self.num_epochs:
+                    end = True 
+            else:
+                end = False
+            
             print(f'Running epoch {epoch}')
             self.model.train()
+            self.model.module.metrics.mode = 'train'
             # Losses from the epoch
             losses, metrics = self.model.module.update_model(self.loader_train, epoch) # Update run 
-            for key in losses:
-                self.writer.add_scalar(tag=f'train/{key}', scalar_value=losses[key], global_step=epoch)
-            for key in metrics:
-                self.writer.add_scalar(tag=f'train/{key}', scalar_value=metrics[key], global_step=epoch)
+            if self.save_results:
+                for key in losses:
+                    self.writer.add_scalar(tag=f'train/{key}', scalar_value=losses[key], global_step=epoch)
+                for key in metrics:
+                    self.writer.add_scalar(tag=f'train/{key}', scalar_value=metrics[key], global_step=epoch)
 
             # Evaluate
-            if epoch % self.eval_every == 0:
+            if epoch % self.eval_every == 0 and self.eval:
                 # Put the model in evaluate mode 
                 self.model.eval()
-                val_losses, metrics = self.model.module.evaluate(self.loader_val)
-                
-                for key in val_losses:
-                    self.writer.add_scalar(tag=f'val/{key}', scalar_value=val_losses[key], 
-                                           global_step=epoch)
-                for key in metrics:
-                    self.writer.add_scalar(tag=f'val/{key}', scalar_value=metrics[key], global_step=epoch)
+                self.model.module.metrics.mode = 'val'
+                val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
+                                                        self.model.module.metrics, self.binary_task, self.device, end)
+
+                if self.save_results:
+                    for key in val_losses:
+                        self.writer.add_scalar(tag=f'val/{key}', scalar_value=val_losses[key], 
+                                            global_step=epoch)
+                    for key in metrics:
+                        self.writer.add_scalar(tag=f'val/{key}', scalar_value=metrics[key], global_step=epoch)
 
                 val_loss = val_losses['loss']
 
                 # Plot reconstruction of a random image 
-                original  = next(iter(self.loader_val))['X'][0].to(self.device).unsqueeze(0)  # Get the first element of the test batch 
-                with torch.no_grad():
-                    reconstructed = self.model.module.generate(original)
-                self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                 tensor_to_image(reconstructed), epoch, self.img_save, self.img_plot)
-                del original
-                del reconstructed
+                if self.img_plot:
+                    with torch.no_grad():
+                        original, reconstructed = self.model.module.generate(self.loader_val)
+                    self.plotter.plot_reconstruction(tensor_to_image(original), 
+                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot)
+                    del original
+                    del reconstructed
                     
                 # Plot generation of sampled images 
-                if self.generate:
-                    sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
-                    self.plotter.plot_channel_panel(sampled_img, epoch, self.img_save, self.img_plot)
-                    del sampled_img
+                    if self.generate:
+                        sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
+                        self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot)
+                        del sampled_img
                 
                 # Save the model if it is the best performing one 
-                if val_loss < min_loss:
+                if val_loss < min_loss and self.save_results:
                     min_loss = val_loss
                     print(f'New best loss is {val_loss}')
                     # Save the model with lowest validation loss 
                     self.model.module.save_checkpoints(epoch, 
-                                                        self.optimizer, 
-                                                        self.lr_scheduling, 
+                                                        self.model.module.optimizer_autoencoder, 
+                                                        self.model.module.scheduler_autoencoder, 
                                                         metrics, 
                                                         losses, 
                                                         val_losses, 
@@ -195,11 +220,14 @@ class Trainer:
                     print(f"Save new checkpoint at {self.checkpoint_path}")
 
             # Scheduler step at the end of the epoch 
-            if epoch <= self.warmup_steps:
-                self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.lr * min(1., self.model.module.warmup_steps/epoch)
+            if epoch <= self.hparams["warmup_steps"]:
+                self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., self.model.module.warmup_steps/epoch)
             else:
                 self.model.module.scheduler_autoencoder.step()
-                self.model.module.scheduler_adversary.step()
+                if self.adversarial:
+                    self.model.module.scheduler_adversary.step()
+        
+
 
 
     def set_device(self):
@@ -214,7 +242,7 @@ class Trainer:
         Load the model from the dedicated library
         """
         # Dictionary of models 
-        models = {'compertVAE': compertVAE}
+        models = {'compertVAE': SigmaVAE}
         model = models[self.model_name]
         return model(adversarial = self.adversarial,
                     in_width = self.in_width,
@@ -222,12 +250,13 @@ class Trainer:
                     in_channels = self.in_channels,
                     device = self.device,
                     num_drugs = self.num_drugs,
+                    n_seen_drugs = self.n_seen_drugs,
                     seed = self.seed,
                     patience = self.patience,
                     hparams = self.hparams,
                     binary_task = self.binary_task,
-                    append_layer_width = self.append_layer_width
-                    )
+                    append_layer_width = self.append_layer_width,
+                    drug_embeddings = self.drug_embeddings)
 
 # Auziliary functions 
 

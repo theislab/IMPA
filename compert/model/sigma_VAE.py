@@ -5,26 +5,39 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 import torchvision.models as models
-from training_utils import *
-from models.vae.VAEmodel import *
+from compert.training_utils import *
+from compert.models.CPA import *
 
 
-class SigmaVAE(BasicVAE):
+class SigmaVAE(CPA):
     def __init__(self,
-                in_channels,
-                latent_dim,
-                hidden_dims,
-                n_residual_blocks, 
-                in_width,
-                in_height,
-                device='cuda',
-                **kwargs) -> None:
+                adversarial: bool,
+                in_width: int,
+                in_height: int,
+                in_channels: int,
+                device: str,
+                num_drugs: int,
+                n_seen_drugs: int,
+                seed: int = 0,
+                patience: int = 5,
+                hparams="",
+                binary_task=False,
+                append_layer_width=None,
+                drug_embeddings = None) -> None:
      
-        super(SigmaVAE, self).__init__(in_channels, latent_dim, hidden_dims, n_residual_blocks, in_width, in_height, device)
-
-        # The log sigma as an external parameter
-        self.log_scale = torch.nn.Parameter(torch.full((1,1,1,1), 0.0), requires_grad=True)
-
+        super(SigmaVAE, self).__init__(adversarial,
+                                        in_width,
+                                        in_height,
+                                        in_channels,
+                                        device,
+                                        num_drugs,
+                                        n_seen_drugs,   
+                                        seed,
+                                        patience,
+                                        hparams,
+                                        binary_task,
+                                        append_layer_width,
+                                        drug_embeddings)
 
     def reconstruction_loss(self, X_hat, X):
         """ Computes the likelihood of the data given the latent variable,
@@ -39,7 +52,7 @@ class SigmaVAE(BasicVAE):
         rec = gaussian_nll(X_hat, log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
         return rec
 
-    def loss_function(self, X_hat, X, mu, log_sigma):
+    def vae_loss(self, X, X_hat, mu, log_sigma):
         """
         Aggregate the reconstruction and kl losses 
         """
