@@ -60,8 +60,9 @@ def training_evaluation(model,
             y_hat_ds.append(torch.argmax(y_hat, dim=1).item())
             metrics.compute_classification_report(y_true_ds, y_hat_ds)
 
-        z_basal_ds.append(z_basal)
-        z_ds.append(z)
+        if end:
+            z_basal_ds.append(z_basal)
+            z_ds.append(z)
 
         val_loss += ae_loss
         val_recon_loss += recon_loss
@@ -165,6 +166,7 @@ def compute_disentanglement_score(Z, y, device, binary_task):
         pred = disentanglement_classifier(normalized_basal).argmax(dim=1)
         acc = torch.sum(pred == labels_tensor) / len(labels_tensor)
     return acc.item()
+    
 
 def compute_silhouette_coefficient(Z, y):
     """Compute the silhouette score of the dataset given the labels y

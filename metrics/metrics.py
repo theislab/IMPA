@@ -13,7 +13,7 @@ class TrainingMetrics:
         self.mode = mode
 
         self.mse_metric = torch.nn.MSELoss()
-        self.metrics = dict(rmse=0, bpd=0, batches = 0) 
+        self.metrics = dict(rmse=0, bpd=0) 
 
         self.device = device
 
@@ -50,7 +50,4 @@ class TrainingMetrics:
     def print_metrics(self, flow = False):
         for metric in self.metrics:
             print(f'{metric} = {self.metrics[metric]}')
-
-
-
 

@@ -24,7 +24,6 @@ import json
 from tqdm import tqdm
 import time 
 
-#TODO: implement early stopping 
 #TODO: write description of the parameters
 
 
@@ -149,27 +148,21 @@ class Trainer:
         if self.img_plot:
             # Setup plotter and writer 
             self.plotter = Plotter(self.dest_dir)
+        
+        # The variable `end` determines whether we are at the end of the training loop and therefore if disentanglement and clustering stats
+        # are to be evaluated
+        end = False
 
         print(f'Beginning training with epochs {self.num_epochs}')
-        min_loss = np.inf  # Will be updated at each step
 
         for epoch in range(self.resume_epoch, self.num_epochs+1):
-            # Flag to decide when to perform ending evaluation
-            if epoch == self.num_epochs:
-                    end = True 
-            else:
-                end = False
-            
             print(f'Running epoch {epoch}')
             self.model.train()
             self.model.module.metrics.mode = 'train'
             # Losses from the epoch
-            losses, metrics = self.model.module.update_model(self.loader_train, epoch) # Update run 
+            losses, metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
             if self.save_results:
-                for key in losses:
-                    self.writer.add_scalar(tag=f'train/{key}', scalar_value=losses[key], global_step=epoch)
-                for key in metrics:
-                    self.writer.add_scalar(tag=f'train/{key}', scalar_value=metrics[key], global_step=epoch)
+                self.write_results(losses, metrics, self.writer, 'train')
 
             # Evaluate
             if epoch % self.eval_every == 0 and self.eval:
@@ -180,13 +173,7 @@ class Trainer:
                                                         self.model.module.metrics, self.binary_task, self.device, end)
 
                 if self.save_results:
-                    for key in val_losses:
-                        self.writer.add_scalar(tag=f'val/{key}', scalar_value=val_losses[key], 
-                                            global_step=epoch)
-                    for key in metrics:
-                        self.writer.add_scalar(tag=f'val/{key}', scalar_value=metrics[key], global_step=epoch)
-
-                val_loss = val_losses['loss']
+                    self.write_results(val_losses, metrics, self.writer, epoch, 'val')
 
                 # Plot reconstruction of a random image 
                 if self.img_plot:
@@ -197,16 +184,20 @@ class Trainer:
                     del original
                     del reconstructed
                     
-                # Plot generation of sampled images 
+                    # Plot generation of sampled images 
                     if self.generate:
                         sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
                         self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot)
                         del sampled_img
+
                 
+                # Decide on early stopping based on the bit/dim of the image 
+                score = metrics['bpd']
+                cond, early_stopping = self.model.module.early_stopping(score) 
+
                 # Save the model if it is the best performing one 
-                if val_loss < min_loss and self.save_results:
-                    min_loss = val_loss
-                    print(f'New best loss is {val_loss}')
+                if cond and self.save_results:
+                    print(f'New best score is {self.model.module.best_score}')
                     # Save the model with lowest validation loss 
                     self.model.module.save_checkpoints(epoch, 
                                                         self.model.module.optimizer_autoencoder, 
@@ -219,23 +210,50 @@ class Trainer:
 
                     print(f"Save new checkpoint at {self.checkpoint_path}")
 
+            # If we overcome the patience, we break the loop
+            if early_stopping:
+                break 
+
             # Scheduler step at the end of the epoch 
             if epoch <= self.hparams["warmup_steps"]:
                 self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., self.model.module.warmup_steps/epoch)
+                if self.adversarial:
+                     self.model.module.scheduler_adversary.step()
             else:
                 self.model.module.scheduler_autoencoder.step()
                 if self.adversarial:
                     self.model.module.scheduler_adversary.step()
         
+        # Perform last evaluation and save
+        end = True
+        val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
+                                                self.model.module.metrics, self.binary_task, self.device, end)
+        if self.save_results:
+            self.write_results(val_losses, metrics, self.writer, epoch,'val')
+        
 
+    def write_results(self, losses, metrics, writer, epoch, fold='train'):
+        """Write results to tensorboard
 
+        Args:
+            losses (dict): _description_
+            metrics (dict): _description_
+            writer (torch.utils.tensorboard.SummaryWriter): summary statistics writer 
+        """
+        for key in losses:
+            writer.add_scalar(tag=f'{fold}/{key}', scalar_value=losses[key], 
+                                    global_step=epoch)
+        for key in metrics:
+            writer.add_scalar(tag=f'{fold}/{key}', scalar_value=metrics[key], global_step=epoch)
 
+        
     def set_device(self):
         """
         Set cpu or gpu device for data and computations 
         """
         device = "cuda" if torch.cuda.is_available() else "cpu"
         return device
+
     
     def load_model(self):
         """
@@ -258,7 +276,8 @@ class Trainer:
                     append_layer_width = self.append_layer_width,
                     drug_embeddings = self.drug_embeddings)
 
-# Auziliary functions 
+
+# Auxiliary functions 
 
 def gaussian_nll(mu, log_sigma, x):
     """

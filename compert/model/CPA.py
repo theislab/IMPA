@@ -43,10 +43,14 @@ class CPA(TemplateModel):
         self.num_drugs = num_drugs 
         self.n_seen_drugs = n_seen_drugs
         self.seed = seed
-        self.patience = patience
         self.binary_task = binary_task 
         self.append_layer_width = append_layer_width
         self.drug_embeddings = drug_embeddings
+
+        # Parameters for early-stopping 
+        self.best_score = -np.inf
+        self.patience = patience
+        self.patience_trials = 0
 
         # set hyperparameters
         if isinstance(hparams, dict):
@@ -281,7 +285,7 @@ class CPA(TemplateModel):
         if self.training:
             if (self.iteration % self.hparams["adversary_steps"]) == 0:
                 # Compute the gradient penalty for the drug regularization term 
-                adv_drugs_grad_penalty = self.compute_gradient_penalty(y_adv_hat.sum(), z)
+                adv_drugs_grad_penalty = self.compute_gradient_penalty(y_adv_hat.sum(), z_basal)
                 loss = adv_loss + self.hparams["penalty_adversary"] * adv_drugs_grad_penalty
             
             else:
@@ -319,8 +323,6 @@ class CPA(TemplateModel):
                 return dict(out=out, z_basal=z_basal, z=z, y_hat=y_hat, ae_loss=ae_loss, recon_loss=recon_loss, kld=kld)
             
         
-        
-
     def compute_gradient_penalty(self, output, input):
         """Compute the penalty of the gradient of an output with respect to an input tensor
 
@@ -370,6 +372,7 @@ class CPA(TemplateModel):
         mu, log_sigma = self.encoder(X)
         return dict(z=self.reparameterize(mu, log_sigma), mu=mu, log_sigma=log_sigma)
 
+
     def generate(self, loader):
         """
         Given an input image x, returns the reconstructed image
@@ -387,10 +390,19 @@ class CPA(TemplateModel):
             z = z_x + z_emb
             reconstructed_X = self.decoder(z) 
         return original_X, reconstructed_X
-
-
-    def reconstruction_loss(self):
-        pass
+    
+    
+    def early_stopping(self, score):
+        """
+        Possibly early-stops training.
+        """
+        cond = score > self.best_score
+        if cond:
+            self.best_score = score
+            self.patience_trials = 0
+        else:
+            self.patience_trials += 1
+        return cond, self.patience_trials > self.patience
 
 
     def vae_loss(self):
@@ -483,13 +495,15 @@ class CPA(TemplateModel):
 
         if self.adversarial:
             avg_ae_loss = tot_ae_loss/len(train_loader)
-            tot_adv_loss = tot_adv_loss/len(train_loader)
+            avg_adv_loss = tot_adv_loss/len(train_loader)
             print(f'Mean autoencoder loss after epoch {epoch}: {avg_ae_loss}')
             print(f'Mean adversarial loss after epoch {epoch}: {tot_adv_loss}')
+            self.metrics.print_metrics()
+            return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss, avg_ae_loss=avg_ae_loss, avg_adv_loss=avg_adv_loss), self.metrics.metrics
 
-
-        self.metrics.print_metrics()
-        return dict(loss=avg_loss, recon_loss=avg_loss, kl_loss=avg_kl_loss), self.metrics.metrics
+        else: 
+            return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss), self.metrics.metrics
+        
 
         
     
