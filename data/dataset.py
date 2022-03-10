@@ -39,7 +39,6 @@ class CustomTransform:
             return X
 
 
-
 class CellPaintingDataset:
     """
     Dataset class for image data 
@@ -142,6 +141,7 @@ class CellPaintingDataset:
             datasets[fold_name]['assay_labels'] = assay_labels
             datasets[fold_name]['state'] = states
         return datasets
+
     
     def get_files_and_mols_from_path(self, data_index_path): 
         """
@@ -238,6 +238,7 @@ class CellPaintingFold(Dataset):
         else:
             return dict(X=img)
 
+
     def sample(self, n, seed=42):
         """
         Sample random observations from the training set
@@ -275,6 +276,28 @@ class CellPaintingFold(Dataset):
                     assay_labels=subset_assay_labels,
                     state = subset_states,
                     smile_id = subset_smile_id) 
+
+    
+    def get_drug_by_name(self, drug_name):
+        """Load the images of specific drugs by name
+
+        Args:
+            drug_name (str): The name of the drug of interest  
+        """
+        drug_idxs = [idx for idx in range(len(self.mol_names)) if self.mol_names[idx]==drug_name]
+
+        # Collect the drug images from the file repository 
+        drug_images = []
+        for drug_idx in drug_idxs:
+            X, _, mol_name, mol_one_hot, assay_label, states, smile_id = self.__getitem__(drug_idx).values()
+            drug_images.append(X.unsqueeze(0))
+
+        return dict(X=torch.cat(drug_images, dim=0), 
+                mol_name=mol_name, 
+                mol_one_hot=mol_one_hot if self.fold != 'ood' else '',
+                assay_labels=assay_label,
+                state = states,
+                smile_id = smile_id) 
 
 
         

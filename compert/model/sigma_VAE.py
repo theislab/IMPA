@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import torchvision.models as models
 from compert.training_utils import *
-from compert.models.CPA import *
+from compert.model.CPA import *
 
 
 class SigmaVAE(CPA):
