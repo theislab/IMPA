@@ -1,6 +1,5 @@
 import argparse
 from compert.training_utils import *
-import json
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform a training loop')

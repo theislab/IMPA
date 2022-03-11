@@ -1,28 +1,30 @@
+from tqdm import tqdm
+from sklearn.metrics import silhouette_score
+
 import torch
 from torch import nn
 from torch.nn import functional as F
-import json
-from tqdm import tqdm
-import numpy as np
+
+# MLP for the discriminator
 from compert.model.modules import MLP
-from sklearn.metrics import silhouette_score
-from compert.model.template_model import TemplateModel
-from metrics.metrics import *
+
 
 def training_evaluation(model,  
                         dataset_loader, 
                         adversarial, 
                         metrics, 
                         binary_task, 
-                        device, end=False):
+                        device, end=False, variational=True):
     """
     Given a dataset to perform validation on, aggregate the metrics on it and return them 
     """
+    # Final dictionary containing all the losses
     losses = {}
     # Initialize the null metrics
     val_loss = 0  # Total validation loss
-    val_recon_loss = 0  # Total reconstruction loss
-    val_kl_loss = 0  # Total Kullback-Leibler loss
+    if variational:
+        val_recon_loss = 0  # Total reconstruction loss
+        val_kl_loss = 0  # Total Kullback-Leibler loss
     if adversarial:
         rmse_basal_full = 0  # The difference between a decoded image with and without addition of the drug
     
@@ -32,6 +34,7 @@ def training_evaluation(model,
     # Classification vectors 
     y_true_ds = []
     y_hat_ds = []
+    # If we are at the last iteration of a CPA-like model we also store predictions 
     if end and adversarial:
         z_basal_ds = []
         z_ds = []
@@ -50,13 +53,12 @@ def training_evaluation(model,
 
         if not adversarial:
             res = model.evaluate(X)
-            out, z, ae_loss, recon_loss, kld = res.values()
-
+            out, z, ae_loss = res.values()
         else:
             # Get evaluation results
             drug_id = observation["smile_id"].to(device)
             res = model.evaluate(X, y_adv=y_adv, drug_id=drug_id)
-            out, out_basal, z_basal, z, y_hat, ae_loss, recon_loss, kld = res.values()
+            out, out_basal, z_basal, z, y_hat, ae_loss = res.values()
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal)
             
             # Collect the labels 
@@ -67,18 +69,23 @@ def training_evaluation(model,
             z_basal_ds.append(z_basal)
             z_ds.append(z)
 
-        val_loss += ae_loss.item()
-        val_recon_loss += recon_loss.item()
-        val_kl_loss += kld.item()
+        val_loss += ae_loss['total_loss'].item()
+        if variational:
+            val_recon_loss += ae_loss['reconstruction_loss'].item()
+            val_kl_loss += ae_loss['KLD'].item()
         
         # Perform optimizer step depending on the iteration
         metrics.update_rmse(X, out)
         
     # Print loss results
     losses["loss"] = val_loss/len(dataset_loader)
-    losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
-    metrics.update_bpd(losses["avg_validation_recon_loss"])
-    losses["avg_validation_kld_loss"] = val_kl_loss/len(dataset_loader)
+    if variational:
+        losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
+        metrics.update_bpd(losses["avg_validation_recon_loss"])
+        losses["avg_validation_kld_loss"] = val_kl_loss/len(dataset_loader)
+    else:
+        metrics.update_bpd(losses["loss"])
+
     metrics.metrics['rmse'] /= len(dataset_loader)
     if adversarial:
         metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
@@ -105,8 +112,9 @@ def training_evaluation(model,
         metrics.metrics["difference_silhouette"] = silhouette_score_z - silhouette_score_basal
         
     print(f'Average validation loss: {losses["loss"]}')
-    print(f'Average validation reconstruction loss: {losses["avg_validation_recon_loss"]}')
-    print(f'Average kld reconstruction loss: {losses["avg_validation_kld_loss"]}')
+    if variational:
+        print(f'Average validation reconstruction loss: {losses["avg_validation_recon_loss"]}')
+        print(f'Average kld reconstruction loss: {losses["avg_validation_kld_loss"]}')
 
     metrics.print_metrics()
     return losses, metrics.metrics

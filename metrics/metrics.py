@@ -1,7 +1,5 @@
 import torch
 import numpy as np
-import sklearn 
-import torch.nn.functional as F
 from sklearn.metrics import precision_recall_fscore_support
 
 class TrainingMetrics:
@@ -56,7 +54,7 @@ class TrainingMetrics:
         self.metrics = dict(rmse=0)    
 
           
-    def print_metrics(self, flow = False):
+    def print_metrics(self):
         for metric in self.metrics:
             print(f'{metric} = {self.metrics[metric]}')
 

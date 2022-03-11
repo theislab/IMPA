@@ -204,7 +204,7 @@ class Encoder(torch.nn.Module):
                 n_residual_blocks: int = 6, 
                 in_width: int = 64,
                 in_height: int = 64,
-                **kwargs) -> None:
+                variational: bool = True) -> None:
         super(Encoder, self).__init__() 
     
         self.in_channels = in_channels
@@ -214,6 +214,7 @@ class Encoder(torch.nn.Module):
         self.n_residual_blocks = n_residual_blocks
         self.in_width, self.in_height = in_width, in_height
         self.kernel_size = 3
+        self.variational = variational
 
         # List containing the modules 
         self.modules = []
@@ -252,19 +253,27 @@ class Encoder(torch.nn.Module):
         downsampling_factor_width = self.in_width//2**(self.depth-1)
         downsampling_factor_height = self.in_height//2**(self.depth-1)
         self.flattened_dim = in_channels*downsampling_factor_width*downsampling_factor_height
-        self.flatten = torch.nn.Flatten()
-        
-        self.fc_mu = torch.nn.Linear(self.flattened_dim, self.latent_dim)  # Mean encoding
-        self.fc_var = torch.nn.Linear(self.flattened_dim, self.latent_dim)  # Log-var encodings 
+        self.flatten = torch.nn.Flatten()   
+
+        # Can select either a variational autoencoder or a deterministic one 
+        if variational:
+            self.fc_mu = torch.nn.Linear(self.flattened_dim, self.latent_dim)  # Mean encoding
+            self.fc_var = torch.nn.Linear(self.flattened_dim, self.latent_dim)  # Log-var encodings 
+        else:
+            self.fc_z = torch.nn.Linear(self.flattened_dim, self.latent_dim)
 
     def forward(self, X):
         X = self.encoder(X)  # Encode the image 
         X = self.flatten(X)  
 
         # Derive the encodings for the mean and the log variance
-        mu = self.fc_mu(X)  
-        log_sigma = self.fc_var(X)
-        return [mu, log_sigma]
+        if self.variational:
+            mu = self.fc_mu(X)
+            log_sigma = self.fc_var(X)
+            return [mu, log_sigma]
+        else:
+            z = self.fc_z(X)
+            return z
 
 
 class Decoder(torch.nn.Module):
@@ -276,7 +285,7 @@ class Decoder(torch.nn.Module):
                 n_residual_blocks: int = 6, 
                 out_width: int = 64,
                 out_height: int = 64,
-                **kwargs) -> None:
+                variational: bool = True) -> None:
 
         super(Decoder, self).__init__() 
         
@@ -296,6 +305,7 @@ class Decoder(torch.nn.Module):
         self.upsampling_factor_height = self.out_height//2**(self.depth-1)
         self.flattened_dim = self.hidden_dim*self.upsampling_factor_width*self.upsampling_factor_height
         self.upsample_fc = torch.nn.Linear(self.latent_dim, self.flattened_dim)
+        self.variational = variational
 
         # Append the residual blocks
         for _ in range(self.n_residual_blocks):

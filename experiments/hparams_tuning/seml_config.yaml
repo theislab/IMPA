@@ -1,3 +1,27 @@
+seml:
+  executable: file_with_sacred_exp.py
+  name: name_experim
+  output_dir: output of the logs 
+  project_root_dir: git repo path
+
+slurm:
+  max_simultaneous_jobs: 10
+  experiments_per_job: 1
+  sbatch_options_template: GPU
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 90G          # memory
+    cpus-per-task: 6  # num cores
+    time: 2-00:00     # max time, D-HH:MM
+
+########## HUPERPARAMETER TUNING ##########
+
+
+fixed:
+  experiment_name 
+
+random:
+
 {   "experiment_name":"first_experiment_compert",
     
     "image_path": "/home/icb/alessandro.palma/data/cellpainting_100",

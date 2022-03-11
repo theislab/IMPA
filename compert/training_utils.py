@@ -1,28 +1,19 @@
-from curses import use_default_colors
 import os
-from random import sample 
 import torch
-import pandas as pd
 
-from compert.model.modules import *
-from compert.model.sigma_VAE import *
-from compert.model.template_model import *
-from compert.model.CPA import *
-
-
-from data.dataset import *
+# Available autoencoder model attached to CPA 
+from compert.model.sigma_VAE import SigmaVAE
+from compert.model.sigma_AE import SigmaAE
+from data.dataset import CellPaintingDataset
 from compert.utils import *
 from compert.plot_utils import Plotter 
 from compert.evaluate import *
 
-from torch.utils.data import Dataset
 from torch.utils.tensorboard import SummaryWriter
 import torch
-import itertools 
 import numpy as np
 import json
-from tqdm import tqdm
-import time 
+
 
 class Config:
     """
@@ -41,7 +32,7 @@ class Config:
 
 
 class Trainer:
-    def __init__(self, config, train_mode = True, **kwargs):
+    def __init__(self, config):
         """Class for training the model 
 
         Args:
@@ -173,7 +164,8 @@ class Trainer:
                 self.model.eval()
                 self.model.module.metrics.mode = 'val'
                 val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
-                                                        self.model.module.metrics, self.binary_task, self.device, end)
+                                                        self.model.module.metrics, self.binary_task, self.device, end, 
+                                                        variational=self.model.module.variational)
 
                 if self.save_results:
                     self.write_results(val_losses, metrics, self.writer, epoch, 'val')
@@ -224,13 +216,25 @@ class Trainer:
             if self.adversarial:
                 self.model.module.scheduler_adversaries.step()
     
-        # Perform last evaluation and save
+        # Perform last evaluation on VALIDATION SET
         end = True
         val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
-                                                self.model.module.metrics, self.binary_task, self.device, end)
+                                                self.model.module.metrics, self.binary_task, self.device, end, 
+                                                variational=self.model.module.variational)
         if self.save_results:
-            self.write_results(val_losses, metrics, self.writer, epoch,' val')
-        self.model.module.save_history('final', losses, metrics, 'val')
+            self.write_results(val_losses, metrics, self.writer, epoch, ' val')
+        self.model.module.save_history('final', val_losses, metrics, 'val')
+
+        # Perform last evaluation on OOD SET
+        ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=False,
+                                                metrics=self.model.module.metrics, binary_task=self.binary_task, device=self.device, end=end, 
+                                                variational=self.model.module.variational)
+        if self.save_results:
+            self.write_results(ood_losses, metrics, self.writer, epoch,' ood')
+        self.model.module.save_history('final', losses, metrics, 'ood')
+        
+
+
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):
@@ -261,7 +265,7 @@ class Trainer:
         Load the model from the dedicated library
         """
         # Dictionary of models 
-        models = {'compertVAE': SigmaVAE}
+        models = {'VAE': SigmaVAE, 'AE': SigmaAE}
         model = models[self.model_name]
         return model(adversarial = self.adversarial,
                     in_width = self.in_width,

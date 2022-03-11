@@ -1,15 +1,16 @@
 """
 Implement custom dataset 
 """
+import os
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder
+import pandas as pd
+
+from compert.utils import *
+
 from torch import nn
 from torch.utils.data import Dataset
 import torchvision.transforms as T
-import torch
-from compert.utils import *
-from sklearn.preprocessing import OneHotEncoder
-import pandas as pd
-import os
 
 
 class CustomTransform:
