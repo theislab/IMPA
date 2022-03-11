@@ -8,9 +8,9 @@
 
 #SBATCH -p gpu_p
 
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 
-#SBATCH --gpus=1
+#SBATCH --gpus=2
 
 #SBATCH --qos=gpu
 

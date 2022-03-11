@@ -24,9 +24,6 @@ import json
 from tqdm import tqdm
 import time 
 
-#TODO: write description of the parameters
-
-
 class Config:
     """
     Read a configuration file in .json format and wraps the hparams into a calss
@@ -50,15 +47,15 @@ class Trainer:
         Args:
             config (dict): The dictionary containing configuration parameters from .json file
         """
-        self.experiment_name = config.experiment_name 
+        self.experiment_name = config.experiment_name  # Will be used to name the path 
 
         self.image_path = config.image_path  # Path to the images 
         self.data_index_path = config.data_index_path  # Path to the image metadata
         self.embeddings_path = config.embedding_path  # The path to the molecular embedding csv
         self.use_embeddings = config.use_embeddings  # Whether to use embeddings or not
 
+        # Path to save the results
         self.result_path = config.result_path
-        self.checkpoint_path = config.checkpoint_path
 
         # Resume the training 
         self.resume = config.resume 
@@ -115,9 +112,17 @@ class Trainer:
         print('Successfully loaded the data')
 
 
-        # If training is resumed from a checkpoint
-        if self.resume:
-            self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint, self.optimizer, self.lr_scheduling)
+        # Create result folder
+        if self.save_results:
+            if not self.resume:
+                print('Create output directories for the experiment')
+                self.dest_dir = make_dirs(self.result_path, self.experiment_name)
+                # Setup logger
+                self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
+            # If training is resumed from a checkpoint
+            if self.resume:
+                self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint, self.adversarial)
+
 
     def create_torch_datasets(self):
         """
@@ -140,11 +145,6 @@ class Trainer:
         """
         Full training 
         """
-        # Create result folder
-        if self.save_results and not self.resume:
-            print('Create output directories for the experiment')
-            self.dest_dir = make_dirs(self.result_path, self.experiment_name, self.save_results)
-
         if self.img_plot:
             # Setup plotter and writer 
             self.plotter = Plotter(self.dest_dir)
@@ -161,9 +161,12 @@ class Trainer:
             self.model.module.metrics.mode = 'train'
             # Losses from the epoch
             losses, metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
+            
+            # Save results to tensorboard and to model's history  
             if self.save_results:
-                self.write_results(losses, metrics, self.writer, 'train')
-
+                self.write_results(losses, metrics, self.writer, epoch, 'train')
+            self.model.module.save_history(epoch, losses, metrics, 'train')
+            
             # Evaluate
             if epoch % self.eval_every == 0 and self.eval:
                 # Put the model in evaluate mode 
@@ -174,6 +177,7 @@ class Trainer:
 
                 if self.save_results:
                     self.write_results(val_losses, metrics, self.writer, epoch, 'val')
+                self.model.module.save_history(epoch, val_losses, metrics, 'val')
 
                 # Plot reconstruction of a random image 
                 if self.img_plot:
@@ -190,25 +194,22 @@ class Trainer:
                         self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot)
                         del sampled_img
 
-                
+                losses = {'a':242}
                 # Decide on early stopping based on the bit/dim of the image 
                 score = metrics['bpd']
                 cond, early_stopping = self.model.module.early_stopping(score) 
-
+                
                 # Save the model if it is the best performing one 
                 if cond and self.save_results:
                     print(f'New best score is {self.model.module.best_score}')
                     # Save the model with lowest validation loss 
                     self.model.module.save_checkpoints(epoch, 
-                                                        self.model.module.optimizer_autoencoder, 
-                                                        self.model.module.scheduler_autoencoder, 
                                                         metrics, 
                                                         losses, 
                                                         val_losses, 
-                                                        self.checkpoint_path, 
-                                                        self.dest_dir)
+                                                        self.dest_dir, self.adversarial)
 
-                    print(f"Save new checkpoint at {self.checkpoint_path}")
+                    print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
 
             # If we overcome the patience, we break the loop
             if early_stopping:
@@ -217,19 +218,19 @@ class Trainer:
             # Scheduler step at the end of the epoch 
             if epoch <= self.hparams["warmup_steps"]:
                 self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., self.model.module.warmup_steps/epoch)
-                if self.adversarial:
-                     self.model.module.scheduler_adversary.step()
             else:
                 self.model.module.scheduler_autoencoder.step()
-                if self.adversarial:
-                    self.model.module.scheduler_adversary.step()
-        
+            
+            if self.adversarial:
+                self.model.module.scheduler_adversaries.step()
+    
         # Perform last evaluation and save
         end = True
         val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
                                                 self.model.module.metrics, self.binary_task, self.device, end)
         if self.save_results:
-            self.write_results(val_losses, metrics, self.writer, epoch,'val')
+            self.write_results(val_losses, metrics, self.writer, epoch,' val')
+        self.model.module.save_history('final', losses, metrics, 'val')
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):

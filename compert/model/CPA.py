@@ -178,7 +178,7 @@ class CPA(TemplateModel):
                 gamma=0.5,
             )
 
-            self.scheduler_adversary = torch.optim.lr_scheduler.StepLR(
+            self.scheduler_adversaries = torch.optim.lr_scheduler.StepLR(
                 self.optimizer_adversaries,
                 step_size=self.hparams["step_size_lr"],
                 gamma=0.5,
@@ -188,7 +188,7 @@ class CPA(TemplateModel):
         self.warmup_steps = self.hparams["warmup_steps"]
 
         # Statistics history
-        self.history = {"epoch": [], "stats_epoch": []}
+        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}}
 
         # Iterations to decide when to perform adversarial training 
         self.iteration = 0
@@ -294,6 +294,7 @@ class CPA(TemplateModel):
             loss = adv_loss
         
         return dict(out=out, z=z_basal, loss=loss, ae_loss=ae_loss, recon_loss=recon_loss, kld=kld, adv_loss=adv_loss)
+
     
     def evaluate(self, X, y_adv=None, drug_id=None):
         """Perform evaluation step
@@ -319,8 +320,9 @@ class CPA(TemplateModel):
                 # Sum the latents of the drug and the image 
                 z = z_basal + z_drug  
                 out = self.decoder(z)
+                out_basal = self.decoder(z_basal)
                 ae_loss, recon_loss, kld = self.vae_loss(X, out, mu, log_sigma).values()
-                return dict(out=out, z_basal=z_basal, z=z, y_hat=y_hat, ae_loss=ae_loss, recon_loss=recon_loss, kld=kld)
+                return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat=y_hat, ae_loss=ae_loss, recon_loss=recon_loss, kld=kld)
             
         
     def compute_gradient_penalty(self, output, input):
@@ -386,9 +388,12 @@ class CPA(TemplateModel):
         with torch.no_grad():
             mu_orig, log_sigma_orig = self.encoder(original_X)  # Encode image
             z_x = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
-            z_emb = self.drug_embedding_encoder(original_emb)
-            z = z_x + z_emb
-            reconstructed_X = self.decoder(z) 
+            if self.adversarial:
+                z_emb = self.drug_embedding_encoder(original_emb)
+                z = z_x + z_emb
+                reconstructed_X = self.decoder(z) 
+            else:
+                reconstructed_X = self.decoder(z_x) 
         return original_X, reconstructed_X
     
     
@@ -396,7 +401,7 @@ class CPA(TemplateModel):
         """
         Possibly early-stops training.
         """
-        cond = score > self.best_score
+        cond = (score > self.best_score).item()
         if cond:
             self.best_score = score
             self.patience_trials = 0
@@ -424,12 +429,10 @@ class CPA(TemplateModel):
             tot_recons_loss = 0
             tot_kl_loss = 0
         
-        
+        # Reset the previously defined metrics
         self.metrics.reset()
-        for batch in tqdm(train_loader):
-            # For printing purposes 
-            step = 'reconstruction' if (self.iteration % self.hparams["adversary_steps"]) == 0 else 'discrimination'
 
+        for batch in tqdm(train_loader):
             # Collect the data from the batch 
             X = batch['X'].to(self.device)
 
@@ -487,6 +490,7 @@ class CPA(TemplateModel):
         avg_recon_loss = tot_recons_loss/len(train_loader)
         self.metrics.update_bpd(avg_recon_loss)
         avg_kl_loss = tot_kl_loss/len(train_loader)
+        self.metrics.metrics['rmse'] /= len(train_loader)
 
         print(f'Mean loss after epoch {epoch}: {avg_loss}')
         print(f'Mean reconstruction loss after epoch {epoch}: {avg_recon_loss}')
@@ -503,6 +507,32 @@ class CPA(TemplateModel):
 
         else: 
             return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss), self.metrics.metrics
+    
+
+    def save_history(self, epoch, losses, metrics, fold):
+        """Save partial model results in the history dictionary 
+
+        Args:
+            epoch (int): the current epoch 
+            losses (dict): dictionary containing the partial losses of the model 
+            metrics (dict): dictionary containing the mpartial metrics of the model 
+            fold (str): train or valid
+        """
+        self.history[fold]["epoch"].append(epoch)
+        # Append the losses to the right fold dictionary 
+        for loss in losses:
+            if loss not in self.history[fold]:
+                self.history[fold][loss] = [losses[loss]]
+            else:
+                self.history[fold][loss] .append(losses[loss])
+        
+        # Append the metrics to the right fold dictionary 
+        for metric in metrics:
+            if metric not in self.history[fold]:
+                self.history[fold][metric] = [metrics[metric]]
+            else:
+                self.history[fold][metric] .append(metrics[metric])
+
         
 
         

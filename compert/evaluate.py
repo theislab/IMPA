@@ -23,6 +23,8 @@ def training_evaluation(model,
     val_loss = 0  # Total validation loss
     val_recon_loss = 0  # Total reconstruction loss
     val_kl_loss = 0  # Total Kullback-Leibler loss
+    if adversarial:
+        rmse_basal_full = 0  # The difference between a decoded image with and without addition of the drug
     
     # Zero out the metrics for the next step
     metrics.reset()  
@@ -30,7 +32,7 @@ def training_evaluation(model,
     # Classification vectors 
     y_true_ds = []
     y_hat_ds = []
-    if end:
+    if end and adversarial:
         z_basal_ds = []
         z_ds = []
 
@@ -48,37 +50,40 @@ def training_evaluation(model,
 
         if not adversarial:
             res = model.evaluate(X)
-            out, z_basal, z, ae_loss, recon_loss, kld = res.values()
+            out, z, ae_loss, recon_loss, kld = res.values()
 
         else:
             # Get evaluation results
             drug_id = observation["smile_id"].to(device)
             res = model.evaluate(X, y_adv=y_adv, drug_id=drug_id)
-            out, z_basal, z, y_hat, ae_loss, recon_loss, kld = res.values()
+            out, out_basal, z_basal, z, y_hat, ae_loss, recon_loss, kld = res.values()
+            rmse_basal_full += metrics.compute_batch_rmse(out, out_basal)
             
             # Collect the labels 
             y_hat_ds.append(torch.argmax(y_hat, dim=1).item())
             metrics.compute_classification_report(y_true_ds, y_hat_ds)
 
-        if end:
+        if end and adversarial:
             z_basal_ds.append(z_basal)
             z_ds.append(z)
 
-        val_loss += ae_loss
-        val_recon_loss += recon_loss
-        val_kl_loss += kld
+        val_loss += ae_loss.item()
+        val_recon_loss += recon_loss.item()
+        val_kl_loss += kld.item()
         
         # Perform optimizer step depending on the iteration
         metrics.update_rmse(X, out)
-
         
     # Print loss results
     losses["loss"] = val_loss/len(dataset_loader)
     losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
     metrics.update_bpd(losses["avg_validation_recon_loss"])
     losses["avg_validation_kld_loss"] = val_kl_loss/len(dataset_loader)
+    metrics.metrics['rmse'] /= len(dataset_loader)
+    if adversarial:
+        metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
 
-    if end:
+    if end and adversarial:
         z_ds = torch.cat(z_ds, dim=0)
         z_basal_ds = torch.cat(z_basal_ds, dim=0)
 

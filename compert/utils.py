@@ -102,7 +102,7 @@ def tensor_to_image(tensor, batch_first = True):
     return tensor.numpy()
 
 
-def make_dirs(path, experiment_name, img_save):
+def make_dirs(path, experiment_name):
     """
     Creates result directories for the models
     --------------------
@@ -114,9 +114,9 @@ def make_dirs(path, experiment_name, img_save):
         os.mkdir(path)
     dest_dir = os.path.join(path, experiment_name+'_'+timestamp)
     os.mkdir(dest_dir)
-    if img_save:
-        os.mkdir(os.path.join(dest_dir, 'reconstructions'))
-        os.mkdir(os.path.join(dest_dir, 'generations'))
+    os.mkdir(os.path.join(dest_dir, 'reconstructions'))
+    os.mkdir(os.path.join(dest_dir, 'generations'))
+    os.mkdir(os.path.join(dest_dir, 'checkpoints'))
     os.mkdir(os.path.join(dest_dir, 'logs'))
     return dest_dir
 

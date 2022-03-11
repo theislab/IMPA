@@ -19,42 +19,45 @@ class TemplateModel(nn.Module):
     
     def save_checkpoints(self, 
                         epoch, 
-                        optimizer, 
-                        scheduler, 
                         metrics, 
                         train_losses, 
                         val_losses, 
-                        checkpoint_path, 
-                        dest_dir):
+                        dest_dir, adversarial):
         """
         Save the checkpoints to a checkpoint dict
         """
         checkpoint = dict()
-        
         # Save to state dict
         checkpoint['epoch'] = epoch
         checkpoint['model_state_dict'] = self.state_dict()  # Parameters of the model
-        checkpoint['optimizer'] = optimizer.state_dict()  # Optimizer
-        checkpoint['scheduler'] = scheduler.state_dict()  # Scheduler
+        checkpoint['optimizer_autoencoder'] = self.optimizer_autoencoder.state_dict()  # Optimizer autoencoder
+        checkpoint['scheduler_autoencoder'] = self.scheduler_autoencoder.state_dict()  # Scheduler
         checkpoint['metrics'] = metrics  # Validation metrics 
         checkpoint['train_losses'] = train_losses  # Training losses 
         checkpoint['val_losses'] = val_losses  # Validation losses
         checkpoint['dest_dir'] = dest_dir
-        torch.save(checkpoint, os.path.join(checkpoint_path))        
+        if adversarial:
+            checkpoint['optimizer_adversaries'] = self.optimizer_adversaries.state_dict()  # Optimizer autoencoder
+            checkpoint['scheduler_autoencoder'] = self.scheduler_autoencoder.state_dict()  # Scheduler
+        torch.save(checkpoint, os.path.join(dest_dir, 'checkpoints','checkpoint.pt'))    
 
-    def load_checkpoints(self, checkpoint_path, optimizer, scheduler):
+
+    def load_checkpoints(self, checkpoint_path, adversarial):
         """
         Load the checkpoints from a checkpoint path 
         """
         checkpoint = torch.load(checkpoint_path)
         epoch = checkpoint['epoch']
         self.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        scheduler.load_state_dict(checkpoint['scheduler'])
+        self.optimizer_autoencoder.load_state_dict(checkpoint['optimizer_autoencoder'])
+        self.scheduler_autoencoder.load_state_dict(checkpoint['scheduler_autoencoder'])
         metrics = checkpoint['metrics']
         train_losses = checkpoint['train_losses']
         val_losses = checkpoint['val_losses']
         dest_dir = checkpoint['dest_dir']
+        if adversarial:
+            self.optimizer_adversaries.load_state_dict(checkpoint['optimizer_adversaries'])    # Optimizer autoencoder
+            self.scheduler_adversaries.load_state_dict(checkpoint['scheduler_autoencoder'])    # Scheduler
 
         print(f'Loaded model at epoch {epoch}')
         for loss in train_losses:
