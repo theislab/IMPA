@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH -o /home/icb/%u/slurm_folder/training_job.job
+#SBATCH -o /home/icb/%u/slurm_folder/training_job_no_pretrained.job
 
-#SBATCH -e /home/icb/%u/slurm_folder/training_job.job
+#SBATCH -e /home/icb/%u/slurm_folder/training_job_no_pretrained.job
 
 #SBATCH -J training_loop
 
 #SBATCH -p gpu_p
 
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 
 #SBATCH --qos=gpu
 
@@ -25,6 +25,9 @@ echo Launching the training script
 
 conda activate imgCPA
 
-python /home/icb/alessandro.palma/imCPA/main.py --config_file=/home/icb/alessandro.palma/imCPA/configs/config_sigma_vae.json --mode=train
+cd .. 
+
+python -m compert.main --config_file=/home/icb/alessandro.palma/imCPA/configs/config.json --mode=train
+#python /home/icb/alessandro.palma/imCPA/compert/main.py --config_file=/home/icb/alessandro.palma/imCPA/configs/config_sigma_vae.json --mode=train
 #python /home/icb/alessandro.palma/imCPA/main.py --config_file=/home/icb/alessandro.palma/imCPA/configs/config_glow.json --mode=train
 

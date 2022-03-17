@@ -1,8 +1,8 @@
 import torch
 import torch.utils.data
 
-from compert.training_utils import *
-from compert.model.CPA import *
+from ..training_utils import *
+from .CPA import *
 
 
 class SigmaAE(CPA):

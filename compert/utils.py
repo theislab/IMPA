@@ -1,23 +1,23 @@
-import tarfile
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 import pandas as pd
-import timeit,time
+import time
 import cv2
-import torch
-from torch import nn
 import time 
 
     
 def img_resize(image, width:int, height:int, interpolation:str):
-    """
-    Resize input image 
-    -------------------
-    image: numpy array of dimension (height, width, channels)
-    width: target width
-    height: target height 
-    interpolation: string in (nn, linear, area, cubic, lanczos)
+    """Resize input image 
+
+    Args:
+        image (np.array): numpy array of dimension (height, width, channels)
+        width (int): target width
+        height (int): target height 
+        interpolation (str): string in (nn, linear, area, cubic, lanczos)
+
+
+    Returns:
+        np.array: Resized image
     """
     interp_dict = {'nn': cv2.INTER_NEAREST, 'linear': cv2.INTER_LINEAR , 'area': cv2.INTER_AREA , 
                    'cubic': cv2.INTER_CUBIC, 'lanczos': cv2.INTER_LANCZOS4 }
@@ -25,27 +25,32 @@ def img_resize(image, width:int, height:int, interpolation:str):
     im_resized = cv2.resize(image, (width, height), interpolation = cv2.INTER_CUBIC)
     return im_resized
 
+
 def img_crop(image, width:int, height:int):
-    """
-    Crop image in a squared window around its centre
-    -------------------
-    image: numpy array of dimension (height, width, channels)
-    width: target image width
-    height: target image height 
+    """Crop image in a squared window around its centre
+
+    Args:
+        image (np.array): numpy array of dimension (height, width, channels)
+        width (int): target image width
+        height (int): target image height 
+
+    Returns:
+        np.array: Cropped image
     """
     (cx, cy) = image.shape[0]//2, image.shape[1]//2
     img_cropped = image[(cx-width//2):(cx+width//2), (cy-width//2):(cy+width//2), :]
     return img_cropped
 
+
 def resize_images(data_dir:str, outdir:str, width=64, height=64, interpolation='cubic'):
-    """
-    Resize images in a tar file to a pre-defined size 
-    -------------------
-    data_dir: name of the directory storing the data
-    outdir: name of destination directory
-    width: target width
-    height: target height 
-    interpolation: string in (nn, linear, area, cubic, lanczos)
+    """Resize images in a tar file to a pre-defined size 
+
+    Args:
+        data_dir (str): name of the directory storing the data
+        outdir (str): name of destination directory
+        width (int, optional): target width. Defaults to 64.
+        height (int, optional):  target height. Defaults to 64.
+        interpolation (str, optional): string in (nn, linear, area, cubic, lanczos). Defaults to 'cubic'.
     """
     assert os.path.exists(data_dir), "The data directory doesn't exist" 
     # Move to working directory
@@ -91,10 +96,17 @@ def extract_filenames_and_molecules(input_path:str, labels_path:str, data_path:s
                         assay_labels=labels['assay_labs'], state = molecule_state)           
     return  sample_names, molecule_names, molecule_SMILE, labels
 
-    
+
 def tensor_to_image(tensor, batch_first = True):
     """
     Convert tensor to numpy for plotting
+
+    Args:
+        tensor (torch.tensor): tensor to be converted to image
+        batch_first (bool, optional): Whether the batch comes in first position in the input. Defaults to True.
+
+    Returns:
+        np.array: A numpy array representing an image
     """
     if batch_first:
         tensor = tensor.squeeze(0)
@@ -103,11 +115,14 @@ def tensor_to_image(tensor, batch_first = True):
 
 
 def make_dirs(path, experiment_name):
-    """
-    Creates result directories for the models
-    --------------------
-    path: path where the directory of the experiment should be dumped 
-    experiment_name: the name of the experiment performed 
+    """Creates result directories for the models
+
+    Args:
+        path (str): path where the directory of the experiment should be dumped 
+        experiment_name (str): the name of the experiment performed 
+
+    Returns:
+        str: name of the destination directory
     """
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     if not os.path.exists(path):

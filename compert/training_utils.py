@@ -2,12 +2,12 @@ import os
 import torch
 
 # Available autoencoder model attached to CPA 
-from compert.model.sigma_VAE import SigmaVAE
-from compert.model.sigma_AE import SigmaAE
-from data.dataset import CellPaintingDataset
-from compert.utils import *
-from compert.plot_utils import Plotter 
-from compert.evaluate import *
+from .model.sigma_VAE import SigmaVAE
+from .model.sigma_AE import SigmaAE
+from .data.dataset import CellPaintingDataset
+from .utils import *
+from .plot_utils import Plotter 
+from .evaluate import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -36,40 +36,40 @@ class Trainer:
         """Class for training the model 
 
         Args:
-            config (dict): The dictionary containing configuration parameters from .json file
+            config (Config): The object containing configuration parameters from .json file
         """
         self.experiment_name = config.experiment_name  # Will be used to name the path 
 
         self.image_path = config.image_path  # Path to the images 
         self.data_index_path = config.data_index_path  # Path to the image metadata
         self.embeddings_path = config.embedding_path  # The path to the molecular embedding csv
-        self.use_embeddings = config.use_embeddings  # Whether to use embeddings or not
+        self.use_embeddings = config.use_embeddings  # Whether to use pre-trained embeddings or not
 
         # Path to save the results
         self.result_path = config.result_path
 
         # Resume the training 
         self.resume = config.resume 
-        self.resume_checkpoint = config.resume_checkpoint
+        self.resume_checkpoint = config.resume_checkpoint  # Path to the pre-trained weights 
         self.resume_epoch = 1
 
-        self.img_plot = config.img_plot
-        self.save_results = config.save_results  # If the images has to be saved to the result folder
+        self.img_plot = config.img_plot  # Used when trained on notebooks - print generations/reconstructions after epoch
+        self.save_results = config.save_results  # If the images have to be saved in the result folder
 
         self.num_epochs = config.num_epochs  # Number of epochs for training
         self.eval = config.eval  # Whether evaluation should occur
-        self.eval_every = config.eval_every  # How often the images are evaluated  
+        self.eval_every = config.eval_every  # How often validation takes place 
 
         self.n_workers_loader = config.n_workers_loader # Number of workers for batch loading
-        self.generate = config.generate  # Whetehr to perform a sampling + decoding experiment during evaluation
+        self.generate = config.generate  # Whether to perform a sampling + decoding experiment during evaluation
         self.model_name = config.model_name  # What model to run
         self.temperature = config.temperature  # Temperature to downscale the random samples from the prior
         self.augment_train = config.augment_train  # Whether augmentation should be carried out on the training set
         self.in_width = config.in_width
         self.in_height = config.in_height
         self.in_channels = config.in_channels
-        self.adversarial = config.adversarial 
-        self.binary_task = config.binary_task 
+        self.adversarial = config.adversarial  # Whether adversarial training is performed (CPA)
+        self.binary_task = config.binary_task  # Controls if the adversarial task is predicting drugs or active vs inactive
         self.append_layer_width = config.append_layer_width
 
         self.patience = config.patience
@@ -86,7 +86,6 @@ class Trainer:
         print('Lodading the data...') 
         self.drug_embeddings, self.num_drugs, self.n_seen_drugs, self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
 
-        
         # Initialize model 
         self.model =  self.load_model().to(self.device)
         self.model = torch.nn.DataParallel(self.model)
@@ -94,6 +93,7 @@ class Trainer:
         # Create data loaders 
         self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.hparams["batch_size"], shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
+        # For validation, it is better to keep the batch size as small as possible 
         self.loader_val = torch.utils.data.DataLoader(self.validation_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
         self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=1, shuffle=True, 
@@ -108,12 +108,13 @@ class Trainer:
             if not self.resume:
                 print('Create output directories for the experiment')
                 self.dest_dir = make_dirs(self.result_path, self.experiment_name)
-                # Setup logger
-                self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
             # If training is resumed from a checkpoint
             if self.resume:
                 self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint, self.adversarial)
-
+            
+            # Setup logger in any case
+            self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
+            
 
     def create_torch_datasets(self):
         """
@@ -125,7 +126,8 @@ class Trainer:
         if self.use_embeddings:
             drug_embeddings = cellpainting_ds.drug_embeddings
         else:
-            drug_embeddings = None
+            drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
+        # Collect the number of total drugs ans the one of seen drugs separately 
         num_drugs = cellpainting_ds.num_drugs
         n_seen_drugs = cellpainting_ds.n_seen_drugs
         training_set, validation_set, test_set, ood_set = cellpainting_ds.fold_datasets.values()
@@ -134,23 +136,23 @@ class Trainer:
     
     def train(self):
         """
-        Full training 
+        Full training loop
         """
         if self.img_plot:
             # Setup plotter and writer 
             self.plotter = Plotter(self.dest_dir)
         
         # The variable `end` determines whether we are at the end of the training loop and therefore if disentanglement and clustering stats
-        # are to be evaluated
+        # are to be evaluated on the validation split
         end = False
 
         print(f'Beginning training with epochs {self.num_epochs}')
 
         for epoch in range(self.resume_epoch, self.num_epochs+1):
             print(f'Running epoch {epoch}')
-            self.model.train()
-            self.model.module.metrics.mode = 'train'
-            # Losses from the epoch
+            self.model.train() 
+            
+            # Losses and metrics dictionaries from the epoch 
             losses, metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
             
             # Save results to tensorboard and to model's history  
@@ -162,7 +164,7 @@ class Trainer:
             if epoch % self.eval_every == 0 and self.eval:
                 # Put the model in evaluate mode 
                 self.model.eval()
-                self.model.module.metrics.mode = 'val'
+
                 val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
                                                         self.model.module.metrics, self.binary_task, self.device, end, 
                                                         variational=self.model.module.variational)
@@ -181,12 +183,11 @@ class Trainer:
                     del reconstructed
                     
                     # Plot generation of sampled images 
-                    if self.generate:
+                    if self.generate and self.model.module.variational:
                         sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
                         self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot)
                         del sampled_img
 
-                losses = {'a':242}
                 # Decide on early stopping based on the bit/dim of the image 
                 score = metrics['bpd']
                 cond, early_stopping = self.model.module.early_stopping(score) 
@@ -218,23 +219,20 @@ class Trainer:
     
         # Perform last evaluation on VALIDATION SET
         end = True
-        val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
+        test_losses, metrics = training_evaluation(self.model.module, self.loader_test, self.adversarial,
                                                 self.model.module.metrics, self.binary_task, self.device, end, 
-                                                variational=self.model.module.variational)
+                                                variational=self.model.module.variational, ood=False)
         if self.save_results:
-            self.write_results(val_losses, metrics, self.writer, epoch, ' val')
-        self.model.module.save_history('final', val_losses, metrics, 'val')
+            self.write_results(test_losses, metrics, self.writer, epoch, ' test')
+        self.model.module.save_history('final', val_losses, metrics, 'test')
 
         # Perform last evaluation on OOD SET
-        ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=False,
+        ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.adversarial,
                                                 metrics=self.model.module.metrics, binary_task=self.binary_task, device=self.device, end=end, 
-                                                variational=self.model.module.variational)
+                                                variational=self.model.module.variational, ood=True)
         if self.save_results:
             self.write_results(ood_losses, metrics, self.writer, epoch,' ood')
         self.model.module.save_history('final', losses, metrics, 'ood')
-        
-
-
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):

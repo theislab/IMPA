@@ -2,7 +2,7 @@
 Input a dataset of images and resize it to a dimension of interest 
 """
 
-from utils import resize_images
+from ..utils import resize_images
 import argparse
 
 # Parser 

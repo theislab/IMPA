@@ -10,8 +10,14 @@ class Plotter:
         self.dest_dir = dest_dir
 
     def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False):
-        """
-        Plot the original and reconstructed channels one over the other 
+        """Plot two images represented the original and reconstructed outputs of a neural network.
+
+        Args:
+            original (np.array): Original image
+            reconstruction (np.array): Reconstructed version of the image 
+            epoch (int): Computaion epoch at which image was produced  
+            save (bool, optional): Whether to save the plot. Defaults to True.
+            plot (bool, optional):  Used in notebooks. Controls whetehr the image should be plot. Defaults to False.
         """
         fig = plt.figure(constrained_layout=True, figsize = (10,10))
         # create 3x1 subfigs
@@ -25,28 +31,33 @@ class Plotter:
             # create 1x3 subplots per subfig
             axs = subfig.subplots(nrows=1, ncols=5)
             for col, ax in enumerate(axs):
-                ax.imshow(images[row][:,:,col], cmap = 'Greys')
+                ax.imshow(images[row][:,:,col], cmap = 'gray')
                 ax.axis('off')
         if save:
             plt.savefig(os.path.join(self.dest_dir, 'reconstructions', f'reconstructions_epoch_{epoch}.png'))
         if plot:
             plt.plot()
     
-    def plot_channel_panel(self, image, epoch, save, plot, title='Generated sample', rgb = False):
-        """
-        Plot a panel of single channel figures 
-        -------------------
-        image: numpy array of dimension (height, width, 5)
+    def plot_channel_panel(self, image, epoch, save, plot, title='Generated sample', rgb = False, size = 10):
+        """Plot a cell painting image either as a single channel or a multiple channel 
+
+        Args:
+            image (np.array): An image as a numpy array with dimensions HxWxC
+            epoch (int): Computaion epoch at which image was produced  
+            save (bool): Whether the image should be saved 
+            plot (bool): Used in notebooks. Controls whetehr the image should be plot
+            title (str, optional): Title of the plot. Defaults to 'Generated sample'.<
+            rgb (bool, optional): If the images should be plotted RGB (True) or in 5 channels (False). Defaults to False.
         """
         if not rgb:
-            fig, axs = plt.subplots(1, 5, figsize = (15,4))
+            fig, axs = plt.subplots(1, 5, figsize = (size,4))
             fig.suptitle(title, fontsize=16)
             for z in range(image.shape[-1]):
-                axs[z].imshow(image[:,:,z], cmap = 'Greys')
+                axs[z].imshow(image[:,:,z], cmap = 'gray')
                 axs[z].axis('off')
         
         else:
-            fig = plt.figure(figsize  = (3,3))
+            fig = plt.figure(figsize  = (size,size))
             plt.imshow(image[:,:,[0,2,4]])
             plt.axis('off')
 

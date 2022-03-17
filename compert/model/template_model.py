@@ -1,11 +1,8 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
-import json
-from tqdm import tqdm
-import numpy as np
-from compert.training_utils import *
-from metrics import *
+
+from ..training_utils import *
+from ..metrics.metrics import *
 import os
 
 """

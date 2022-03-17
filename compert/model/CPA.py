@@ -3,10 +3,10 @@ from tqdm import tqdm
 import numpy as np
 import torch
 
-from compert.model.modules import *
-from compert.model.template_model import *
+from .modules import *
+from .template_model import *
 
-from metrics.metrics import *
+from ..metrics.metrics import *
 
 
 """
@@ -56,10 +56,10 @@ class CPA(TemplateModel):
         else:
             self.set_hparams_(seed, hparams)
 
-        # Setup metrics 
+        # Setup metrics object
         self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.hparams["latent_dim"], device = self.device)
 
-        # The log sigma as an external parameter
+        # The log sigma as an external parameter of the sigma vae
         self.log_scale = torch.nn.Parameter(torch.full((1,1,1,1), 0.0), requires_grad=True)
         self.variational = variational 
 
@@ -68,8 +68,8 @@ class CPA(TemplateModel):
         self.encoder = Encoder(
             in_channels = self.in_channels,
             latent_dim = self.hparams["latent_dim"],
-            hidden_dim = self.hparams["hidden_dim"],
-            depth = self.hparams["depth"],
+            init_fm = self.hparams["init_fm"],
+            n_conv = self.hparams["n_conv"],
             n_residual_blocks = self.hparams["n_residual_blocks"], 
             in_width = self.in_width,
             in_height = self.in_height,
@@ -79,8 +79,8 @@ class CPA(TemplateModel):
         self.decoder = Decoder(
             out_channels = self.in_channels,
             latent_dim = self.hparams["latent_dim"],
-            hidden_dim = self.hparams["hidden_dim"],
-            depth = self.hparams["depth"],
+            init_fm = self.hparams["init_fm"],
+            n_conv = self.hparams["n_conv"],
             n_residual_blocks = self.hparams["n_residual_blocks"],  
             out_width = self.in_width,
             out_height = self.in_height,
@@ -128,7 +128,7 @@ class CPA(TemplateModel):
                     )
                     embedding_requires_grad = True
                 else:
-                    self.drug_embeddings = self.drug_embeddings
+                    self.drug_embeddings = self.drug_embeddings  # From pre-trained 
                     embedding_requires_grad = False
 
                 # Drug embedding encoder 
@@ -191,7 +191,7 @@ class CPA(TemplateModel):
         self.warmup_steps = self.hparams["warmup_steps"]
 
         # Statistics history
-        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "ood":{'epoch'}}
+        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "ood":{'epoch':[]}}
 
         # Iterations to decide when to perform adversarial training 
         self.iteration = 0
@@ -208,8 +208,8 @@ class CPA(TemplateModel):
         np.random.seed(seed)
         self.hparams = {
             "latent_dim": 512 if default else int(np.random.choice([256, 512, 1024])),
-            "hidden_dim": 64 if default else int(np.random.choice([32, 64, 128])),
-            "depth": 3 if default else int(np.random.choice([3, 4, 5])),
+            "init_fm": 64 if default else int(np.random.choice([32, 64, 128])),  # Will be upsampled depth times
+            "n_conv": 3 if default else int(np.random.choice([3, 4, 5])),
             "n_residual_blocks":12 if default else int(np.random.choice([6, 12, 18])),
 
             "adversary_width": 128 if default else int(np.random.choice([64, 128, 256])),
@@ -295,15 +295,18 @@ class CPA(TemplateModel):
         y_adv_hat = self.adversary_drugs(z_basal)
 
         # Embed the drug
-        drug_embedding = self.drug_embeddings(drug_ids)
+        drug_embedding = self.drug_embeddings(drug_ids)  # Embedding weights from drug id 
         z_drug = self.drug_embedding_encoder(drug_embedding)  # Embed input drug
 
         # Sum the latents of the drug and the image 
-        z_adv = z_basal + z_drug  
-        out = self.decoder(z_adv) 
+        z = z_basal + z_drug  
+        out = self.decoder(z) 
 
         # Compute the adversarial loss
-        adv_loss = self.loss_adversary_drugs(y_adv_hat, torch.argmax(y_adv, dim = 1))
+        if not self.binary_task:
+            adv_loss = self.loss_adversary_drugs(y_adv_hat, torch.argmax(y_adv, dim = 1))
+        else:
+            adv_loss = self.loss_adversary_drugs(y_adv_hat, y_adv)
 
         # The autoencoder loss 
         if self.variational:
@@ -318,12 +321,17 @@ class CPA(TemplateModel):
             loss = adv_loss + self.hparams["penalty_adversary"] * adv_drugs_grad_penalty
         
         else:
+            #----------------- Addition Log ------------------------------------------ 
+            sign = ae_loss['total_loss'].sign().item()  # Sign of the autoencoder loss
+            ae_loss['total_loss'] = sign*torch.abs(ae_loss['total_loss']).log()  
+            #-------------------------------------------------------------------------
+
             loss = ae_loss['total_loss'] - self.hparams["reg_adversary"] * adv_loss
         
-        return dict(out=out, z=z_basal, loss=loss, ae_loss=ae_loss, adv_loss=adv_loss)
+        return dict(out=out, z_basal=z_basal, loss=loss, ae_loss=ae_loss, adv_loss=adv_loss)
 
     
-    def evaluate(self, X, y_adv=None, drug_id=None):
+    def evaluate(self, X, drug_id=None):
         """Perform evaluation step
 
         Args:
@@ -332,12 +340,14 @@ class CPA(TemplateModel):
             drug_embed (torch.tensor): The embedding of the drug 
         """
         with torch.no_grad():
+            # Activate autoencoder
             if self.variational:
                 mu, log_sigma = self.encoder(X)
                 z_basal = self.reparameterize(mu, log_sigma)
             else:
                 z_basal = self.encoder(X)
 
+            # If not adversarial training, simply return the autoencoder losses
             if not self.adversarial:
                 out = self.decoder(z_basal)
                 if self.variational:
@@ -346,6 +356,7 @@ class CPA(TemplateModel):
                     ae_loss = self.ae_loss(X, out)
                 return dict(out=out, z=z_basal, ae_loss=ae_loss)
 
+            # If adversarial training, exploit both the drug encoding and the image encoding
             else:
                 y_hat = self.adversary_drugs(z_basal)
                 drug_embedding = self.drug_embeddings(drug_id)
@@ -361,7 +372,7 @@ class CPA(TemplateModel):
                     ae_loss = self.ae_loss(X, out)
 
                 return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat=y_hat, 
-                            ae_loss=ae_loss)
+                            ae_loss=ae_loss, z_drug=z_drug)
             
         
     def compute_gradient_penalty(self, output, input):
@@ -412,7 +423,7 @@ class CPA(TemplateModel):
         self.metrics.reset()
 
         for batch in tqdm(train_loader):
-            # Collect the data from the batch 
+            # Collect the image data from the batch 
             X = batch['X'].to(self.device)
 
             # If no adversarial training, simply perform the VAE training loop
@@ -428,10 +439,11 @@ class CPA(TemplateModel):
             else:
                 # self.binary is true when the task is predicting trt vs dmso 
                 if self.binary_task:
-                    y_adv = batch['state'].to(self.device).long()
+                    y_adv = batch['state'].to(self.device).float()
                 else:
                     y_adv = batch['mol_one_hot'].to(self.device).long()
                 
+                # drug id necessary to extract embedding 
                 drug_id = batch["smile_id"].to(self.device)
                 del batch # Free memory
                 
@@ -447,13 +459,12 @@ class CPA(TemplateModel):
                     self.optimizer_adversaries.zero_grad()
                     loss.backward()
                     self.optimizer_adversaries.step()
-                
+                # Optimizer step - adversary step
                 else:
                     self.optimizer_autoencoder.zero_grad()
                     loss.backward()
                     self.optimizer_autoencoder.step()
             
-
             # Increase number of iterations
             self.iteration += 1
 
@@ -468,13 +479,18 @@ class CPA(TemplateModel):
 
         # Print the loss metrics 
         avg_loss = training_loss/len(train_loader)
-        if self.variational:
-            avg_recon_loss = tot_recons_loss/len(train_loader)
-            avg_kl_loss = tot_kl_loss/len(train_loader)
-            self.metrics.update_bpd(avg_recon_loss)
-        else:
-            self.metrics.update_bpd(avg_loss)
         
+        # Update the reconstruction loss and KL divergence according to whether we 
+        # are using a variational autoencoder or a deterministic one 
+        if self.variational:
+            avg_kl_loss = tot_kl_loss/len(train_loader)
+            avg_recon_loss = tot_recons_loss/len(train_loader)
+        else:
+            avg_recon_loss = tot_ae_loss/len(train_loader)
+            
+        self.metrics.update_bpd(avg_recon_loss)
+
+        # The average RMSE between the evaluated images for all seen batches
         self.metrics.metrics['rmse'] /= len(train_loader)
 
         print(f'Mean loss after epoch {epoch}: {avg_loss}')
@@ -489,25 +505,25 @@ class CPA(TemplateModel):
             avg_ae_loss = tot_ae_loss/len(train_loader)
             avg_adv_loss = tot_adv_loss/len(train_loader)
             print(f'Mean autoencoder loss after epoch {epoch}: {avg_ae_loss}')
-            print(f'Mean adversarial loss after epoch {epoch}: {tot_adv_loss}')
+            print(f'Mean adversarial loss after epoch {epoch}: {avg_adv_loss}')
             if self.variational:
                 return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss, avg_ae_loss=avg_ae_loss, avg_adv_loss=avg_adv_loss), self.metrics.metrics
             else:
-                return dict(loss=avg_loss, avg_ae_loss=avg_ae_loss, avg_adv_loss=avg_adv_loss), self.metrics.metrics
+                return dict(loss=avg_loss, avg_ae_loss=avg_recon_loss, avg_adv_loss=avg_adv_loss), self.metrics.metrics
         else: 
             if self.variational:
                 return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss), self.metrics.metrics
             else:
-                return dict(loss=avg_loss), self.metrics.metrics
+                return dict(loss=avg_recon_loss), self.metrics.metrics
 
 
     def save_history(self, epoch, losses, metrics, fold):
-        """Save partial model results in the history dictionary 
+        """Save partial model results in the history dictionary (model attribute) 
 
         Args:
             epoch (int): the current epoch 
             losses (dict): dictionary containing the partial losses of the model 
-            metrics (dict): dictionary containing the mpartial metrics of the model 
+            metrics (dict): dictionary containing the partial metrics of the model 
             fold (str): train or valid
         """
         self.history[fold]["epoch"].append(epoch)
@@ -516,14 +532,14 @@ class CPA(TemplateModel):
             if loss not in self.history[fold]:
                 self.history[fold][loss] = [losses[loss]]
             else:
-                self.history[fold][loss] .append(losses[loss])
+                self.history[fold][loss].append(losses[loss])
         
         # Append the metrics to the right fold dictionary 
         for metric in metrics:
             if metric not in self.history[fold]:
                 self.history[fold][metric] = [metrics[metric]]
             else:
-                self.history[fold][metric] .append(metrics[metric])
+                self.history[fold][metric].append(metrics[metric])
 
         
 

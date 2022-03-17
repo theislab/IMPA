@@ -17,4 +17,4 @@ conda activate imgCPA
 
 cd /home/icb/alessandro.palma/imCPA
 
-python3 ./data/resize_ds.py --data_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_512_dmso --out_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_100_dmso --width 100 --height 100 --interp cubic
+python3 -m compert.data.resize_ds --data_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_512_dmso --out_dir /storage/groups/ml01/workspace/alessandro.palma/cellpainting_100_dmso --width 100 --height 100 --interp cubic
