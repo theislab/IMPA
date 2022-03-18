@@ -82,6 +82,7 @@ def extract_filenames_and_molecules(input_path:str, labels_path:str, data_path:s
     sample_names = fold_dataset.SAMPLE_KEY.values
     molecule_names = fold_dataset.CPD_NAME.values
     molecule_SMILE = fold_dataset.SMILES.values
+    molecule_n_cells = fold_dataset.IMG_CNT_CELLS.values
     
     if ds_type == 'integrated':
         molecule_state = fold_dataset.STATE
@@ -89,11 +90,11 @@ def extract_filenames_and_molecules(input_path:str, labels_path:str, data_path:s
     if save:
         if ds_type == 'original':
             np.savez(os.path.join(data_path, f'{fold}_data_index'), filenames = sample_names, mol_names = molecule_names, mol_smiles = molecule_SMILE, 
-                        assay_labels=labels['assay_labs'])
+                        assay_labels=labels['assay_labs'], n_cells=molecule_n_cells)
         else:
             # If the data contains as well the DMSO samples, then we return as well the condition between trt and ctr 
             np.savez(os.path.join(data_path, f'{fold}_data_index'), filenames = sample_names, mol_names = molecule_names, mol_smiles = molecule_SMILE, 
-                        assay_labels=labels['assay_labs'], state = molecule_state)           
+                        assay_labels=labels['assay_labs'], state = molecule_state, n_cells=molecule_n_cells)           
     return  sample_names, molecule_names, molecule_SMILE, labels
 
 

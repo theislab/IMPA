@@ -17,7 +17,7 @@ class SigmaAE(CPA):
                 seed: int = 0,
                 patience: int = 5,
                 hparams="",
-                binary_task=False,
+                predict_n_cells=False,
                 append_layer_width=None,
                 drug_embeddings = None) -> None:
      
@@ -31,7 +31,7 @@ class SigmaAE(CPA):
                                         seed,
                                         patience,
                                         hparams,
-                                        binary_task,
+                                        predict_n_cells,
                                         append_layer_width,
                                         drug_embeddings, 
                                         variational=False)

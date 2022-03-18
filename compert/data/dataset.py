@@ -75,7 +75,7 @@ class CellPaintingDataset:
             # Each smile has an id
             drug_embeddings = pd.read_csv(self.embeddings_path, index_col=0).loc[self.all_drugs]  # Read embedding paths
             # Tranform the embddings to torch embeddings
-            drug_embeddings  = torch.tensor(drug_embeddings.loc[self.all_drugs].values, 
+            drug_embeddings  = torch.tensor(drug_embeddings.values, 
                                                 dtype=torch.float32, device=self.device)
             # Must feed from_pretrained() with num_embeddings x dimension
             self.drug_embeddings = torch.nn.Embedding.from_pretrained(drug_embeddings, freeze=True).to(self.device)
@@ -124,7 +124,7 @@ class CellPaintingDataset:
             # Fetch the data
             data_index_path = os.path.join(self.data_index_path, f'{fold_name}_data_index.npz')
             # Get the files with the sample splits and add them to the dictionary 
-            fold_file, mol_names, mol_smiles, assay_labels, states  = self.get_files_and_mols_from_path(data_index_path=data_index_path)
+            fold_file, mol_names, mol_smiles, assay_labels, states, n_cells  = self.get_files_and_mols_from_path(data_index_path=data_index_path)
 
             # Add the  important entries to the dataset
             datasets[fold_name]['file_names'] = fold_file
@@ -132,6 +132,7 @@ class CellPaintingDataset:
             datasets[fold_name]['mol_smiles'] = mol_smiles
             datasets[fold_name]['assay_labels'] = assay_labels
             datasets[fold_name]['state'] = states
+            datasets[fold_name]['n_cells'] = n_cells 
         return datasets
 
     
@@ -149,6 +150,7 @@ class CellPaintingDataset:
         mol_names = file['mol_names']
         mol_smiles =  file['mol_smiles']
         assay_labels = file['assay_labels']
+        n_cells = file['n_cells']
         # State contains 1 or 0 labels representing inactive vs active compounds  
         if 'state' in file:
             states = file['state']
@@ -156,7 +158,7 @@ class CellPaintingDataset:
         else:
             states = None 
         # Convert state to binary
-        return file_names, mol_names, mol_smiles, assay_labels, states
+        return file_names, mol_names, mol_smiles, assay_labels, states, n_cells
     
 
 class CellPaintingFold(Dataset):
@@ -170,6 +172,7 @@ class CellPaintingFold(Dataset):
         self.mol_smiles = data['mol_smiles']
         self.assay_labels = data['assay_labels']
         self.states = data['state']
+        self.n_cells = data['n_cells']
 
         # Data paths 
         self.data_path = image_path
@@ -219,8 +222,7 @@ class CellPaintingFold(Dataset):
             img = f['arr_0']
         img = torch.from_numpy(img).to(torch.float)
         img = img.permute(2,0,1)  # Place channel dimension in front of the others 
-        if self.transform != None:
-            img = self.transform(img)
+        img = self.transform(img)
 
         if self.return_labels:
             return dict(X=img, 
@@ -229,7 +231,8 @@ class CellPaintingFold(Dataset):
                         mol_one_hot=self.one_hot_drugs[idx] if self.fold != 'ood' else '',
                         assay_labels=self.assay_labels[idx],
                         state = self.states[idx],
-                        smile_id = self.mol2label[self.mol_smiles[idx]])
+                        smile_id = self.mol2label[self.mol_smiles[idx]],
+                        n_cells = self.n_cells[idx])
         else:
             return dict(X=img)
 
@@ -257,10 +260,11 @@ class CellPaintingFold(Dataset):
         subset_assay_labels = []
         subset_states = []
         subset_smile_id = []
+        subset_n_cells = []
         
         
         for i in idx_sample:
-            X, file_name, mol_name, mol_one_hot, assay_label, states, smile_id = self.__getitem__(i).values()
+            X, file_name, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(i).values()
             imgs.append(X.unsqueeze(0))  # Unsqueeze barch dimension
             subset_file_names.append(file_name)
             subset_mol_name.append(mol_name)
@@ -268,6 +272,7 @@ class CellPaintingFold(Dataset):
             subset_assay_labels.append(assay_label)
             subset_states.append(states)
             subset_smile_id.append(smile_id)
+            subset_n_cells.append(n_cells)
 
         imgs = torch.cat(imgs, dim=0)
         return dict(X=imgs, 
@@ -276,7 +281,8 @@ class CellPaintingFold(Dataset):
                     mol_one_hot=self.one_hot_drugs[idx] if self.fold != 'ood' else '',
                     assay_labels=subset_assay_labels,
                     state = subset_states,
-                    smile_id = subset_smile_id) 
+                    smile_id = subset_smile_id, 
+                    n_cells = subset_n_cells) 
 
     
     def get_drug_by_name(self, drug_name):
@@ -291,7 +297,7 @@ class CellPaintingFold(Dataset):
         # Collect the drug images from the file repository 
         drug_images = []
         for drug_idx in drug_idxs:
-            X, _, mol_name, mol_one_hot, assay_label, states, smile_id = self.__getitem__(drug_idx).values()
+            X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
             drug_images.append(X.unsqueeze(0))
 
         return dict(X=torch.cat(drug_images, dim=0), 
@@ -299,7 +305,8 @@ class CellPaintingFold(Dataset):
                 mol_one_hot=mol_one_hot if self.fold != 'ood' else '',
                 assay_labels=assay_label,
                 state = states,
-                smile_id = smile_id) 
+                smile_id = smile_id, 
+                n_cells = n_cells) 
 
 
         

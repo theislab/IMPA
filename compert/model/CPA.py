@@ -25,7 +25,7 @@ class CPA(TemplateModel):
             seed: int = 0,
             patience: int = 5,
             hparams="",
-            binary_task=False,
+            predict_n_cells=False,
             append_layer_width=None,
             drug_embeddings = None,
             variational: bool = True):     
@@ -41,7 +41,7 @@ class CPA(TemplateModel):
         self.num_drugs = num_drugs 
         self.n_seen_drugs = n_seen_drugs
         self.seed = seed
-        self.binary_task = binary_task 
+        self.predict_n_cells = predict_n_cells 
         self.append_layer_width = append_layer_width
         self.drug_embeddings = drug_embeddings
 
@@ -59,10 +59,9 @@ class CPA(TemplateModel):
         # Setup metrics object
         self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.hparams["latent_dim"], device = self.device)
 
-        # The log sigma as an external parameter of the sigma vae
+        # The log sigma as an external parameter of the sigma vae training paradigm 
         self.log_scale = torch.nn.Parameter(torch.full((1,1,1,1), 0.0), requires_grad=True)
         self.variational = variational 
-
 
         # Instantiate the convolutional encoder and decoder modules
         self.encoder = Encoder(
@@ -108,7 +107,7 @@ class CPA(TemplateModel):
             # Instantiate the drug embedding and adversarial part of the network 
             if self.num_drugs > 0:
                 # Adversary network is a simple MLP with custom depth and width 
-                if not self.binary_task:
+                if not self.predict_n_cells:
                     self.adversary_drugs = MLP(
                         [self.hparams["latent_dim"]]
                         + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
@@ -141,8 +140,8 @@ class CPA(TemplateModel):
                 )
 
                 # Binary task predicts active versus inactive using the specific drug 
-                if self.binary_task:
-                    self.loss_adversary_drugs = torch.nn.BCEWithLogitsLoss(reduction = 'mean')
+                if self.predict_n_cells:
+                    self.loss_adversary_drugs = torch.nn.MSELoss(reduction = 'mean')
                 else:
                     self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(reduction = 'mean')
 
@@ -221,12 +220,13 @@ class CPA(TemplateModel):
             "adversary_lr": 3e-4 if default else float(10 ** np.random.uniform(-5, -3)),
             "autoencoder_wd": 1e-6 if default else float(10 ** np.random.uniform(-8, -4)),
             "adversary_wd": 1e-4 if default else float(10 ** np.random.uniform(-6, -3)),
-            "adversary_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),
+            "adversary_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),  # To not be confused: the number of adversary steps before the next VAE step 
             "batch_size": 128 if default else int(np.random.choice([64, 128, 256, 512])),
             "step_size_lr": 45 if default else int(np.random.choice([15, 25, 45])),
             "embedding_encoder_width": 512,
             "embedding_encoder_depth": 0,
-            "warmup_steps": 5 if default else int(np.random.choice([0, 5, 10, 15]))
+            "warmup_steps": 5 if default else int(np.random.choice([0, 5, 10, 15])), 
+            "data_driven_sigma": True if default else np.random.choice([True, False])
         }
         # the user may fix some hparams
         if hparams != "":
@@ -241,14 +241,13 @@ class CPA(TemplateModel):
         """ Computes the likelihood of the data given the latent variable,
         in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
         same for VAE and AE) """
-        # log rmse
-        log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
-        self.log_scale = torch.nn.Parameter(log_scale)
         # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
         # ensures stable training.
-        log_scale = softclip(log_scale, -6)
+        if self.hparams["data_driven_sigma"]:
+            self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
+            self.log_scale = softclip(self.log_scale, -6)
         # Gaussian log lik
-        rec = gaussian_nll(X_hat, log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
+        rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
         return rec
 
 
@@ -303,7 +302,7 @@ class CPA(TemplateModel):
         out = self.decoder(z) 
 
         # Compute the adversarial loss
-        if not self.binary_task:
+        if not self.predict_n_cells:
             adv_loss = self.loss_adversary_drugs(y_adv_hat, torch.argmax(y_adv, dim = 1))
         else:
             adv_loss = self.loss_adversary_drugs(y_adv_hat, y_adv)
@@ -321,11 +320,6 @@ class CPA(TemplateModel):
             loss = adv_loss + self.hparams["penalty_adversary"] * adv_drugs_grad_penalty
         
         else:
-            #----------------- Addition Log ------------------------------------------ 
-            sign = ae_loss['total_loss'].sign().item()  # Sign of the autoencoder loss
-            ae_loss['total_loss'] = sign*torch.abs(ae_loss['total_loss']).log()  
-            #-------------------------------------------------------------------------
-
             loss = ae_loss['total_loss'] - self.hparams["reg_adversary"] * adv_loss
         
         return dict(out=out, z_basal=z_basal, loss=loss, ae_loss=ae_loss, adv_loss=adv_loss)
@@ -438,7 +432,7 @@ class CPA(TemplateModel):
 
             else:
                 # self.binary is true when the task is predicting trt vs dmso 
-                if self.binary_task:
+                if self.predict_n_cells:
                     y_adv = batch['state'].to(self.device).float()
                 else:
                     y_adv = batch['mol_one_hot'].to(self.device).long()

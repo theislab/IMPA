@@ -69,7 +69,7 @@ class Trainer:
         self.in_height = config.in_height
         self.in_channels = config.in_channels
         self.adversarial = config.adversarial  # Whether adversarial training is performed (CPA)
-        self.binary_task = config.binary_task  # Controls if the adversarial task is predicting drugs or active vs inactive
+        self.predict_n_cells = config.predict_n_cells  # Controls if the adversarial task is predicting drugs or active vs inactive
         self.append_layer_width = config.append_layer_width
 
         self.patience = config.patience
@@ -166,7 +166,7 @@ class Trainer:
                 self.model.eval()
 
                 val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
-                                                        self.model.module.metrics, self.binary_task, self.device, end, 
+                                                        self.model.module.metrics, self.predict_n_cells, self.device, end, 
                                                         variational=self.model.module.variational)
 
                 if self.save_results:
@@ -220,7 +220,7 @@ class Trainer:
         # Perform last evaluation on VALIDATION SET
         end = True
         test_losses, metrics = training_evaluation(self.model.module, self.loader_test, self.adversarial,
-                                                self.model.module.metrics, self.binary_task, self.device, end, 
+                                                self.model.module.metrics, self.predict_n_cells, self.device, end, 
                                                 variational=self.model.module.variational, ood=False)
         if self.save_results:
             self.write_results(test_losses, metrics, self.writer, epoch, ' test')
@@ -228,7 +228,7 @@ class Trainer:
 
         # Perform last evaluation on OOD SET
         ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.adversarial,
-                                                metrics=self.model.module.metrics, binary_task=self.binary_task, device=self.device, end=end, 
+                                                metrics=self.model.module.metrics, predict_n_cells=self.predict_n_cells, device=self.device, end=end, 
                                                 variational=self.model.module.variational, ood=True)
         if self.save_results:
             self.write_results(ood_losses, metrics, self.writer, epoch,' ood')
@@ -275,7 +275,7 @@ class Trainer:
                     seed = self.seed,
                     patience = self.patience,
                     hparams = self.hparams,
-                    binary_task = self.binary_task,
+                    predict_n_cells = self.predict_n_cells,
                     append_layer_width = self.append_layer_width,
                     drug_embeddings = self.drug_embeddings)
 

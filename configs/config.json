@@ -9,8 +9,8 @@
     "resume_checkpoint": "",
     "resume_epoch": 1, 
 
-    "img_plot": true,
-    "save_results": true, 
+    "img_plot": false,
+    "save_results": false, 
     "generate": false,
 
     "num_epochs": 50,
@@ -24,7 +24,7 @@
     "in_height": 100,
     "in_channels": 5,
     "adversarial": true,
-    "binary_task": false,
+    "predict_n_cells": false,
     "append_layer_width": null, 
     "use_embeddings": false,
     "patience": 5,
@@ -36,7 +36,7 @@
         "latent_dim": 512,
         "init_fm": 64,
         "n_conv": 3,
-        "n_residual_blocks": 12,
+        "n_residual_blocks": 6,
         "adversary_width": 256,
         "adversary_depth": 3,
         "reg_adversary": 5, 
@@ -49,6 +49,7 @@
         "step_size_lr": 45, 
         "embedding_encoder_width": 512,
         "embedding_encoder_depth": 0,
-        "warmup_steps": 1
+        "warmup_steps": 1, 
+        "data_driven_sigma": true
     }
 }
