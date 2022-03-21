@@ -1,7 +1,7 @@
 import torch
 import torch.utils.data
 
-from ..training_utils import *
+from ..train import *
 from .CPA import *
 
 
@@ -68,4 +68,3 @@ class SigmaAE(CPA):
             else:
                 reconstructed_X = self.decoder(z_x) 
         return original_X, reconstructed_X
-

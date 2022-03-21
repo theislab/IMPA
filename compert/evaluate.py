@@ -219,3 +219,4 @@ def compute_silhouette_coefficient(Z, y):
         y (torch.tensor): The labels of the matrix
     """
     return silhouette_score(Z, y, metric='euclidean')
+    

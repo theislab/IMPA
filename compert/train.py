@@ -198,9 +198,9 @@ class Trainer:
                         del sampled_img
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                if epoch < self.ae_pretrain_steps:
+                if epoch < self.model.module.ae_pretrain_steps:
                     score = metrics['bpd']
-                elif epoch == self.ae_pretrain_steps:
+                elif epoch == self.model.module.ae_pretrain_stepss:
                     self.model.module.best_score = -np.inf
                     score = metrics["rmse_basal_full"]
                 else:

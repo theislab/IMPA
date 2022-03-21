@@ -34,7 +34,7 @@
         "latent_dim": 512,
         "init_fm": 64,
         "n_conv": 3,
-        "n_residual_blocks": 6,
+        "n_residual_blocks": 8,
         "adversary_width": 256,
         "adversary_depth": 3,
         "reg_adversary": 5000, 

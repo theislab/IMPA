@@ -547,9 +547,3 @@ class CPA(TemplateModel):
                 self.history[fold][metric] = [metrics[metric]]
             else:
                 self.history[fold][metric].append(metrics[metric])
-
-        
-
-        
-    
-

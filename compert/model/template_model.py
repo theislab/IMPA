@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from ..training_utils import *
+from ..train import *
 from ..metrics.metrics import *
 import os
 
@@ -68,6 +68,3 @@ class TemplateModel(nn.Module):
         
         return epoch, dest_dir
     
-
-
-

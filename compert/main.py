@@ -1,5 +1,5 @@
 import argparse
-from .training_utils import *
+from .train import *
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform a training loop')
