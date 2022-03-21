@@ -51,24 +51,27 @@ class Trainer:
         # Resume the training 
         self.resume = config.resume 
         self.resume_checkpoint = config.resume_checkpoint  # Path to the pre-trained weights 
-        self.resume_epoch = 1
+        self.resume_epoch = 1  # By default, we start at epoch 1 
 
         self.img_plot = config.img_plot  # Used when trained on notebooks - print generations/reconstructions after epoch
         self.save_results = config.save_results  # If the images have to be saved in the result folder
 
         self.num_epochs = config.num_epochs  # Number of epochs for training
+        self.batch_size = config.batch_size
         self.eval = config.eval  # Whether evaluation should occur
         self.eval_every = config.eval_every  # How often validation takes place 
 
         self.n_workers_loader = config.n_workers_loader # Number of workers for batch loading
-        self.generate = config.generate  # Whether to perform a sampling + decoding experiment during evaluation
+        self.generate = config.generate  # Whether to perform a sampling + decoding experiment during evaluation (only variational)
         self.model_name = config.model_name  # What model to run
         self.temperature = config.temperature  # Temperature to downscale the random samples from the prior
         self.augment_train = config.augment_train  # Whether augmentation should be carried out on the training set
+
+        # Image features
         self.in_width = config.in_width
         self.in_height = config.in_height
         self.in_channels = config.in_channels
-        self.adversarial = config.adversarial  # Whether adversarial training is performed (CPA)
+
         self.predict_n_cells = config.predict_n_cells  # Controls if the adversarial task is predicting drugs or active vs inactive
         self.append_layer_width = config.append_layer_width
 
@@ -88,10 +91,10 @@ class Trainer:
 
         # Initialize model 
         self.model =  self.load_model().to(self.device)
-        self.model = torch.nn.DataParallel(self.model)
+        self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present 
         
         # Create data loaders 
-        self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.hparams["batch_size"], shuffle=True, 
+        self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
         # For validation, it is better to keep the batch size as small as possible 
         self.loader_val = torch.utils.data.DataLoader(self.validation_set, batch_size=1, shuffle=True, 
@@ -109,8 +112,8 @@ class Trainer:
                 print('Create output directories for the experiment')
                 self.dest_dir = make_dirs(self.result_path, self.experiment_name)
             # If training is resumed from a checkpoint
-            if self.resume:
-                self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint, self.adversarial)
+            else:
+                self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint)
             
             # Setup logger in any case
             self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
@@ -138,17 +141,22 @@ class Trainer:
         """
         Full training loop
         """
-        if self.img_plot:
+        if self.save_results:
             # Setup plotter and writer 
             self.plotter = Plotter(self.dest_dir)
         
         # The variable `end` determines whether we are at the end of the training loop and therefore if disentanglement and clustering stats
-        # are to be evaluated on the validation split
+        # are to be evaluated on the test and ood splits
         end = False
 
         print(f'Beginning training with epochs {self.num_epochs}')
 
         for epoch in range(self.resume_epoch, self.num_epochs+1):
+
+            # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
+            if epoch == self.model.module.hparams["ae_pretrain_steps"]:
+                self.model.module.initialize_adversarial()
+            
             print(f'Running epoch {epoch}')
             self.model.train() 
             
@@ -159,13 +167,14 @@ class Trainer:
             if self.save_results:
                 self.write_results(losses, metrics, self.writer, epoch, 'train')
             self.model.module.save_history(epoch, losses, metrics, 'train')
-            
+
             # Evaluate
             if epoch % self.eval_every == 0 and self.eval:
-                # Put the model in evaluate mode 
+                # Switch the model to evaluate mode 
                 self.model.eval()
 
-                val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.adversarial,
+                # Get the validation results 
+                val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
                                                         self.model.module.metrics, self.predict_n_cells, self.device, end, 
                                                         variational=self.model.module.variational)
 
@@ -174,7 +183,7 @@ class Trainer:
                 self.model.module.save_history(epoch, val_losses, metrics, 'val')
 
                 # Plot reconstruction of a random image 
-                if self.img_plot:
+                if self.save_results:
                     with torch.no_grad():
                         original, reconstructed = self.model.module.generate(self.loader_val)
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
@@ -188,8 +197,15 @@ class Trainer:
                         self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot)
                         del sampled_img
 
-                # Decide on early stopping based on the bit/dim of the image 
-                score = metrics['bpd']
+                # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
+                if epoch < self.ae_pretrain_steps:
+                    score = metrics['bpd']
+                elif epoch == self.ae_pretrain_steps:
+                    self.model.module.best_score = -np.inf
+                    score = metrics["rmse_basal_full"]
+                else:
+                    score = metrics["rmse_basal_full"]
+                
                 cond, early_stopping = self.model.module.early_stopping(score) 
                 
                 # Save the model if it is the best performing one 
@@ -200,7 +216,7 @@ class Trainer:
                                                         metrics, 
                                                         losses, 
                                                         val_losses, 
-                                                        self.dest_dir, self.adversarial)
+                                                        self.dest_dir)
 
                     print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
 
@@ -214,25 +230,27 @@ class Trainer:
             else:
                 self.model.module.scheduler_autoencoder.step()
             
-            if self.adversarial:
+            if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
-    
-        # Perform last evaluation on VALIDATION SET
+
+        self.model.eval()
+        epoch = 30
+        # Perform last evaluation on TEST SET   
         end = True
-        test_losses, metrics = training_evaluation(self.model.module, self.loader_test, self.adversarial,
+        test_losses, metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.predict_n_cells, self.device, end, 
                                                 variational=self.model.module.variational, ood=False)
         if self.save_results:
             self.write_results(test_losses, metrics, self.writer, epoch, ' test')
-        self.model.module.save_history('final', val_losses, metrics, 'test')
+        self.model.module.save_history('final', test_losses, metrics, 'test')
 
         # Perform last evaluation on OOD SET
-        ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.adversarial,
+        ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
                                                 metrics=self.model.module.metrics, predict_n_cells=self.predict_n_cells, device=self.device, end=end, 
                                                 variational=self.model.module.variational, ood=True)
         if self.save_results:
             self.write_results(ood_losses, metrics, self.writer, epoch,' ood')
-        self.model.module.save_history('final', losses, metrics, 'ood')
+        self.model.module.save_history('final', ood_losses, metrics, 'ood')
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):
@@ -265,8 +283,7 @@ class Trainer:
         # Dictionary of models 
         models = {'VAE': SigmaVAE, 'AE': SigmaAE}
         model = models[self.model_name]
-        return model(adversarial = self.adversarial,
-                    in_width = self.in_width,
+        return model(in_width = self.in_width,
                     in_height = self.in_height,
                     in_channels = self.in_channels,
                     device = self.device,

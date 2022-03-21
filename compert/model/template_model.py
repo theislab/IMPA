@@ -19,7 +19,7 @@ class TemplateModel(nn.Module):
                         metrics, 
                         train_losses, 
                         val_losses, 
-                        dest_dir, adversarial):
+                        dest_dir):
         """
         Save the checkpoints to a checkpoint dict
         """
@@ -33,13 +33,14 @@ class TemplateModel(nn.Module):
         checkpoint['train_losses'] = train_losses  # Training losses 
         checkpoint['val_losses'] = val_losses  # Validation losses
         checkpoint['dest_dir'] = dest_dir
-        if adversarial:
+        checkpoint['history'] = self.history
+        if self.adversarial:
             checkpoint['optimizer_adversaries'] = self.optimizer_adversaries.state_dict()  # Optimizer autoencoder
             checkpoint['scheduler_autoencoder'] = self.scheduler_autoencoder.state_dict()  # Scheduler
         torch.save(checkpoint, os.path.join(dest_dir, 'checkpoints','checkpoint.pt'))    
 
 
-    def load_checkpoints(self, checkpoint_path, adversarial):
+    def load_checkpoints(self, checkpoint_path):
         """
         Load the checkpoints from a checkpoint path 
         """
@@ -52,7 +53,8 @@ class TemplateModel(nn.Module):
         train_losses = checkpoint['train_losses']
         val_losses = checkpoint['val_losses']
         dest_dir = checkpoint['dest_dir']
-        if adversarial:
+        self.history = checkpoint['history']
+        if 'optimizer_adversaries' in checkpoint:
             self.optimizer_adversaries.load_state_dict(checkpoint['optimizer_adversaries'])    # Optimizer autoencoder
             self.scheduler_adversaries.load_state_dict(checkpoint['scheduler_autoencoder'])    # Scheduler
 

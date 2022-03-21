@@ -43,7 +43,7 @@ class CellPaintingDataset:
     """
     Dataset class for image data 
     """
-    def __init__(self, image_path, data_index_path, embeddings_path, device='cuda', return_labels=True, augment_train=False, use_pretrained=True):    
+    def __init__(self, image_path, data_index_path, embeddings_path, device='cuda', return_labels=False, augment_train=False, use_pretrained=True):    
         assert os.path.exists(image_path), 'The data path does not exist'
         assert os.path.exists(data_index_path), 'The data index path does not exist'
 
@@ -153,11 +153,11 @@ class CellPaintingDataset:
         n_cells = file['n_cells']
         # State contains 1 or 0 labels representing inactive vs active compounds  
         if 'state' in file:
+            # Convert state to binary
             states = file['state']
             states = np.where(states=='ctr', 0., 1.)
         else:
             states = None 
-        # Convert state to binary
         return file_names, mol_names, mol_smiles, assay_labels, states, n_cells
     
 

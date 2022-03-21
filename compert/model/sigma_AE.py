@@ -7,7 +7,6 @@ from .CPA import *
 
 class SigmaAE(CPA):
     def __init__(self,
-                adversarial: bool,
                 in_width: int,
                 in_height: int,
                 in_channels: int,
@@ -21,8 +20,7 @@ class SigmaAE(CPA):
                 append_layer_width=None,
                 drug_embeddings = None) -> None:
      
-        super(SigmaAE, self).__init__(adversarial,
-                                        in_width,
+        super(SigmaAE, self).__init__(in_width,
                                         in_height,
                                         in_channels,
                                         device,

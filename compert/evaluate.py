@@ -12,7 +12,7 @@ def training_evaluation(model,
                         dataset_loader, 
                         adversarial, 
                         metrics, 
-                        binary_task, 
+                        predict_n_cells, 
                         device, end=False, variational=True, ood=False):
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
@@ -21,7 +21,7 @@ def training_evaluation(model,
         dataset_loader (torch.utils.data.DataLoader): Data loader of the split of interest
         adversarial (bool): Whether adversarial training is performed or not
         metrics (Metrics): Metrics object for computing qulity scores  
-        binary_task (bool): Whether the classification process is a binary task 
+        predict_n_cells (bool): Whether the task is to predict the drug or the number of cells
         device (str): `cuda` or `cpu`
         end (bool, optional): If the evaluation is performed at the end of the training loop. Defaults to False.
         variational (bool, optional): Whether a VAE is used over an AE. Defaults to True.
@@ -56,18 +56,18 @@ def training_evaluation(model,
         # Load observation X
         X = observation['X'].to(device)
         # Select the right task 
-        if binary_task:
-            # If binary prediction, then we store as labels 1.0 or 0.0 determining activity versus inactivity 
+        if predict_n_cells:
+            # If number of cells prediction, then we store as labels 1.0 or 0.0 determining activity versus inactivity 
             y_adv = observation['state'].item()
             y_true_ds.append(y_adv)
         else:
-            # If not binary prediction, store the whole drug label array 
+            # If not number of cells prediction, store the whole drug label array 
             if not ood:
                 y_adv = observation['mol_one_hot'].to(device)
                 # Store labels
                 y_true_ds.append(torch.argmax(y_adv, dim=1).item())
             else: 
-                # If we are evaluating the ood fold, we use thre druf ids and not the one-hot encoded molecules
+                # If we are evaluating the ood fold, we use drug ids and not the one-hot encoded molecules
                 y_adv = observation['smile_id'].to(device)
                 y_true_ds.append(y_adv.item())
         
@@ -81,11 +81,11 @@ def training_evaluation(model,
             res = model.evaluate(X, drug_id=drug_id)
             out, out_basal, z_basal, z, y_hat, ae_loss, _ = res.values()
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal)
-            
             # Collect the labels 
             if not ood:
                 y_hat_ds.append(torch.argmax(y_hat, dim=1).item())
-
+            
+            # Only at the end of training we store the latent vectors for analysis 
             if end:
                 z_basal_ds.append(z_basal)
                 z_ds.append(z)
@@ -97,8 +97,8 @@ def training_evaluation(model,
         
         # Perform optimizer step depending on the iteration
         metrics.update_rmse(X, out)
-    
-    if not ood:
+
+    if not ood and adversarial:
         if X.shape[0]>1:
             y_true_ds = torch.cat(y_true_ds, dim=0).to('cpu').numpy()
             y_hat_ds = torch.cat(y_hat_ds, dim=0).to('cpu').numpy()
@@ -117,14 +117,14 @@ def training_evaluation(model,
     if adversarial:
         metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
 
-    # Disentanglement and clustering evaluated inly at the end
+    # Disentanglement and clustering evaluated only at the end
     if end:
         z_ds = torch.cat(z_ds, dim=0)
         z_basal_ds = torch.cat(z_basal_ds, dim=0)
         
         # Disentanglement score before and after drug addition 
-        disentanglement_score_basal = compute_disentanglement_score(z_basal_ds, y_true_ds, device, binary_task, linear=True)
-        disentanglement_score_z = compute_disentanglement_score(z_ds, y_true_ds, device, binary_task, linear=True)
+        disentanglement_score_basal = compute_disentanglement_score(z_basal_ds, y_true_ds, device, predict_n_cells, linear=True)
+        disentanglement_score_z = compute_disentanglement_score(z_ds, y_true_ds, device, predict_n_cells, linear=True)
         metrics.metrics["disentanglement_score_basal"] = disentanglement_score_basal
         metrics.metrics["disentanglement_score_z"] = disentanglement_score_z
         metrics.metrics["difference_disentanglement"] = disentanglement_score_basal - disentanglement_score_z
@@ -132,7 +132,7 @@ def training_evaluation(model,
         z_ds = z_ds.to('cpu').numpy()
         z_basal_ds = z_basal_ds.to('cpu').numpy()
 
-        if not (binary_task and ood):
+        if not (predict_n_cells and ood):
             # Silhouette score before and after drug addition 
             silhouette_score_basal = compute_silhouette_coefficient(z_basal_ds, y_true_ds)
             silhouette_score_z = compute_silhouette_coefficient(z_ds, y_true_ds)
@@ -149,14 +149,14 @@ def training_evaluation(model,
     return losses, metrics.metrics
 
 
-def compute_disentanglement_score(Z, y, device, binary_task, linear=True):
+def compute_disentanglement_score(Z, y, device, predict_n_cells, linear=True):
     """Train a classifier that evaluates the disentanglement of the latents space from the information
     on the drug
 
     Args:
         Z (torch.tensor): Latent representation of the validation set under the model 
         y (torch.tensor): The label assigned to each observation
-        binary_task (bool): Whether the task is to predict the drug or the case/control condition  
+        predict_n_cells (bool): Whether the task is to predict the drug or the number of cells
 
     Returns:
         dict: dictionary with the results
@@ -171,14 +171,14 @@ def compute_disentanglement_score(Z, y, device, binary_task, linear=True):
     unique_labels = set(y)
     label_to_idx = {labels: idx for idx, labels in enumerate(unique_labels)}
     labels_tensor = torch.tensor(
-        [label_to_idx[label] for label in y], dtype=torch.float if binary_task else torch.long, device="cuda"
+        [label_to_idx[label] for label in y], dtype=torch.float if predict_n_cells else torch.long, device="cuda"
     )
     assert normalized_basal.size(0) == len(labels_tensor), f'Z of length {normalized_basal.size(0)}, y of length {len(labels_tensor)}'
     
-    if not binary_task:
+    if not predict_n_cells:
         criterion = nn.CrossEntropyLoss()
     else:
-        criterion = nn.BCEWithLogitsLoss()
+        criterion = nn.MSELoss()
 
     dataset = torch.utils.data.TensorDataset(normalized_basal, labels_tensor)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=True)
@@ -189,14 +189,14 @@ def compute_disentanglement_score(Z, y, device, binary_task, linear=True):
     disentanglement_classifier = MLP(
         [normalized_basal.size(1)]
         + [normalized_basal.size(1) for _ in range(classifier_depth)]
-        + [len(unique_labels) if not binary_task else 1]
+        + [len(unique_labels) if not predict_n_cells else 1]
     ).to(device)
     optimizer = torch.optim.Adam(disentanglement_classifier.parameters(), lr=1e-2)
 
     for epoch in tqdm(range(100)):
         for X, y in data_loader:
             pred = disentanglement_classifier(X)
-            if not binary_task:
+            if not predict_n_cells:
                 loss = criterion(pred, y)
             else:
                 loss = criterion(pred.squeeze(), y)

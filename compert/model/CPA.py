@@ -15,7 +15,6 @@ The default AE/VAE class
 
 class CPA(TemplateModel):
     def __init__(self,
-            adversarial: bool,
             in_width: int,
             in_height: int,
             in_channels: int,
@@ -31,7 +30,7 @@ class CPA(TemplateModel):
             variational: bool = True):     
 
         super(CPA, self).__init__() 
-        self.adversarial = adversarial  # If train a normal VAE or and adversarial VAE s
+        self.adversarial = False  # If a normal model or an adversarial network must be trained
         self.in_width = in_width  # Image width 
         self.in_height = in_height  # Image height
         self.in_channels = in_channels  # Image channels (5 in this case)
@@ -60,7 +59,10 @@ class CPA(TemplateModel):
         self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.hparams["latent_dim"], device = self.device)
 
         # The log sigma as an external parameter of the sigma vae training paradigm 
-        self.log_scale = torch.nn.Parameter(torch.full((1,1,1,1), 0.0), requires_grad=True)
+        if self.hparams["data_driven_sigma"]:
+            self.log_scale = 0
+        else:
+            self.log_scale = torch.nn.Parameter(torch.full((1,1,1,1), 0.0), requires_grad=True)
         self.variational = variational 
 
         # Instantiate the convolutional encoder and decoder modules
@@ -86,7 +88,20 @@ class CPA(TemplateModel):
             variational = self.variational
         ) 
 
+        # Initialize warmup params
+        self.warmup_steps = self.hparams["warmup_steps"]
 
+        # Statistics history
+        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "ood":{'epoch':[]}}
+
+        # Iterations to decide when to perform adversarial training 
+        self.iteration = 0
+
+        # Initialize the autoencoder first with adversarial equal to False
+        self.initialize_ae() 
+
+    def initialize_ae(self):
+        print('Initalize autoencoder')
         # Can train with adversarial loss or a normal VAE (use adversary = False in latter case)
         if not self.adversarial:
             # Setup the optimizer and scheduler for the standard VAE 
@@ -103,97 +118,89 @@ class CPA(TemplateModel):
                 gamma=0.5,
             )
 
-        if self.adversarial:
-            # Instantiate the drug embedding and adversarial part of the network 
-            if self.num_drugs > 0:
-                # Adversary network is a simple MLP with custom depth and width 
-                if not self.predict_n_cells:
-                    self.adversary_drugs = MLP(
-                        [self.hparams["latent_dim"]]
-                        + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
-                        + [self.n_seen_drugs]
-                    )
-                else:
-                    self.adversary_drugs = MLP(
-                        [self.hparams["latent_dim"]]
-                        + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
-                        + [1]
-                    )
+    def initialize_adversarial(self):
+        print('Initalize adversarial training')
+        # Adversary network is a simple MLP with custom depth and width 
+        if not self.predict_n_cells:
+            self.adversary_drugs = MLP(
+                [self.hparams["latent_dim"]]
+                + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
+                + [self.n_seen_drugs]
+            ).to(self.device)
+        else:
+            self.adversary_drugs = MLP(
+                [self.hparams["latent_dim"]]
+                + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
+                + [1]
+            ).to(self.device)
 
-                # Set the drug embedding to a fixed or trainable status depending on whether a pre-trained model is used 
-                if self.drug_embeddings is None:
-                    self.drug_embeddings = torch.nn.Embedding(
-                        self.num_drugs, self.hparams["latent_dim"]
-                    )
-                    embedding_requires_grad = True
-                else:
-                    self.drug_embeddings = self.drug_embeddings  # From pre-trained 
-                    embedding_requires_grad = False
+        # Set the drug embedding to a fixed or trainable status depending on whether a pre-trained model is used 
+        if self.drug_embeddings is None:
+            self.drug_embeddings = torch.nn.Embedding(
+                self.num_drugs, self.hparams["latent_dim"])
+            embedding_requires_grad = True
+        else:
+            self.drug_embeddings = self.drug_embeddings  # From pre-trained 
+            embedding_requires_grad = False
 
-                # Drug embedding encoder 
-                self.drug_embedding_encoder = MLP(
-                    [self.drug_embeddings.embedding_dim]
-                    + [self.hparams["embedding_encoder_width"]]
-                    * self.hparams["embedding_encoder_depth"]
-                    + [self.hparams["latent_dim"]],
-                    last_layer_act="linear",
-                )
+        # Drug embedding encoder 
+        self.drug_embedding_encoder = MLP(
+            [self.drug_embeddings.embedding_dim]
+            + [self.hparams["embedding_encoder_width"]]
+            * self.hparams["embedding_encoder_depth"]
+            + [self.hparams["latent_dim"]],
+            last_layer_act="linear",
+        ).to(self.device)
 
-                # Binary task predicts active versus inactive using the specific drug 
-                if self.predict_n_cells:
-                    self.loss_adversary_drugs = torch.nn.MSELoss(reduction = 'mean')
-                else:
-                    self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(reduction = 'mean')
+        # Binary task predicts active versus inactive using the specific drug 
+        if self.predict_n_cells:
+            self.loss_adversary_drugs = torch.nn.MSELoss(reduction = 'mean')
+        else:
+            self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(reduction = 'mean')
 
 
-            # Now initialize the optimizer and the parameters needed for backpropagation
-            has_drugs = self.num_drugs > 0
-            get_params = lambda model, cond: list(model.parameters()) if cond else []  # Get the parameters of a model if a condition is verified
-            # Collect parameters 
-            _parameters = (
-                get_params(self.encoder, True)
-                + get_params(self.decoder, True)
-                + get_params(self.drug_embeddings, has_drugs and embedding_requires_grad)
-                + get_params(self.drug_embedding_encoder, True)
-            )
+        # Now initialize the optimizer and the parameters needed for backpropagation
+        has_drugs = self.num_drugs > 0
+        get_params = lambda model, cond: list(model.parameters()) if cond else []  # Get the parameters of a model if a condition is verified
+        # Collect parameters 
+        _parameters = (
+            get_params(self.encoder, True)
+            + get_params(self.decoder, True)
+            + get_params(self.drug_embeddings, has_drugs and embedding_requires_grad)
+            + get_params(self.drug_embedding_encoder, True)
+        )
 
-            # Optimizer for the autoencoder 
-            self.optimizer_autoencoder = torch.optim.Adam(
-                _parameters,
-                lr=self.hparams["autoencoder_lr"],
-                weight_decay=self.hparams["autoencoder_wd"],
-            )
+        # Optimizer for the autoencoder 
+        self.optimizer_autoencoder = torch.optim.Adam(
+            _parameters,
+            lr=self.hparams["autoencoder_lr"],
+            weight_decay=self.hparams["autoencoder_wd"],
+        )
 
-            # Optimizer for the drug adversary. Make sure that only the right parameters are bound to it
-            _parameters = get_params(self.adversary_drugs, has_drugs)
+        # Optimizer for the drug adversary. Make sure that only the right parameters are bound to it
+        _parameters = get_params(self.adversary_drugs, has_drugs)
 
-            self.optimizer_adversaries = torch.optim.Adam(
-                _parameters,
-                lr=self.hparams["adversary_lr"],
-                weight_decay=self.hparams["adversary_wd"],
-            )
+        self.optimizer_adversaries = torch.optim.Adam(
+            _parameters,
+            lr=self.hparams["adversary_lr"],
+            weight_decay=self.hparams["adversary_wd"],
+        )
 
-            # Learning rate schedulers for the model 
-            self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
-                self.optimizer_autoencoder,
-                step_size=self.hparams["step_size_lr"],
-                gamma=0.5,
-            )
+        # Learning rate schedulers for the model 
+        self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
+            self.optimizer_autoencoder,
+            step_size=self.hparams["step_size_lr"],
+            gamma=0.5,
+        )
 
-            self.scheduler_adversaries = torch.optim.lr_scheduler.StepLR(
-                self.optimizer_adversaries,
-                step_size=self.hparams["step_size_lr"],
-                gamma=0.5,
-            )
+        self.scheduler_adversaries = torch.optim.lr_scheduler.StepLR(
+            self.optimizer_adversaries,
+            step_size=self.hparams["step_size_lr"],
+            gamma=0.5,
+        )
 
-        # Initialize warmup params
-        self.warmup_steps = self.hparams["warmup_steps"]
-
-        # Statistics history
-        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "ood":{'epoch':[]}}
-
-        # Iterations to decide when to perform adversarial training 
-        self.iteration = 0
+        # Turn adversarial to True
+        self.adversarial = True
 
     
     def set_hparams_(self, seed, hparams):
@@ -226,7 +233,9 @@ class CPA(TemplateModel):
             "embedding_encoder_width": 512,
             "embedding_encoder_depth": 0,
             "warmup_steps": 5 if default else int(np.random.choice([0, 5, 10, 15])), 
-            "data_driven_sigma": True if default else np.random.choice([True, False])
+            "data_driven_sigma": True if default else np.random.choice([True, False]),
+            "ae_pretrain": True if default else np.random.choice([True, False]),
+            "ae_pretrain_steps": 5
         }
         # the user may fix some hparams
         if hparams != "":
@@ -267,6 +276,7 @@ class CPA(TemplateModel):
             mu, log_sigma = self.encoder(X)
             # Apply reparametrization trick
             z = self.reparameterize(mu, log_sigma)
+        # Decode z
         out = self.decoder(z)
         if self.variational:
             ae_loss = self.ae_loss(X, out, mu, log_sigma)
@@ -314,7 +324,7 @@ class CPA(TemplateModel):
             ae_loss = self.ae_loss(X, out)
 
         # Check whether to perform adversarial training 
-        if (self.iteration % self.hparams["adversary_steps"]) == 0:
+        if (self.iteration % self.hparams["adversary_steps"]) != 0:
             # Compute the gradient penalty for the drug regularization term 
             adv_drugs_grad_penalty = self.compute_gradient_penalty(y_adv_hat.sum(), z_basal)
             loss = adv_loss + self.hparams["penalty_adversary"] * adv_drugs_grad_penalty
@@ -420,7 +430,7 @@ class CPA(TemplateModel):
             # Collect the image data from the batch 
             X = batch['X'].to(self.device)
 
-            # If no adversarial training, simply perform the VAE training loop
+            # If no adversarial training, simply perform the AE training loop
             if not self.adversarial:
                 res = self.forward_ae(X)
                 out, _, ae_loss = res.values()  # Collect the losses 
@@ -433,7 +443,7 @@ class CPA(TemplateModel):
             else:
                 # self.binary is true when the task is predicting trt vs dmso 
                 if self.predict_n_cells:
-                    y_adv = batch['state'].to(self.device).float()
+                    y_adv = batch['n_cells'].to(self.device).float()
                 else:
                     y_adv = batch['mol_one_hot'].to(self.device).long()
                 
@@ -448,12 +458,12 @@ class CPA(TemplateModel):
                 tot_ae_loss += ae_loss['total_loss'].item()
                 tot_adv_loss += adv_loss.item()
                 
-                # Optimizer step - non-adversarial training 
-                if (self.iteration % self.hparams["adversary_steps"]) == 0:       
+                # Optimizer step - adversarial training 
+                if (self.iteration % self.hparams["adversary_steps"]) != 0:       
                     self.optimizer_adversaries.zero_grad()
                     loss.backward()
                     self.optimizer_adversaries.step()
-                # Optimizer step - adversary step
+                # Optimizer step - non-adversarial training 
                 else:
                     self.optimizer_autoencoder.zero_grad()
                     loss.backward()
@@ -480,8 +490,11 @@ class CPA(TemplateModel):
             avg_kl_loss = tot_kl_loss/len(train_loader)
             avg_recon_loss = tot_recons_loss/len(train_loader)
         else:
-            avg_recon_loss = tot_ae_loss/len(train_loader)
-            
+            if not self.adversarial:
+                avg_recon_loss = training_loss/len(train_loader)
+            else:
+                avg_recon_loss = tot_ae_loss/len(train_loader)
+
         self.metrics.update_bpd(avg_recon_loss)
 
         # The average RMSE between the evaluated images for all seen batches

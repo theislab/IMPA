@@ -1,19 +1,20 @@
-{   "experiment_name":"first_experiment_compert",
+{   "experiment_name":"pre_train_5_adv_50",
     
     "image_path": "/home/icb/alessandro.palma/data/cellpainting_100",
     "data_index_path": "/home/icb/alessandro.palma/data/data_index/integrated/200k",
     "embedding_path":"/home/icb/alessandro.palma/data/metadata_processed/original/embeddings/rdkit/rdkit2D_embedding_cellpainting.csv",
-    "result_path": "/home/icb/alessandro.palma/results/try_new_saves", 
+    "result_path": "/home/icb/alessandro.palma/results/pre_train_5_adv_50", 
     
     "resume": false,
     "resume_checkpoint": "",
     "resume_epoch": 1, 
 
-    "img_plot": false,
-    "save_results": false, 
+    "img_plot": true,
+    "save_results": true, 
     "generate": false,
 
-    "num_epochs": 50,
+    "num_epochs": 30,
+    "batch_size": 256,
     "eval": true,
     "eval_every": 1,
     "n_workers_loader": 4,
@@ -23,33 +24,32 @@
     "in_width": 100,
     "in_height": 100,
     "in_channels": 5,
-    "adversarial": true,
     "predict_n_cells": false,
     "append_layer_width": null, 
-    "use_embeddings": false,
-    "patience": 5,
-
+    "use_embeddings": true,
+    "patience": 30,
     "seed": 42,
 
     "hparams": {
-        "batch_size": 256,
         "latent_dim": 512,
         "init_fm": 64,
         "n_conv": 3,
         "n_residual_blocks": 6,
         "adversary_width": 256,
         "adversary_depth": 3,
-        "reg_adversary": 5, 
+        "reg_adversary": 5000, 
         "penalty_adversary": 3, 
         "autoencoder_lr": 1e-4, 
         "adversary_lr": 1e-3,
         "autoencoder_wd": 1e-6, 
         "adversary_wd": 1e-4, 
-        "adversary_steps": 2, 
-        "step_size_lr": 45, 
+        "adversary_steps": 50, 
+        "step_size_lr": 10, 
         "embedding_encoder_width": 512,
-        "embedding_encoder_depth": 0,
+        "embedding_encoder_depth": 1,
         "warmup_steps": 1, 
-        "data_driven_sigma": true
+        "data_driven_sigma": true,
+        "ae_pretrain": true,
+        "ae_pretrain_steps": 5
     }
 }
