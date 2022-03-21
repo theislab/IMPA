@@ -13,7 +13,7 @@
     "save_results": true, 
     "generate": false,
 
-    "num_epochs": 30,
+    "num_epochs": 1,
     "batch_size": 256,
     "eval": true,
     "eval_every": 1,
@@ -50,6 +50,6 @@
         "warmup_steps": 1, 
         "data_driven_sigma": true,
         "ae_pretrain": true,
-        "ae_pretrain_steps": 5
+        "ae_pretrain_steps": 0
     }
 }

@@ -154,7 +154,7 @@ class Trainer:
         for epoch in range(self.resume_epoch, self.num_epochs+1):
 
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
-            if epoch == self.model.module.hparams["ae_pretrain_steps"]:
+            if epoch >= self.model.module.hparams["ae_pretrain_steps"]:
                 self.model.module.initialize_adversarial()
             
             print(f'Running epoch {epoch}')
@@ -198,16 +198,17 @@ class Trainer:
                         del sampled_img
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                if epoch < self.model.module.ae_pretrain_steps:
+                if epoch < self.model.module.hparams["ae_pretrain_steps"]:
                     score = metrics['bpd']
-                elif epoch == self.model.module.ae_pretrain_stepss:
+                elif epoch == self.model.module.hparams["ae_pretrain_steps"]+1:
                     self.model.module.best_score = -np.inf
                     score = metrics["rmse_basal_full"]
                 else:
                     score = metrics["rmse_basal_full"]
                 
+                # Evaluate early-stopping 
                 cond, early_stopping = self.model.module.early_stopping(score) 
-                
+
                 # Save the model if it is the best performing one 
                 if cond and self.save_results:
                     print(f'New best score is {self.model.module.best_score}')
@@ -223,7 +224,7 @@ class Trainer:
             # If we overcome the patience, we break the loop
             if early_stopping:
                 break 
-
+            
             # Scheduler step at the end of the epoch 
             if epoch <= self.hparams["warmup_steps"]:
                 self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., self.model.module.warmup_steps/epoch)
@@ -242,7 +243,7 @@ class Trainer:
                                                 variational=self.model.module.variational, ood=False)
         if self.save_results:
             self.write_results(test_losses, metrics, self.writer, epoch, ' test')
-        self.model.module.save_history('final', test_losses, metrics, 'test')
+        self.model.module.save_history('final_test', test_losses, metrics, 'test')
 
         # Perform last evaluation on OOD SET
         ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
@@ -250,7 +251,7 @@ class Trainer:
                                                 variational=self.model.module.variational, ood=True)
         if self.save_results:
             self.write_results(ood_losses, metrics, self.writer, epoch,' ood')
-        self.model.module.save_history('final', ood_losses, metrics, 'ood')
+        self.model.module.save_history('final_ood', ood_losses, metrics, 'ood')
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):

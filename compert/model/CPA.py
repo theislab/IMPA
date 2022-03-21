@@ -92,7 +92,7 @@ class CPA(TemplateModel):
         self.warmup_steps = self.hparams["warmup_steps"]
 
         # Statistics history
-        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "ood":{'epoch':[]}}
+        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "test":{'epoch':[]}, "ood":{'epoch':[]}}
 
         # Iterations to decide when to perform adversarial training 
         self.iteration = 0
