@@ -12,86 +12,152 @@ from .evaluate import *
 from torch.utils.tensorboard import SummaryWriter
 import torch
 import numpy as np
+
 import json
+import logging
+import seml
+from sacred import Experiment
 
+# Initialize seml experiment
+ex = Experiment()
+seml.setup_logger(ex)
 
-class Config:
-    """
-    Read a configuration file in .json format and wraps the hparams into a calss
-    """
-    def __init__(self, config_path):
-        self.config_path = config_path
-        with open(self.config_path) as f:
-            self.params = json.load(f)
-    
-    def __getattr__(self, name):
-        if name in self.params:
-            return self.params[name]
-        else:
-            raise AttributeError("No such attribute: " + name)
+# Setup the statistics collection post experiment 
+@ex.post_run_hook
+def collect_stats(_run):
+    seml.collect_exp_stats(_run)
 
+# Configure the seml experiment 
+@ex.config
+def config():
+    overwrite = None
+    db_collection = None
+    if db_collection is not None:
+        ex.observers.append(
+            seml.create_mongodb_observer(db_collection, overwrite=overwrite))
 
 class Trainer:
-    def __init__(self, config):
-        """Class for training the model 
+    """
+    Experiment wrapper around the Sacred experiment class
+    """
+
+    def __init__(self, init_all=True):
+        if init_all:
+            self.init_all()
+    
+    @ex.capture(prefix="paths")
+    def init_folders(self, experiment_name, image_path, data_index_path, embeddings_path, use_embeddings, result_path):
+        """Initialize the logging folders 
 
         Args:
-            config (Config): The object containing configuration parameters from .json file
+            experiment_name (str): Name of the experiment 
+            image_path (str): Path to the image dataset
+            data_index_path (str): Path to the image metadata
+            embeddings_path (str): The path to the molecular embedding csv
+            use_embeddings (str): Whether to use pre-trained embeddings or not
+            result_path (str): path to the outcome 
         """
-        self.experiment_name = config.experiment_name  # Will be used to name the path 
+        self.experiment_name = experiment_name  
+        self.image_path = image_path 
+        self.data_index_path = data_index_path  
+        self.embeddings_path = embeddings_path  
+        self.use_embeddings = use_embeddings  
+        self.result_path = result_path
 
-        self.image_path = config.image_path  # Path to the images 
-        self.data_index_path = config.data_index_path  # Path to the image metadata
-        self.embeddings_path = config.embedding_path  # The path to the molecular embedding csv
-        self.use_embeddings = config.use_embeddings  # Whether to use pre-trained embeddings or not
 
-        # Path to save the results
-        self.result_path = config.result_path
+    @ex.capture(prefix="resume")
+    def init_resume(self, resume, resume_checkpoint):
+        """Initialize the resuming of an initialized run
 
+        Args:
+            resume (bool): Whether to resume a previously performed run 
+            resume_checkpoint (str): The checkpoint path  
+            resume_epoch (str): The epoch for the resuming 
+        """
         # Resume the training 
-        self.resume = config.resume 
-        self.resume_checkpoint = config.resume_checkpoint  # Path to the pre-trained weights 
+        self.resume = resume 
+        self.resume_checkpoint = resume_checkpoint  # Path to the pre-trained weights 
         self.resume_epoch = 1  # By default, we start at epoch 1 
 
-        self.img_plot = config.img_plot  # Used when trained on notebooks - print generations/reconstructions after epoch
-        self.save_results = config.save_results  # If the images have to be saved in the result folder
 
-        self.num_epochs = config.num_epochs  # Number of epochs for training
-        self.batch_size = config.batch_size
-        self.eval = config.eval  # Whether evaluation should occur
-        self.eval_every = config.eval_every  # How often validation takes place 
+    @ex.capture(prefix="training_params")
+    def init_training_params(self, img_plot, save_results, num_epochs, batch_size, eval, eval_every, 
+                            n_workers_loader, generate, model_name, temperature, augment_train, patience, seed,
+                            predict_n_cells=False, append_layer_width=False):
+        """Initialization of parameters for training
 
-        self.n_workers_loader = config.n_workers_loader # Number of workers for batch loading
-        self.generate = config.generate  # Whether to perform a sampling + decoding experiment during evaluation (only variational)
-        self.model_name = config.model_name  # What model to run
-        self.temperature = config.temperature  # Temperature to downscale the random samples from the prior
-        self.augment_train = config.augment_train  # Whether augmentation should be carried out on the training set
+        Args:
+            img_plot (bool): Used when trained on notebooks - print generations/reconstructions after epoch
+            save_results (bool): If the images have to be saved in the result folder
+            num_epochs (int): Number of epochs for training
+            batch_size (int): Size of the batches
+            eval (bool): Whether evaluation should occur
+            eval_every (int): How often validation takes place 
+            n_workers_loader (int): Number of workers for batch loading
+            generate (bool): Whether to perform a sampling + decoding experiment during evaluation (only variational)
+            model_name (str): Name of model to run (AE or VAE)
+            temperature (float): Temperature to downscale the random samples from the prior
+            augment_train (bool): Whether augmentation should be carried out on the training set
+            patience (int): How many steps of non-improvement of valid loss before stopping 
+            seed (int): The random seed for reproducibility 
+            predict_n_cells (bool, optional): Controls if the adversarial task is predicting drugs or active vs inactive. Defaults to False.
+            append_layer_width (bool, optional): Controls The addition of trailing layers to the adversarial and drug embedding MLPs. Defaults to False.
+        """
+        self.img_plot = img_plot  
+        self.save_results = save_results  
 
-        # Image features
-        self.in_width = config.in_width
-        self.in_height = config.in_height
-        self.in_channels = config.in_channels
+        self.num_epochs = num_epochs  
+        self.batch_size = batch_size
+        self.eval = eval  
+        self.eval_every = eval_every   
 
-        self.predict_n_cells = config.predict_n_cells  # Controls if the adversarial task is predicting drugs or active vs inactive
-        self.append_layer_width = config.append_layer_width
+        self.n_workers_loader = n_workers_loader  
+        self.generate = generate  
+        self.model_name = model_name   
+        self.temperature = temperature   
+        self.augment_train = augment_train   
 
-        self.patience = config.patience
-        self.seed = config.seed 
-    
-        self.hparams = config.hparams  # Dictionary with model hyperparameters 
-
+        self.patience = patience
+        self.seed = seed 
+        
+        self.predict_n_cells = predict_n_cells   
+        self.append_layer_width = append_layer_width
         # Set device
         self.device = self.set_device() 
         print(f'Working on device: {self.device}')
 
-        
-        # Prepare the data
-        print('Lodading the data...') 
-        self.drug_embeddings, self.num_drugs, self.n_seen_drugs, self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
 
+    @ex.capture(prefix="image_params")
+    def init_img_params(self, in_width, in_height, in_channels):
+        """Initialize image parameters 
+
+        Args:
+            in_width (int): Spatial width
+            in_height (int): Spatial height 
+            in_channels (int): Number of input channels  
+        """
+        # Image features
+        self.in_width = in_width
+        self.in_height = in_height
+        self.in_channels = in_channels
+
+
+    @ex.capture(prefix="model")
+    def init_model(self, hparams):      
+        """Initialize the model 
+        """
+        self.hparams = hparams  # Dictionary with model hyperparameters 
         # Initialize model 
         self.model =  self.load_model().to(self.device)
-        self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present 
+        self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present
+
+
+    def init_dataset(self):
+        """Initialize dataset and data loaders
+        """
+        # # Prepare the data
+        print('Lodading the data...') 
+        self.drug_embeddings, self.num_drugs, self.n_seen_drugs, self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
         
         # Create data loaders 
         self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, 
@@ -105,7 +171,10 @@ class Trainer:
                                                     num_workers=self.n_workers_loader, drop_last=False)
         print('Successfully loaded the data')
 
-
+    
+    def init_log(self):
+        """Initialize the tensorboard loader and directories 
+        """
         # Create result folder
         if self.save_results:
             if not self.resume:
@@ -117,7 +186,22 @@ class Trainer:
             
             # Setup logger in any case
             self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
-            
+
+    
+    @ex.capture
+    def init_all(self, seed: int):
+        """
+        Sequentially run the sub-initializers of the experiment.
+        """
+        self.seed = seed
+        self.init_folders()
+        self.init_resume()
+        self.init_training_params()
+        self.init_img_params()
+        self.init_model()
+        self.init_dataset()
+        self.init_log()
+        
 
     def create_torch_datasets(self):
         """
@@ -161,12 +245,12 @@ class Trainer:
             self.model.train() 
             
             # Losses and metrics dictionaries from the epoch 
-            losses, metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
+            train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
             
             # Save results to tensorboard and to model's history  
             if self.save_results:
-                self.write_results(losses, metrics, self.writer, epoch, 'train')
-            self.model.module.save_history(epoch, losses, metrics, 'train')
+                self.write_results(train_losses, train_metrics, self.writer, epoch, 'train')
+            self.model.module.save_history(epoch, train_losses, train_metrics, 'train')
 
             # Evaluate
             if epoch % self.eval_every == 0 and self.eval:
@@ -174,13 +258,13 @@ class Trainer:
                 self.model.eval()
 
                 # Get the validation results 
-                val_losses, metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
+                val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
                                                         self.model.module.metrics, self.predict_n_cells, self.device, end, 
                                                         variational=self.model.module.variational)
 
                 if self.save_results:
-                    self.write_results(val_losses, metrics, self.writer, epoch, 'val')
-                self.model.module.save_history(epoch, val_losses, metrics, 'val')
+                    self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
+                self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
 
                 # Plot reconstruction of a random image 
                 if self.save_results:
@@ -199,12 +283,12 @@ class Trainer:
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
                 if epoch < self.model.module.hparams["ae_pretrain_steps"]:
-                    score = metrics['bpd']
-                elif epoch == self.model.module.hparams["ae_pretrain_steps"]+1:
+                    score = val_metrics['bpd']
+                elif epoch == self.model.module.hparams["ae_pretrain_steps"] + 1:
                     self.model.module.best_score = -np.inf
-                    score = metrics["rmse_basal_full"]
+                    score = val_metrics["rmse_basal_full"]
                 else:
-                    score = metrics["rmse_basal_full"]
+                    score = val_metrics["rmse_basal_full"]
                 
                 # Evaluate early-stopping 
                 cond, early_stopping = self.model.module.early_stopping(score) 
@@ -214,8 +298,8 @@ class Trainer:
                     print(f'New best score is {self.model.module.best_score}')
                     # Save the model with lowest validation loss 
                     self.model.module.save_checkpoints(epoch, 
-                                                        metrics, 
-                                                        losses, 
+                                                        val_metrics, 
+                                                        train_losses, 
                                                         val_losses, 
                                                         self.dest_dir)
 
@@ -235,23 +319,24 @@ class Trainer:
                 self.model.module.scheduler_adversaries.step()
 
         self.model.eval()
-        epoch = 30
         # Perform last evaluation on TEST SET   
         end = True
-        test_losses, metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
+        test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.predict_n_cells, self.device, end, 
                                                 variational=self.model.module.variational, ood=False)
         if self.save_results:
-            self.write_results(test_losses, metrics, self.writer, epoch, ' test')
-        self.model.module.save_history('final_test', test_losses, metrics, 'test')
+            self.write_results(test_losses, test_metrics, self.writer, epoch, ' test')
+        self.model.module.save_history('final_test', test_losses, test_metrics, 'test')
 
         # Perform last evaluation on OOD SET
-        ood_losses, metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
+        ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
                                                 metrics=self.model.module.metrics, predict_n_cells=self.predict_n_cells, device=self.device, end=end, 
                                                 variational=self.model.module.variational, ood=True)
         if self.save_results:
-            self.write_results(ood_losses, metrics, self.writer, epoch,' ood')
-        self.model.module.save_history('final_ood', ood_losses, metrics, 'ood')
+            self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
+        self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
+
+        return self.model.module.history
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):
@@ -299,7 +384,6 @@ class Trainer:
 
 
 # Auxiliary functions 
-
 def gaussian_nll(mu, log_sigma, x):
     """
     Implement Gaussian nll loss
@@ -311,3 +395,21 @@ def softclip(tensor, min):
     """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
     result_tensor = min + F.softplus(tensor - min)
     return result_tensor
+
+
+# We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,
+# where we can then for instance load a pretrained model to inspect the performance.
+@ex.command(unobserved=True)
+def get_experiment(init_all=False):
+    print("get_experiment")
+    experiment = Trainer(init_all=init_all)
+    return experiment
+
+
+# This function will be called by default. Note that we could in principle manually pass an experiment instance,
+# e.g., obtained by loading a model from the database or by calling this from a Jupyter notebook.
+@ex.automain
+def train(experiment=None):
+    if experiment is None:
+        experiment = Trainer()
+    experiment.train()
