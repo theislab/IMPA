@@ -1,7 +1,7 @@
 import torch
 import torch.utils.data
 
-from ..train import *
+from train import *
 from .CPA import *
 
 

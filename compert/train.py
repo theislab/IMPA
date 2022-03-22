@@ -2,12 +2,12 @@ import os
 import torch
 
 # Available autoencoder model attached to CPA 
-from .model.sigma_VAE import SigmaVAE
-from .model.sigma_AE import SigmaAE
-from .data.dataset import CellPaintingDataset
-from .utils import *
-from .plot_utils import Plotter 
-from .evaluate import *
+from model.sigma_VAE import SigmaVAE
+from model.sigma_AE import SigmaAE
+from data.dataset import CellPaintingDataset
+from utils import *
+from plot_utils import Plotter 
+from evaluate import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torch
