@@ -1,13 +1,15 @@
 import os
 import torch
+import sys
+sys.path.insert(0, '.')
 
 # Available autoencoder model attached to CPA 
-from model.sigma_VAE import SigmaVAE
-from model.sigma_AE import SigmaAE
-from data.dataset import CellPaintingDataset
-from utils import *
-from plot_utils import Plotter 
-from evaluate import *
+from .model.sigma_VAE import SigmaVAE
+from .model.sigma_AE import SigmaAE
+from .dataset import CellPaintingDataset
+from .utils import *
+from .plot_utils import Plotter 
+from .evaluate import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -198,8 +200,8 @@ class Trainer:
         self.init_resume()
         self.init_training_params()
         self.init_img_params()
-        self.init_model()
         self.init_dataset()
+        self.init_model()
         self.init_log()
         
 
@@ -273,7 +275,7 @@ class Trainer:
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
                                                     tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot)
                     del original
-                    del reconstructed
+                    del reconstructedls
                     
                     # Plot generation of sampled images 
                     if self.generate and self.model.module.variational:
@@ -381,20 +383,6 @@ class Trainer:
                     predict_n_cells = self.predict_n_cells,
                     append_layer_width = self.append_layer_width,
                     drug_embeddings = self.drug_embeddings)
-
-
-# Auxiliary functions 
-def gaussian_nll(mu, log_sigma, x):
-    """
-    Implement Gaussian nll loss
-    """
-    return 0.5 * torch.pow((x - mu) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
-
-
-def softclip(tensor, min):
-    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
-    result_tensor = min + F.softplus(tensor - min)
-    return result_tensor
 
 
 # We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,

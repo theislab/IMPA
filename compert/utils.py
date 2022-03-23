@@ -1,9 +1,8 @@
 import numpy as np
 import os
 import pandas as pd
-import time
 import cv2
-import time 
+from datetime import datetime 
 
     
 def img_resize(image, width:int, height:int, interpolation:str):
@@ -125,7 +124,7 @@ def make_dirs(path, experiment_name):
     Returns:
         str: name of the destination directory
     """
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S%f")
     if not os.path.exists(path):
         os.mkdir(path)
     dest_dir = os.path.join(path, experiment_name+'_'+timestamp)

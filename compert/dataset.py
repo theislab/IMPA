@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
 
-from ..utils import *
+from .utils import *
 
 import torch
 from torch.utils.data import Dataset
