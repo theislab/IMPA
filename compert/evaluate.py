@@ -1,11 +1,13 @@
 from tqdm import tqdm
 from sklearn.metrics import silhouette_score
+from sklearn import model_selection
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
 
 # MLP for the discriminator
-from .model.modules import MLP
+from model.modules import MLP
 
 
 def training_evaluation(model,  
@@ -98,6 +100,7 @@ def training_evaluation(model,
         # Perform optimizer step depending on the iteration
         metrics.update_rmse(X, out)
 
+
     if not ood and adversarial:
         if X.shape[0]>1:
             y_true_ds = torch.cat(y_true_ds, dim=0).to('cpu').numpy()
@@ -149,7 +152,7 @@ def training_evaluation(model,
     return losses, metrics.metrics
 
 
-def compute_disentanglement_score(Z, y, device, predict_n_cells, linear=True):
+def compute_disentanglement_score(Z, drug, device, predict_n_cells, linear=True):
     """Train a classifier that evaluates the disentanglement of the latents space from the information
     on the drug
 
@@ -162,54 +165,67 @@ def compute_disentanglement_score(Z, y, device, predict_n_cells, linear=True):
         dict: dictionary with the results
     """
     print('Training discriminator network on drug latent space')
+
     # Normalize the latent descriptors 
     mean = Z.mean(dim=0, keepdim=True)
     stddev = Z.std(0, unbiased=False, keepdim=True)
     normalized_basal = (Z - mean) / stddev
 
-    # Collect labels for a classifier
-    unique_labels = set(y)
-    label_to_idx = {labels: idx for idx, labels in enumerate(unique_labels)}
-    labels_tensor = torch.tensor(
-        [label_to_idx[label] for label in y], dtype=torch.float if predict_n_cells else torch.long, device="cuda"
-    )
-    assert normalized_basal.size(0) == len(labels_tensor), f'Z of length {normalized_basal.size(0)}, y of length {len(labels_tensor)}'
-    
-    if not predict_n_cells:
-        criterion = nn.CrossEntropyLoss()
-    else:
-        criterion = nn.MSELoss()
+    # Fetch unique molecules and their counts  
+    unique_classes, freqs = np.unique(drug, return_counts=True)  # Given a class vector y, reduce it to unique definitions 
+    label_to_idx = {labels: idx for idx, labels in enumerate(unique_classes)}
+    # Bind each class to the number of occurrences in the test set 
+    class2freq = {key:value for key, value in zip(unique_classes, freqs)}
+    # Keep only the molecules with more than 3 classes (about 42k obs out of 44k)
+    class_to_keep = [key for key in class2freq if class2freq[key]>3]
 
-    dataset = torch.utils.data.TensorDataset(normalized_basal, labels_tensor)
+    # Single out the indexes to keep 
+    idx_to_keep = np.array([i for i in np.arange(len(drug)) if drug[i] in class_to_keep])
+
+    # Filter the inputs and the labels and stratify 
+    X = normalized_basal[idx_to_keep]
+    y = np.array(drug)[idx_to_keep]
+
+    # Split into training and test set 
+    X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.30, stratify=y, random_state=42)
+    y_train_tensor = torch.tensor(
+        [label_to_idx[label] for label in y_train], dtype=torch.long, device="cuda")
+    y_test_tensor = torch.tensor(
+        [label_to_idx[label] for label in y_test], dtype=torch.long, device="cuda")
+
+    # Create loader and dataset
+    dataset = torch.utils.data.TensorDataset(X_train, y_train_tensor)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=True)
 
-    # 2 non-linear layers of size <input_dimension>
-    # followed by a linear layer.
-    classifier_depth = 2 if not linear else 0
-    disentanglement_classifier = MLP(
-        [normalized_basal.size(1)]
-        + [normalized_basal.size(1) for _ in range(classifier_depth)]
-        + [len(unique_labels) if not predict_n_cells else 1]
-    ).to(device)
-    optimizer = torch.optim.Adam(disentanglement_classifier.parameters(), lr=1e-2)
+    # initialize nwtwork and training hyperparameters 
+    net = torch.nn.Linear(X_train.shape[1], len(unique_classes)).to('cuda')
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 
+    # Trauin the small network 
     for epoch in tqdm(range(100)):
         for X, y in data_loader:
-            pred = disentanglement_classifier(X)
-            if not predict_n_cells:
-                loss = criterion(pred, y)
-            else:
-                loss = criterion(pred.squeeze(), y)
+            pred = net(X.to('cuda'))
+            loss = criterion(pred, y)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-    print('Training discriminator network on drug latent space')
-
-    with torch.no_grad():
-        pred = disentanglement_classifier(normalized_basal).argmax(dim=1)
-        acc = torch.sum(pred == labels_tensor) / len(labels_tensor)
-    return acc.item()
     
+    test_pred = net(X_test.to('cuda'))
+    return accuracy(y_test_tensor, test_pred.argmax(1))
+
+def accuracy(y, y_hat):
+    """Simple accuracy function between two tensors 
+
+    Args:
+        y (torch.tensor): The true label tensor
+        y_hat (torch.tensor): The predicted label tensor 
+
+    Returns:
+        float: Accuracy value bewteen the two
+    """
+    return (torch.sum(y==y_hat)/len(y)).item()
+
 
 def compute_silhouette_coefficient(Z, y):
     """Compute the silhouette score of the dataset given the labels y

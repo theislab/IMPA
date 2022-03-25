@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
 
-from .utils import *
+from utils import *
 
 import torch
 from torch.utils.data import Dataset
@@ -170,7 +170,7 @@ class CellPaintingFold(Dataset):
         self.file_names = data['file_names']
         self.mol_names = data['mol_names']
         self.mol_smiles = data['mol_smiles']
-        self.assay_labels = data['assay_labels']
+        #self.assay_labels = data['assay_labels']
         self.states = data['state']
         self.n_cells = data['n_cells']
 
@@ -181,7 +181,9 @@ class CellPaintingFold(Dataset):
         
         # Drug data
         self.drug_encoder = drug_encoder
-        self.mol2label = mol2label
+
+        # Subset mol2label to the important part only 
+        self.mol2label = {key:value for key, value in mol2label.items() if key in self.mol_smiles}
         
         # Transform only the training set and only if required
         if self.augment_train and self.fold == 'train':
@@ -226,10 +228,10 @@ class CellPaintingFold(Dataset):
 
         if self.return_labels:
             return dict(X=img, 
-                        file_name=img_file,
-                        mol_name=self.mol_names[idx], 
+                        #file_name=img_file,
+                        #mol_name=self.mol_names[idx], 
                         mol_one_hot=self.one_hot_drugs[idx] if self.fold != 'ood' else '',
-                        assay_labels=self.assay_labels[idx],
+                        #assay_labels=self.assay_labels[idx],
                         state = self.states[idx],
                         smile_id = self.mol2label[self.mol_smiles[idx]],
                         n_cells = self.n_cells[idx])
@@ -254,32 +256,24 @@ class CellPaintingFold(Dataset):
 
         # Select from the the filenames at random
         imgs = []
-        subset_file_names = []
-        subset_mol_name = []
         subset_mol_one_hot = []
-        subset_assay_labels = []
         subset_states = []
         subset_smile_id = []
         subset_n_cells = []
         
         
         for i in idx_sample:
-            X, file_name, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(i).values()
+            #X, file_name, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(i).values()
+            X, mol_one_hot, states, smile_id, n_cells = self.__getitem__(i).values()
             imgs.append(X.unsqueeze(0))  # Unsqueeze barch dimension
-            subset_file_names.append(file_name)
-            subset_mol_name.append(mol_name)
             subset_mol_one_hot.append(mol_one_hot)
-            subset_assay_labels.append(assay_label)
             subset_states.append(states)
             subset_smile_id.append(smile_id)
             subset_n_cells.append(n_cells)
 
         imgs = torch.cat(imgs, dim=0)
-        return dict(X=imgs, 
-                    file_name=subset_file_names,
-                    mol_name=subset_mol_name, 
+        return dict(X=imgs,
                     mol_one_hot=self.one_hot_drugs[idx] if self.fold != 'ood' else '',
-                    assay_labels=subset_assay_labels,
                     state = subset_states,
                     smile_id = subset_smile_id, 
                     n_cells = subset_n_cells) 
@@ -297,13 +291,12 @@ class CellPaintingFold(Dataset):
         # Collect the drug images from the file repository 
         drug_images = []
         for drug_idx in drug_idxs:
-            X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
+            #X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
+            X, mol_one_hot, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
             drug_images.append(X.unsqueeze(0))
 
         return dict(X=torch.cat(drug_images, dim=0), 
-                mol_name=mol_name, 
                 mol_one_hot=mol_one_hot if self.fold != 'ood' else '',
-                assay_labels=assay_label,
                 state = states,
                 smile_id = smile_id, 
                 n_cells = n_cells) 

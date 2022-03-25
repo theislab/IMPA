@@ -9,7 +9,7 @@ from .template_model import *
 import sys
 sys.path.insert(0, '..')
 
-from ..metrics.metrics import *
+from metrics.metrics import *
 
 
 """
@@ -266,10 +266,8 @@ class CPA(TemplateModel):
     # Forward pass    
     def forward_ae(self, X):
         """Simple encoding-decoding process
-
         Args:
             X (torch.Tensor): The image data X
-
         Returns:
             dict: The reconstructed input, the latent representation and the losses  
         """
@@ -290,7 +288,6 @@ class CPA(TemplateModel):
     
     def forward_compert(self, X, y_adv, drug_ids):
         """The forward step with adversarial training
-
         Args:
             X (torch.Tensor): the image data X
             y_adv (torch.Tensor): the target for the adversarial training  
@@ -335,12 +332,11 @@ class CPA(TemplateModel):
         else:
             loss = ae_loss['total_loss'] - self.hparams["reg_adversary"] * adv_loss
         
-        return dict(out=out, z_basal=z_basal, loss=loss, ae_loss=ae_loss, adv_loss=adv_loss)
+        return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss=adv_loss)
 
     
     def evaluate(self, X, drug_id=None):
         """Perform evaluation step
-
         Args:
             X (torch.tensor): The batch of observations
             y_adv (torch.tensor): The drug label of the observation 
@@ -384,11 +380,9 @@ class CPA(TemplateModel):
         
     def compute_gradient_penalty(self, output, input):
         """Compute the penalty of the gradient of an output with respect to an input tensor
-
         Args:
             output (_torch.nn.Tensor_): Result of a differentiable function 
             input (_torch.nn.Tensor_): The input
-
         Returns:
             torch.Tensor: The gradient penalty associated to the gradient of output with respect to input 
         """
@@ -455,7 +449,7 @@ class CPA(TemplateModel):
                 del batch # Free memory
                 
                 # Forward pass
-                out, _, loss, ae_loss, adv_loss = self.forward_compert(X, y_adv, drug_id).values()
+                out, loss, ae_loss, adv_loss = self.forward_compert(X, y_adv, drug_id).values()
 
                 # Cumulate the separate adversarial and training losses 
                 tot_ae_loss += ae_loss['total_loss'].item()
@@ -529,7 +523,6 @@ class CPA(TemplateModel):
 
     def save_history(self, epoch, losses, metrics, fold):
         """Save partial model results in the history dictionary (model attribute) 
-
         Args:
             epoch (int): the current epoch 
             losses (dict): dictionary containing the partial losses of the model 

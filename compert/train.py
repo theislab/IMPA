@@ -1,22 +1,22 @@
+
 import os
 import torch
 import sys
 sys.path.insert(0, '.')
 
 # Available autoencoder model attached to CPA 
-from .model.sigma_VAE import SigmaVAE
-from .model.sigma_AE import SigmaAE
-from .dataset import CellPaintingDataset
-from .utils import *
-from .plot_utils import Plotter 
-from .evaluate import *
+from model.sigma_VAE import SigmaVAE
+from model.sigma_AE import SigmaAE
+from dataset import CellPaintingDataset
+from utils import *
+from plot_utils import Plotter 
+from evaluate import *
 
 from torch.utils.tensorboard import SummaryWriter
 import torch
 import numpy as np
 
-import json
-import logging
+
 import seml
 from sacred import Experiment
 
@@ -50,7 +50,6 @@ class Trainer:
     @ex.capture(prefix="paths")
     def init_folders(self, experiment_name, image_path, data_index_path, embeddings_path, use_embeddings, result_path):
         """Initialize the logging folders 
-
         Args:
             experiment_name (str): Name of the experiment 
             image_path (str): Path to the image dataset
@@ -70,7 +69,6 @@ class Trainer:
     @ex.capture(prefix="resume")
     def init_resume(self, resume, resume_checkpoint):
         """Initialize the resuming of an initialized run
-
         Args:
             resume (bool): Whether to resume a previously performed run 
             resume_checkpoint (str): The checkpoint path  
@@ -87,7 +85,6 @@ class Trainer:
                             n_workers_loader, generate, model_name, temperature, augment_train, patience, seed,
                             predict_n_cells=False, append_layer_width=False):
         """Initialization of parameters for training
-
         Args:
             img_plot (bool): Used when trained on notebooks - print generations/reconstructions after epoch
             save_results (bool): If the images have to be saved in the result folder
@@ -132,7 +129,6 @@ class Trainer:
     @ex.capture(prefix="image_params")
     def init_img_params(self, in_width, in_height, in_channels):
         """Initialize image parameters 
-
         Args:
             in_width (int): Spatial width
             in_height (int): Spatial height 
@@ -220,6 +216,8 @@ class Trainer:
         num_drugs = cellpainting_ds.num_drugs
         n_seen_drugs = cellpainting_ds.n_seen_drugs
         training_set, validation_set, test_set, ood_set = cellpainting_ds.fold_datasets.values()
+        # Free cell painting dataset memory
+        del cellpainting_ds
         return drug_embeddings, num_drugs, n_seen_drugs, training_set, validation_set, test_set, ood_set
 
     
@@ -275,7 +273,7 @@ class Trainer:
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
                                                     tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot)
                     del original
-                    del reconstructedls
+                    del reconstructed
                     
                     # Plot generation of sampled images 
                     if self.generate and self.model.module.variational:
@@ -321,7 +319,7 @@ class Trainer:
                 self.model.module.scheduler_adversaries.step()
 
         self.model.eval()
-        # Perform last evaluation on TEST SET   
+        # # Perform last evaluation on TEST SET   
         end = True
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.predict_n_cells, self.device, end, 
@@ -336,14 +334,14 @@ class Trainer:
                                                 variational=self.model.module.variational, ood=True)
         if self.save_results:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
-        self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
+        
+        result = self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
 
-        return self.model.module.history
+        return result
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):
         """Write results to tensorboard
-
         Args:
             losses (dict): _description_
             metrics (dict): _description_

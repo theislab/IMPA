@@ -4,7 +4,7 @@ from torch import nn
 import sys 
 sys.path.insert(0, '..')
 
-from ..metrics.metrics import *
+from metrics.metrics import *
 import os
 
 """

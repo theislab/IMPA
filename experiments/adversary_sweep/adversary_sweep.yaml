@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/train.py
   name: adversary_sweep
-  output_dir: /home/icb/alessandro.palma/results/adversary_sweep
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/results/adversary_sweep
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -23,7 +23,7 @@ fixed:
   paths.data_index_path: /home/icb/alessandro.palma/data/data_index/integrated/200k
   paths.embeddings_path: /home/icb/alessandro.palma/data/metadata_processed/original/embeddings/rdkit/rdkit2D_embedding_cellpainting.csv
   paths.use_embeddings: True
-  paths.result_path: /home/icb/alessandro.palma/results/adversary_sweep
+  paths.result_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/results/adversary_sweep
 
   resume.resume: False
   resume.resume_checkpoint: ""
@@ -104,6 +104,3 @@ random:
       - 100
 
   
-
-
-
