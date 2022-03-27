@@ -1,0 +1,22 @@
+Starting job 5601020
+SLURM assigned me the node(s): supergpu07
+[W 20:44:42.028 NotebookApp] WARNING: The notebook server is listening on all IP addresses and not using encryption. This is not recommended.
+[W 2022-03-26 20:44:42.577 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2022-03-26 20:44:42.578 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2022-03-26 20:44:42.578 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[I 2022-03-26 20:44:42.593 LabApp] JupyterLab extension loaded from /home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/jupyterlab
+[I 2022-03-26 20:44:42.593 LabApp] JupyterLab application directory is /mnt/home/icb/alessandro.palma/miniconda3/envs/imgCPA/share/jupyter/lab
+[I 20:44:42.604 NotebookApp] Serving notebooks from local directory: /mnt/home/icb/alessandro.palma/imCPA
+[I 20:44:42.604 NotebookApp] Jupyter Notebook 6.4.8 is running at:
+[I 20:44:42.604 NotebookApp] http://supergpu07.scidom.de:8888/?token=5990873cd086059523f79f0b63ed79c16ff99f922c82c714
+[I 20:44:42.605 NotebookApp]  or http://127.0.0.1:8888/?token=5990873cd086059523f79f0b63ed79c16ff99f922c82c714
+[I 20:44:42.605 NotebookApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[C 20:44:42.621 NotebookApp] 
+    
+    To access the notebook, open this file in a browser:
+        file:///mnt/home/icb/alessandro.palma/.local/share/jupyter/runtime/nbserver-187473-open.html
+    Or copy and paste one of these URLs:
+        http://supergpu07.scidom.de:8888/?token=5990873cd086059523f79f0b63ed79c16ff99f922c82c714
+     or http://127.0.0.1:8888/?token=5990873cd086059523f79f0b63ed79c16ff99f922c82c714
+[I 20:46:49.043 NotebookApp] 302 GET /?token=5990873cd086059523f79f0b63ed79c16ff99f922c82c714 (146.107.158.54) 0.780000ms
+slurmstepd: error: *** JOB 5601020 ON supergpu07 CANCELLED AT 2022-03-26T20:47:16 ***

@@ -56,7 +56,7 @@ class CPA(TemplateModel):
         if isinstance(hparams, dict):
             self.hparams = hparams
         else:
-            self.set_hparams_(seed, hparams)
+            self.set_hparams_(0, hparams)
 
         # Setup metrics object
         self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.hparams["latent_dim"], device = self.device)
@@ -77,7 +77,10 @@ class CPA(TemplateModel):
             n_residual_blocks = self.hparams["n_residual_blocks"], 
             in_width = self.in_width,
             in_height = self.in_height,
-            variational = self.variational
+            variational = self.variational,
+            batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
+            dropout_ae = self.hparams["dropout_ae"],
+            dropout_rate_ae = self.hparams["dropout_rate_ae"]
         )
 
         self.decoder = Decoder(
@@ -88,7 +91,10 @@ class CPA(TemplateModel):
             n_residual_blocks = self.hparams["n_residual_blocks"],  
             out_width = self.in_width,
             out_height = self.in_height,
-            variational = self.variational
+            variational = self.variational,
+            batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
+            dropout_ae = self.hparams["dropout_ae"],
+            dropout_rate_ae = self.hparams["dropout_rate_ae"]
         ) 
 
         # Initialize warmup params
@@ -100,26 +106,33 @@ class CPA(TemplateModel):
         # Iterations to decide when to perform adversarial training 
         self.iteration = 0
 
+        # Get the parameters of a model if a condition is verified
+        self.get_params = lambda model, cond: list(model.parameters()) if cond else []  
+
         # Initialize the autoencoder first with adversarial equal to False
         self.initialize_ae() 
 
     def initialize_ae(self):
         print('Initalize autoencoder')
-        # Can train with adversarial loss or a normal VAE (use adversary = False in latter case)
-        if not self.adversarial:
-            # Setup the optimizer and scheduler for the standard VAE 
-            self.optimizer_autoencoder = torch.optim.Adam(
-                self.parameters(),
-                lr=self.hparams["autoencoder_lr"],
-                weight_decay=self.hparams["autoencoder_wd"],
-            )
-            
-            # Learning rate schedulers for the model 
-            self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
-                self.optimizer_autoencoder,
-                step_size=self.hparams["step_size_lr"],
-                gamma=0.5,
-            )
+
+        _parameters = (
+            self.get_params(self.encoder, True)
+            + self.get_params(self.decoder, True)
+            + self.get_params(self.log_scale, not self.hparams["data_driven_sigma"])
+        )
+        # Setup the optimizer and scheduler for the standard VAE 
+        self.optimizer_autoencoder = torch.optim.Adam(
+            _parameters,
+            lr=self.hparams["autoencoder_lr"],
+            weight_decay=self.hparams["autoencoder_wd"],
+        )
+        
+        # Learning rate schedulers for the model 
+        self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
+            self.optimizer_autoencoder,
+            step_size=self.hparams["step_size_lr"],
+            gamma=0.5,
+        )
 
     def initialize_adversarial(self):
         print('Initalize adversarial training')
@@ -128,13 +141,13 @@ class CPA(TemplateModel):
             self.adversary_drugs = MLP(
                 [self.hparams["latent_dim"]]
                 + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
-                + [self.n_seen_drugs]
+                + [self.n_seen_drugs], self.hparams["batch_norm_adversarial"]
             ).to(self.device)
         else:
             self.adversary_drugs = MLP(
                 [self.hparams["latent_dim"]]
                 + [self.hparams["adversary_width"]] * self.hparams["adversary_depth"]
-                + [1]
+                + [1], self.hparams["batch_norm_adversarial"]
             ).to(self.device)
 
         # Set the drug embedding to a fixed or trainable status depending on whether a pre-trained model is used 
@@ -164,13 +177,13 @@ class CPA(TemplateModel):
 
         # Now initialize the optimizer and the parameters needed for backpropagation
         has_drugs = self.num_drugs > 0
-        get_params = lambda model, cond: list(model.parameters()) if cond else []  # Get the parameters of a model if a condition is verified
+        
         # Collect parameters 
         _parameters = (
-            get_params(self.encoder, True)
-            + get_params(self.decoder, True)
-            + get_params(self.drug_embeddings, has_drugs and embedding_requires_grad)
-            + get_params(self.drug_embedding_encoder, True)
+            self.get_params(self.encoder, True)
+            + self.get_params(self.decoder, True)
+            + self.get_params(self.drug_embeddings, has_drugs and embedding_requires_grad)
+            + self.get_params(self.drug_embedding_encoder, True)
         )
 
         # Optimizer for the autoencoder 
@@ -181,7 +194,7 @@ class CPA(TemplateModel):
         )
 
         # Optimizer for the drug adversary. Make sure that only the right parameters are bound to it
-        _parameters = get_params(self.adversary_drugs, has_drugs)
+        _parameters = self.get_params(self.adversary_drugs, has_drugs)
 
         self.optimizer_adversaries = torch.optim.Adam(
             _parameters,
@@ -238,7 +251,12 @@ class CPA(TemplateModel):
             "warmup_steps": 5 if default else int(np.random.choice([0, 5, 10, 15])), 
             "data_driven_sigma": True if default else np.random.choice([True, False]),
             "ae_pretrain": True if default else np.random.choice([True, False]),
-            "ae_pretrain_steps": 5
+            "ae_pretrain_steps": 5,
+
+            "batch_norm_adversarial": True if default else np.random.choice([True, False]),
+            "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
+            "dropout_ae": False if default else np.random.choice([True, False]),
+            "dropout_rate_ae": 0.1 if default else np.random.choice([0.1, 0.5, 0.8])
         }
         # the user may fix some hparams
         if hparams != "":
@@ -408,17 +426,14 @@ class CPA(TemplateModel):
         """
         Compute a forward step and returns the losses 
         """
+        training_loss = 0  # adv + ae loss
         if self.adversarial:
-            training_loss = 0  # adv + ae loss
-            tot_recons_loss = 0
-            tot_kl_loss = 0
             tot_ae_loss = 0
             tot_adv_loss = 0
-        else:
-            training_loss = 0
-            if self.variational:
-                tot_recons_loss = 0
-                tot_kl_loss = 0
+
+        if self.variational:
+            tot_recons_loss = 0
+            tot_kl_loss = 0
         
         # Reset the previously defined metrics
         self.metrics.reset()
@@ -454,15 +469,17 @@ class CPA(TemplateModel):
                 # Cumulate the separate adversarial and training losses 
                 tot_ae_loss += ae_loss['total_loss'].item()
                 tot_adv_loss += adv_loss.item()
-                
+
+                # Zero-grad both optimizers
+                self.optimizer_adversaries.zero_grad()
+                self.optimizer_autoencoder.zero_grad()
+
                 # Optimizer step - adversarial training 
-                if (self.iteration % self.hparams["adversary_steps"]) != 0:       
-                    self.optimizer_adversaries.zero_grad()
+                if (self.iteration % self.hparams["adversary_steps"]) != 0: 
                     loss.backward()
                     self.optimizer_adversaries.step()
                 # Optimizer step - non-adversarial training 
                 else:
-                    self.optimizer_autoencoder.zero_grad()
                     loss.backward()
                     self.optimizer_autoencoder.step()
             
@@ -557,3 +574,4 @@ def softclip(tensor, min):
     """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
     result_tensor = min + F.softplus(tensor - min)
     return result_tensor
+    

@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/train.py
-  name: adversary_sweep
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/cellpainting/results/1.adversary_sweep
+  name: resnet_sweep
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/results/learning_rate_sweep
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -18,12 +18,12 @@ slurm:
 ########## HUPERPARAMETER TUNING ##########
 
 fixed:
-  paths.experiment_name: adversary_sweep
+  paths.experiment_name: learning_rate_sweep
   paths.image_path: /home/icb/alessandro.palma/data/cellpainting_100
   paths.data_index_path: /home/icb/alessandro.palma/data/data_index/integrated/200k
   paths.embeddings_path: /home/icb/alessandro.palma/data/metadata_processed/original/embeddings/rdkit/rdkit2D_embedding_cellpainting.csv
   paths.use_embeddings: True
-  paths.result_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/cellpainting/results/1.adversary_sweep
+  paths.result_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/results/learning_rate_sweep
 
   resume.resume: False
   resume.resume_checkpoint: ""
@@ -48,62 +48,66 @@ fixed:
   image_params.in_height: 100
   image_params.in_channels: 5
 
-  #model.hparams.latent_dim: 512
+  model.hparams.latent_dim: 1024
   model.hparams.init_fm: 64
   model.hparams.n_conv: 3
-  model.hparams.n_residual_blocks: 8
+  model.hparams.n_residual_blocks: 18
   model.hparams.adversary_width: 512
   model.hparams.adversary_depth: 3
-  #model.hparams.reg_adversary: 10000
+  # model.hparams.reg_adversary: 100
   model.hparams.penalty_adversary: 3
-  model.hparams.autoencoder_lr: 1e-4
-  model.hparams.adversary_lr: 1e-3
-  model.hparams.autoencoder_wd: 1e-6
-  model.hparams.adversary_wd: 1e-6
-  #model.hparams.adversary_steps: 50 
+  # model.hparams.autoencoder_lr: 1e-4
+  # model.hparams.adversary_lr: 1e-3
+  # model.hparams.autoencoder_wd: 1e-6
+  # model.hparams.adversary_wd: 1e-6
+  # model.hparams.adversary_steps: 50 
   model.hparams.step_size_lr: 512
   model.hparams.embedding_encoder_width: 512 
   model.hparams.embedding_encoder_depth: 1
   model.hparams.warmup_steps: 1
   model.hparams.data_driven_sigma: True
   model.hparams.ae_pretrain: True
-  #model.hparams.ae_pretrain_steps: 3
-  model.hparams.batch_norm_adversarial: True 
-  model.hparams.batch_norm_layers_ae: False 
-  model.hparams.dropout_ae: False 
-  model.hparams.dropout_rate_ae: 0
+  model.hparams.ae_pretrain_steps: 3
+  batch_norm_adversarial: True 
+  batch_norm_layers_ae: False 
+  dropout_ae: False 
+  dropout_rate_ae: 0
   
 
 random:
-  samples: 10
+  samples: 15
   seed: 42
-
-  model.hparams.ae_pretrain_steps: 
-    type: choice 
-    options:
-      - 0
-      - 1
-      - 3
 
   model.hparams.reg_adversary:
     type: choice 
     options:
-      - 1
+      - 1000
       - 100
-      - 10000
-  
-  model.hparams.latent_dim:
-    type: choice
-    options:
-      - 128
-      - 512
-      - 1024
+      - 10
 
   model.hparams.adversary_steps:
     type: choice
     options:
       - 10
-      - 50 
       - 100
+    
+  model.hparams.autoencoder_lr:
+    type: loguniform
+        min: 1e-5
+        max: 1e-2
 
-  
+  model.hparams.adversary_lr:
+    type: loguniform
+        min: 1e-5
+        max: 1e-2
+    
+  model.hparams.autoencoder_wd:
+    type: loguniform
+        min: 1e-6
+        max: 1e-2
+
+  model.hparams.adversary_wd:
+    type: loguniform
+        min: 1e-6
+        max: 1e-2
+     

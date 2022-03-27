@@ -238,7 +238,7 @@ class Trainer:
         for epoch in range(self.resume_epoch, self.num_epochs+1):
 
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
-            if epoch >= self.model.module.hparams["ae_pretrain_steps"]:
+            if epoch == self.model.module.hparams["ae_pretrain_steps"] + 1:
                 self.model.module.initialize_adversarial()
             
             print(f'Running epoch {epoch}')
@@ -284,9 +284,11 @@ class Trainer:
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
                 if epoch < self.model.module.hparams["ae_pretrain_steps"]:
                     score = val_metrics['bpd']
+
                 elif epoch == self.model.module.hparams["ae_pretrain_steps"] + 1:
                     self.model.module.best_score = -np.inf
                     score = val_metrics["rmse_basal_full"]
+                
                 else:
                     score = val_metrics["rmse_basal_full"]
                 
@@ -334,10 +336,10 @@ class Trainer:
                                                 variational=self.model.module.variational, ood=True)
         if self.save_results:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
-        
-        result = self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
+        self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
 
-        return result
+        results = self.model.module.history
+        return results
         
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):

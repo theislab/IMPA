@@ -34,6 +34,7 @@ def training_evaluation(model,
     """
     # Final dictionary containing all the losses
     losses = {}
+
     # Initialize the null metrics
     val_loss = 0  # Total validation loss
     if variational:
@@ -59,8 +60,8 @@ def training_evaluation(model,
         X = observation['X'].to(device)
         # Select the right task 
         if predict_n_cells:
-            # If number of cells prediction, then we store as labels 1.0 or 0.0 determining activity versus inactivity 
-            y_adv = observation['state'].item()
+            # If number of cells prediction, we don't predict the specific drug 
+            y_adv = observation['n_cells'].item()
             y_true_ds.append(y_adv)
         else:
             # If not number of cells prediction, store the whole drug label array 
@@ -100,7 +101,6 @@ def training_evaluation(model,
         # Perform optimizer step depending on the iteration
         metrics.update_rmse(X, out)
 
-
     if not ood and adversarial:
         if X.shape[0]>1:
             y_true_ds = torch.cat(y_true_ds, dim=0).to('cpu').numpy()
@@ -126,8 +126,8 @@ def training_evaluation(model,
         z_basal_ds = torch.cat(z_basal_ds, dim=0)
         
         # Disentanglement score before and after drug addition 
-        disentanglement_score_basal = compute_disentanglement_score(z_basal_ds, y_true_ds, device, predict_n_cells, linear=True)
-        disentanglement_score_z = compute_disentanglement_score(z_ds, y_true_ds, device, predict_n_cells, linear=True)
+        disentanglement_score_basal = compute_disentanglement_score(z_basal_ds, y_true_ds)
+        disentanglement_score_z = compute_disentanglement_score(z_ds, y_true_ds)
         metrics.metrics["disentanglement_score_basal"] = disentanglement_score_basal
         metrics.metrics["disentanglement_score_z"] = disentanglement_score_z
         metrics.metrics["difference_disentanglement"] = disentanglement_score_basal - disentanglement_score_z
@@ -152,7 +152,7 @@ def training_evaluation(model,
     return losses, metrics.metrics
 
 
-def compute_disentanglement_score(Z, drug, device, predict_n_cells, linear=True):
+def compute_disentanglement_score(Z, drug):
     """Train a classifier that evaluates the disentanglement of the latents space from the information
     on the drug
 
@@ -182,7 +182,7 @@ def compute_disentanglement_score(Z, drug, device, predict_n_cells, linear=True)
     # Single out the indexes to keep 
     idx_to_keep = np.array([i for i in np.arange(len(drug)) if drug[i] in class_to_keep])
 
-    # Filter the inputs and the labels and stratify 
+    # Filter the inputs and the labels
     X = normalized_basal[idx_to_keep]
     y = np.array(drug)[idx_to_keep]
 
@@ -202,7 +202,7 @@ def compute_disentanglement_score(Z, drug, device, predict_n_cells, linear=True)
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 
-    # Trauin the small network 
+    # Train the small network 
     for epoch in tqdm(range(100)):
         for X, y in data_loader:
             pred = net(X.to('cuda'))

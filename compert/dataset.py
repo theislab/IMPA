@@ -31,7 +31,7 @@ class CustomTransform:
         if self.augment:
             transform = T.Compose([
                 T.RandomHorizontalFlip(p=0.5),
-                T.RandomRotation(np.random.randint(0,30)),
+                T.RandomRotation(np.random.randint(0,90)),
                 T.RandomVerticalFlip(p=0.5)]
             )
             return transform(X)
@@ -170,10 +170,13 @@ class CellPaintingFold(Dataset):
         self.file_names = data['file_names']
         self.mol_names = data['mol_names']
         self.mol_smiles = data['mol_smiles']
-        #self.assay_labels = data['assay_labels']
         self.states = data['state']
         self.n_cells = data['n_cells']
+        #self.assay_labels = data['assay_labels']
 
+        # Dree memory due to the data
+        del data 
+        
         # Data paths 
         self.data_path = image_path
         # Whether to perform training augmentation
@@ -228,13 +231,14 @@ class CellPaintingFold(Dataset):
 
         if self.return_labels:
             return dict(X=img, 
-                        #file_name=img_file,
-                        #mol_name=self.mol_names[idx], 
                         mol_one_hot=self.one_hot_drugs[idx] if self.fold != 'ood' else '',
-                        #assay_labels=self.assay_labels[idx],
                         state = self.states[idx],
                         smile_id = self.mol2label[self.mol_smiles[idx]],
-                        n_cells = self.n_cells[idx])
+                        n_cells = self.n_cells[idx],
+                        #file_name=img_file,
+                        #mol_name=self.mol_names[idx], 
+                        #assay_labels=self.assay_labels[idx]
+                    )
         else:
             return dict(X=img)
 
@@ -300,6 +304,3 @@ class CellPaintingFold(Dataset):
                 state = states,
                 smile_id = smile_id, 
                 n_cells = n_cells) 
-
-
-        

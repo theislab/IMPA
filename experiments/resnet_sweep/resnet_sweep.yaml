@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/train.py
   name: resnet_sweep
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/results/resnet_sweep
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/cellpainting/results/resnet_sweep
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -23,7 +23,7 @@ fixed:
   paths.data_index_path: /home/icb/alessandro.palma/data/data_index/integrated/200k
   paths.embeddings_path: /home/icb/alessandro.palma/data/metadata_processed/original/embeddings/rdkit/rdkit2D_embedding_cellpainting.csv
   paths.use_embeddings: True
-  paths.result_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/results/resnet_sweep
+  paths.result_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/cellpainting/results/resnet_sweep
 
   resume.resume: False
   resume.resume_checkpoint: ""
@@ -61,7 +61,6 @@ fixed:
   model.hparams.autoencoder_wd: 1e-6
   model.hparams.adversary_wd: 1e-6
   #model.hparams.adversary_steps: 50 
-  model.hparams.batch_size: 10
   model.hparams.step_size_lr: 512
   model.hparams.embedding_encoder_width: 512 
   model.hparams.embedding_encoder_depth: 1
@@ -69,6 +68,10 @@ fixed:
   model.hparams.data_driven_sigma: True
   model.hparams.ae_pretrain: True
   #model.hparams.ae_pretrain_steps: 3
+  batch_norm_adversarial: True 
+  batch_norm_layers_ae: False 
+  dropout_ae: False 
+  dropout_rate_ae: 0
   
 
 random:
