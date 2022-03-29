@@ -38,7 +38,7 @@ class Plotter:
         if plot:
             plt.plot()
     
-    def plot_channel_panel(self, image, epoch, save, plot, title='Generated sample', rgb = False, size = 10):
+    def plot_channel_panel(self, image, epoch, save, plot, title='Generated sample', rgb = False, size = 10, dim = 5):
         """Plot a cell painting image either as a single channel or a multiple channel 
 
         Args:
@@ -50,7 +50,7 @@ class Plotter:
             rgb (bool, optional): If the images should be plotted RGB (True) or in 5 channels (False). Defaults to False.
         """
         if not rgb:
-            fig, axs = plt.subplots(1, 5, figsize = (size,4))
+            fig, axs = plt.subplots(1, dim, figsize = (size,4))
             fig.suptitle(title, fontsize=16)
             for z in range(image.shape[-1]):
                 axs[z].imshow(image[:,:,z], cmap = 'gray')

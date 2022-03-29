@@ -83,7 +83,7 @@ def training_evaluation(model,
             drug_id = observation["smile_id"].to(device)
             res = model.evaluate(X, drug_id=drug_id)
             out, out_basal, z_basal, z, y_hat, ae_loss, _ = res.values()
-            rmse_basal_full += metrics.compute_batch_rmse(out, out_basal)
+            rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
             # Collect the labels 
             if not ood:
                 y_hat_ds.append(torch.argmax(y_hat, dim=1).item())

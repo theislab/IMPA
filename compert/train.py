@@ -220,11 +220,14 @@ class Trainer:
         del cellpainting_ds
         return drug_embeddings, num_drugs, n_seen_drugs, training_set, validation_set, test_set, ood_set
 
-    
+    @ex.capture(prefix="training")
     def train(self):
         """
         Full training loop
         """
+        print('Training with hparams')
+        print(self.hparams)
+
         if self.save_results:
             # Setup plotter and writer 
             self.plotter = Plotter(self.dest_dir)
@@ -282,7 +285,7 @@ class Trainer:
                         del sampled_img
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                if epoch < self.model.module.hparams["ae_pretrain_steps"]:
+                if epoch < self.model.module.hparams["ae_pretrain_steps"] + 1:
                     score = val_metrics['bpd']
 
                 elif epoch == self.model.module.hparams["ae_pretrain_steps"] + 1:
@@ -294,6 +297,7 @@ class Trainer:
                 
                 # Evaluate early-stopping 
                 cond, early_stopping = self.model.module.early_stopping(score) 
+
 
                 # Save the model if it is the best performing one 
                 if cond and self.save_results:
@@ -338,9 +342,11 @@ class Trainer:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
         self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
 
-        results = self.model.module.history
+        # Get results in a correct format
+        results = self.format_seml_results(self.model.module.history)
+        print(results)
         return results
-        
+
 
     def write_results(self, losses, metrics, writer, epoch, fold='train'):
         """Write results to tensorboard
@@ -354,6 +360,20 @@ class Trainer:
                                     global_step=epoch)
         for key in metrics:
             writer.add_scalar(tag=f'{fold}/{key}', scalar_value=metrics[key], global_step=epoch)
+    
+
+    def format_seml_results(self, history):
+        """Format results for seml 
+
+        Args:
+            history (_dict_): dictionary containing the history of the model's statisistics
+        """
+        results = {}
+        for fold in history:
+            for stat in history[fold]:
+                key = f'{fold}_{stat}'
+                results[key] = history[fold][stat]
+        return results
 
         
     def set_device(self):
@@ -400,4 +420,4 @@ def get_experiment(init_all=False):
 def train(experiment=None):
     if experiment is None:
         experiment = Trainer()
-    experiment.train()
+    return experiment.train()

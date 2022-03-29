@@ -413,7 +413,7 @@ class CPA(TemplateModel):
         """
         Possibly early-stops training.
         """
-        cond = (score > self.best_score).item()
+        cond = (score > self.best_score)
         if cond:
             self.best_score = score
             self.patience_trials = 0
