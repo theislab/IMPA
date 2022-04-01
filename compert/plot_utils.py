@@ -9,7 +9,7 @@ class Plotter:
     def __init__(self, dest_dir):
         self.dest_dir = dest_dir
 
-    def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False):
+    def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False, dim = 5):
         """Plot two images represented the original and reconstructed outputs of a neural network.
 
         Args:
@@ -29,7 +29,7 @@ class Plotter:
             subfig.suptitle(titles[row], fontsize = 15)
 
             # create 1x3 subplots per subfig
-            axs = subfig.subplots(nrows=1, ncols=5)
+            axs = subfig.subplots(nrows=1, ncols=dim)
             for col, ax in enumerate(axs):
                 ax.imshow(images[row][:,:,col], cmap = 'gray')
                 ax.axis('off')

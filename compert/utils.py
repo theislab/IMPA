@@ -132,5 +132,5 @@ def make_dirs(path, experiment_name):
     os.mkdir(os.path.join(dest_dir, 'reconstructions'))
     os.mkdir(os.path.join(dest_dir, 'generations'))
     os.mkdir(os.path.join(dest_dir, 'checkpoints'))
-    os.mkdir(os.path.join(dest_dir, 'logs'))
+    # os.mkdir(os.path.join(dest_dir, 'logs'))
     return dest_dir

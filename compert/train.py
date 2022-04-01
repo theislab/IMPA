@@ -1,4 +1,3 @@
-
 import os
 import torch
 import sys
@@ -7,7 +6,8 @@ sys.path.insert(0, '.')
 # Available autoencoder model attached to CPA 
 from model.sigma_VAE import SigmaVAE
 from model.sigma_AE import SigmaAE
-from dataset import CellPaintingDataset
+from data.cellpainting import CellPaintingDataset
+from data.fluorescent import BBBC021Dataset
 from utils import *
 from plot_utils import Plotter 
 from evaluate import *
@@ -48,7 +48,7 @@ class Trainer:
             self.init_all()
     
     @ex.capture(prefix="paths")
-    def init_folders(self, experiment_name, image_path, data_index_path, embeddings_path, use_embeddings, result_path):
+    def init_folders(self, experiment_name, image_path, data_index_path, embeddings_path, use_embeddings, result_path, dataset_name):
         """Initialize the logging folders 
         Args:
             experiment_name (str): Name of the experiment 
@@ -56,7 +56,8 @@ class Trainer:
             data_index_path (str): Path to the image metadata
             embeddings_path (str): The path to the molecular embedding csv
             use_embeddings (str): Whether to use pre-trained embeddings or not
-            result_path (str): path to the outcome 
+            result_path (str): path to the outcome
+            dataset_name (str): the name of the dataset. Can be cellpainting or BBBC021
         """
         self.experiment_name = experiment_name  
         self.image_path = image_path 
@@ -64,6 +65,7 @@ class Trainer:
         self.embeddings_path = embeddings_path  
         self.use_embeddings = use_embeddings  
         self.result_path = result_path
+        self.dataset_name = dataset_name
 
 
     @ex.capture(prefix="resume")
@@ -83,7 +85,7 @@ class Trainer:
     @ex.capture(prefix="training_params")
     def init_training_params(self, img_plot, save_results, num_epochs, batch_size, eval, eval_every, 
                             n_workers_loader, generate, model_name, temperature, augment_train, patience, seed,
-                            predict_n_cells=False, append_layer_width=False):
+                            append_layer_width=False, predict_moa = False):
         """Initialization of parameters for training
         Args:
             img_plot (bool): Used when trained on notebooks - print generations/reconstructions after epoch
@@ -99,8 +101,8 @@ class Trainer:
             augment_train (bool): Whether augmentation should be carried out on the training set
             patience (int): How many steps of non-improvement of valid loss before stopping 
             seed (int): The random seed for reproducibility 
-            predict_n_cells (bool, optional): Controls if the adversarial task is predicting drugs or active vs inactive. Defaults to False.
             append_layer_width (bool, optional): Controls The addition of trailing layers to the adversarial and drug embedding MLPs. Defaults to False.
+            predict_moa (book, optional): used only if the the dataset employed has MOAs annotated 
         """
         self.img_plot = img_plot  
         self.save_results = save_results  
@@ -119,8 +121,8 @@ class Trainer:
         self.patience = patience
         self.seed = seed 
         
-        self.predict_n_cells = predict_n_cells   
         self.append_layer_width = append_layer_width
+        self.predict_moa = predict_moa
         # Set device
         self.device = self.set_device() 
         print(f'Working on device: {self.device}')
@@ -140,22 +142,12 @@ class Trainer:
         self.in_channels = in_channels
 
 
-    @ex.capture(prefix="model")
-    def init_model(self, hparams):      
-        """Initialize the model 
-        """
-        self.hparams = hparams  # Dictionary with model hyperparameters 
-        # Initialize model 
-        self.model =  self.load_model().to(self.device)
-        self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present
-
-
     def init_dataset(self):
         """Initialize dataset and data loaders
         """
         # # Prepare the data
         print('Lodading the data...') 
-        self.drug_embeddings, self.num_drugs, self.n_seen_drugs, self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
+        self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
         
         # Create data loaders 
         self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, 
@@ -170,6 +162,16 @@ class Trainer:
         print('Successfully loaded the data')
 
     
+    @ex.capture(prefix="model")
+    def init_model(self, hparams):      
+        """Initialize the model 
+        """
+        self.hparams = hparams  # Dictionary with model hyperparameters 
+        # Initialize model 
+        self.model =  self.load_model().to(self.device)
+        self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present
+    
+
     def init_log(self):
         """Initialize the tensorboard loader and directories 
         """
@@ -183,7 +185,7 @@ class Trainer:
                 self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint)
             
             # Setup logger in any case
-            self.writer = SummaryWriter(os.path.join(self.dest_dir, 'logs'))
+            self.writer = SummaryWriter(os.path.join(self.result_path, 'logs'))
 
     
     @ex.capture
@@ -206,19 +208,35 @@ class Trainer:
         Create dataset compatible with the pytorch training loop 
         """
         # Create dataset objects for the three data folds
-        cellpainting_ds = CellPaintingDataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
-                                                return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train)
-        if self.use_embeddings:
-            drug_embeddings = cellpainting_ds.drug_embeddings
+        if self.dataset_name == 'cellpainting':
+            dataset = CellPaintingDataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
+                                                    return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train)
+            self.dim = 5
         else:
-            drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
+            dataset = BBBC021Dataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
+                                                    return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train) 
+            self.dim = 3
+
+        #Extract matrix of embeddings only if the embedding option is chosen 
+        if self.use_embeddings:
+            self.drug_embeddings = dataset.drug_embeddings
+        else:
+            self.drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
+
         # Collect the number of total drugs ans the one of seen drugs separately 
-        num_drugs = cellpainting_ds.num_drugs
-        n_seen_drugs = cellpainting_ds.n_seen_drugs
-        training_set, validation_set, test_set, ood_set = cellpainting_ds.fold_datasets.values()
+        self.num_drugs = dataset.num_drugs
+        # The ood set in the BBC021 dataset does not leave out entire compoinds but only compound dosage combinations 
+        if self.dataset_name == 'BBBC021':
+            self.n_seen_drugs = self.num_drugs
+            self.num_moa = dataset.num_moa
+        else:
+            self.n_seen_drugs = dataset.n_seen_drugs
+            self.num_moa = 0 
+        training_set, validation_set, test_set, ood_set = dataset.fold_datasets.values()
         # Free cell painting dataset memory
-        del cellpainting_ds
-        return drug_embeddings, num_drugs, n_seen_drugs, training_set, validation_set, test_set, ood_set
+        del dataset
+        return training_set, validation_set, test_set, ood_set
+
 
     @ex.capture(prefix="training")
     def train(self):
@@ -262,8 +280,8 @@ class Trainer:
 
                 # Get the validation results 
                 val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
-                                                        self.model.module.metrics, self.predict_n_cells, self.device, end, 
-                                                        variational=self.model.module.variational)
+                                                        self.model.module.metrics, self.device, end, 
+                                                        variational=self.model.module.variational, predict_moa=self.predict_moa)
 
                 if self.save_results:
                     self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
@@ -274,30 +292,21 @@ class Trainer:
                     with torch.no_grad():
                         original, reconstructed = self.model.module.generate(self.loader_val)
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot)
+                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim)
                     del original
                     del reconstructed
                     
                     # Plot generation of sampled images 
                     if self.generate and self.model.module.variational:
                         sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
-                        self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot)
+                        self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot, dim=self.dim)
                         del sampled_img
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                if epoch < self.model.module.hparams["ae_pretrain_steps"] + 1:
-                    score = val_metrics['bpd']
-
-                elif epoch == self.model.module.hparams["ae_pretrain_steps"] + 1:
-                    self.model.module.best_score = -np.inf
-                    score = val_metrics["rmse_basal_full"]
-                
-                else:
-                    score = val_metrics["rmse_basal_full"]
+                score = val_metrics['bpd']
                 
                 # Evaluate early-stopping 
                 cond, early_stopping = self.model.module.early_stopping(score) 
-
 
                 # Save the model if it is the best performing one 
                 if cond and self.save_results:
@@ -328,23 +337,22 @@ class Trainer:
         # # Perform last evaluation on TEST SET   
         end = True
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
-                                                self.model.module.metrics, self.predict_n_cells, self.device, end, 
-                                                variational=self.model.module.variational, ood=False)
+                                                self.model.module.metrics, self.device, end, 
+                                                variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa)
         if self.save_results:
             self.write_results(test_losses, test_metrics, self.writer, epoch, ' test')
         self.model.module.save_history('final_test', test_losses, test_metrics, 'test')
 
         # Perform last evaluation on OOD SET
         ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
-                                                metrics=self.model.module.metrics, predict_n_cells=self.predict_n_cells, device=self.device, end=end, 
-                                                variational=self.model.module.variational, ood=True)
+                                                metrics=self.model.module.metrics, device=self.device, end=end, 
+                                                variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa)
         if self.save_results:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
         self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
 
         # Get results in a correct format
         results = self.format_seml_results(self.model.module.history)
-        print(results)
         return results
 
 
@@ -356,10 +364,10 @@ class Trainer:
             writer (torch.utils.tensorboard.SummaryWriter): summary statistics writer 
         """
         for key in losses:
-            writer.add_scalar(tag=f'{fold}/{key}', scalar_value=losses[key], 
+            writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=losses[key], 
                                     global_step=epoch)
         for key in metrics:
-            writer.add_scalar(tag=f'{fold}/{key}', scalar_value=metrics[key], global_step=epoch)
+            writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=metrics[key], global_step=epoch)
     
 
     def format_seml_results(self, history):
@@ -400,9 +408,11 @@ class Trainer:
                     seed = self.seed,
                     patience = self.patience,
                     hparams = self.hparams,
-                    predict_n_cells = self.predict_n_cells,
                     append_layer_width = self.append_layer_width,
-                    drug_embeddings = self.drug_embeddings)
+                    drug_embeddings = self.drug_embeddings,
+                    dataset_name = self.dataset_name,
+                    predict_moa = self.predict_moa,
+                    n_moa = self.num_moa)
 
 
 # We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,

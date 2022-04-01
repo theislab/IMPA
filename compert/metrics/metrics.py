@@ -42,11 +42,11 @@ class TrainingMetrics:
         self.metrics['bpd'] = (-loss)/(self.height*self.width*self.channels)/np.log(2.)
     
 
-    def compute_classification_report(self, y, y_hat):
+    def compute_classification_report(self, y, y_hat, label=''):
         prec, rec, F1, _ = precision_recall_fscore_support(y, y_hat, average='macro', zero_division=0)
-        self.metrics['precision'] = prec 
-        self.metrics['recall'] = rec
-        self.metrics['F1'] = F1
+        self.metrics['precision{}'] = prec 
+        self.metrics['recall{}'] = rec
+        self.metrics['F1{}'] = F1
         
 
     def get_metrics(self):

@@ -6,16 +6,12 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-# MLP for the discriminator
-from model.modules import MLP
-
 
 def training_evaluation(model,  
                         dataset_loader, 
                         adversarial, 
                         metrics, 
-                        predict_n_cells, 
-                        device, end=False, variational=True, ood=False):
+                        device, end=False, variational=True, ood=False, predict_moa=False):
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
     Args:
@@ -23,7 +19,6 @@ def training_evaluation(model,
         dataset_loader (torch.utils.data.DataLoader): Data loader of the split of interest
         adversarial (bool): Whether adversarial training is performed or not
         metrics (Metrics): Metrics object for computing qulity scores  
-        predict_n_cells (bool): Whether the task is to predict the drug or the number of cells
         device (str): `cuda` or `cpu`
         end (bool, optional): If the evaluation is performed at the end of the training loop. Defaults to False.
         variational (bool, optional): Whether a VAE is used over an AE. Defaults to True.
@@ -46,9 +41,12 @@ def training_evaluation(model,
     # Zero out the metrics for the next step
     metrics.reset()  
 
-    # Classification vectors 
-    y_true_ds = []
-    y_hat_ds = []
+    # Settings for ground truth prediction
+    y_true_ds_drugs = []
+    y_hat_ds_drugs = []
+    if predict_moa:
+        y_true_ds_moa = []
+        y_hat_ds_moa = []
     
     # If we are at the last iteration of a CPA-like model we also store z_basal predictions 
     if end:
@@ -58,21 +56,20 @@ def training_evaluation(model,
     for observation in tqdm(dataset_loader):
         # Load observation X
         X = observation['X'].to(device)
-        # Select the right task 
-        if predict_n_cells:
-            # If number of cells prediction, we don't predict the specific drug 
-            y_adv = observation['n_cells'].item()
-            y_true_ds.append(y_adv)
-        else:
-            # If not number of cells prediction, store the whole drug label array 
-            if not ood:
-                y_adv = observation['mol_one_hot'].to(device)
-                # Store labels
-                y_true_ds.append(torch.argmax(y_adv, dim=1).item())
-            else: 
-                # If we are evaluating the ood fold, we use drug ids and not the one-hot encoded molecules
-                y_adv = observation['smile_id'].to(device)
-                y_true_ds.append(y_adv.item())
+
+        # If not number of cells prediction, store the whole drug label array 
+        if (not ood) or predict_moa:
+            y_adv_drugs = observation['mol_one_hot'].to(device)
+            # Store labels
+            y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())
+            if predict_moa:
+                y_adv_moa = observation['moa_one_hot'].to(device)
+                y_true_ds_moa.append(torch.argmax(y_adv_moa, dim=1).item())
+
+        else: 
+            # If we are evaluating the ood fold, we use drug ids and not the one-hot encoded molecules
+            y_adv_drugs = observation['smile_id'].to(device)
+            y_true_ds_drugs.append(y_adv_drugs.item())
         
 
         if not adversarial:
@@ -81,18 +78,27 @@ def training_evaluation(model,
         else:
             # Get evaluation results
             drug_id = observation["smile_id"].to(device)
-            res = model.evaluate(X, drug_id=drug_id)
-            out, out_basal, z_basal, z, y_hat, ae_loss, _ = res.values()
+            if predict_moa:
+                moa_id = observation["moa_id"]
+            else: 
+                moa_id = None 
+
+            res = model.evaluate(X, drug_id=drug_id, moa_id=moa_id)
+            out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
+
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
             # Collect the labels 
-            if not ood:
-                y_hat_ds.append(torch.argmax(y_hat, dim=1).item())
+            if not ood or predict_moa:
+                y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
+                if predict_moa:
+                    y_hat_ds_moa.append(y_hat_moa)
             
             # Only at the end of training we store the latent vectors for analysis 
             if end:
                 z_basal_ds.append(z_basal)
                 z_ds.append(z)
-        
+
+        # Update the losses and the metrics 
         val_loss += ae_loss['total_loss'].item()
         if variational:
             val_recon_loss += ae_loss['reconstruction_loss'].item()
@@ -103,11 +109,18 @@ def training_evaluation(model,
 
     if not ood and adversarial:
         if X.shape[0]>1:
-            y_true_ds = torch.cat(y_true_ds, dim=0).to('cpu').numpy()
-            y_hat_ds = torch.cat(y_hat_ds, dim=0).to('cpu').numpy()
-        metrics.compute_classification_report(y_true_ds, y_hat_ds)
-        
-    # Print loss results
+            # Update metric for drug prediction
+            y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
+            y_hat_drug = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
+            metrics.compute_classification_report(y_true_ds_drugs, y_hat_drug, '_drug')
+            
+            # Update the metric for the moa prediction, if applicable
+            if predict_moa:
+                y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
+                y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
+                metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
+                    
+    # Print loss results 
     losses["loss"] = val_loss/len(dataset_loader)
     if variational:
         losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
@@ -116,6 +129,7 @@ def training_evaluation(model,
     else:
         metrics.update_bpd(losses["loss"])
 
+    # Update the rmse and rmse_basal_full metric 
     metrics.metrics['rmse'] /= len(dataset_loader)
     if adversarial:
         metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
@@ -126,23 +140,34 @@ def training_evaluation(model,
         z_basal_ds = torch.cat(z_basal_ds, dim=0)
         
         # Disentanglement score before and after drug addition 
-        disentanglement_score_basal = compute_disentanglement_score(z_basal_ds, y_true_ds)
-        disentanglement_score_z = compute_disentanglement_score(z_ds, y_true_ds)
-        metrics.metrics["disentanglement_score_basal"] = disentanglement_score_basal
-        metrics.metrics["disentanglement_score_z"] = disentanglement_score_z
-        metrics.metrics["difference_disentanglement"] = disentanglement_score_basal - disentanglement_score_z
+        disentanglement_score_basal_drug = compute_disentanglement_score(z_basal_ds, y_true_ds_drugs)
+        disentanglement_score_z_drug = compute_disentanglement_score(z_ds, y_true_ds_drugs)
+        metrics.metrics["disentanglement_score_basal_drug"] = disentanglement_score_basal_drug
+        metrics.metrics["disentanglement_score_z_drug"] = disentanglement_score_z_drug
+        metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_drug - disentanglement_score_basal_drug
+
+        if predict_moa:
+            disentanglement_score_basal_moa = compute_disentanglement_score(z_basal_ds, y_true_ds_moa)
+            disentanglement_score_z_moa= compute_disentanglement_score(z_ds, y_true_ds_moa)
+            metrics.metrics["disentanglement_score_basal_moa"] = disentanglement_score_basal_moa
+            metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
+            metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
 
         z_ds = z_ds.to('cpu').numpy()
         z_basal_ds = z_basal_ds.to('cpu').numpy()
 
-        if not (predict_n_cells and ood):
+        if not ood or predict_moa:
             # Silhouette score before and after drug addition 
-            silhouette_score_basal = compute_silhouette_coefficient(z_basal_ds, y_true_ds)
-            silhouette_score_z = compute_silhouette_coefficient(z_ds, y_true_ds)
-            metrics.metrics["silhouette_score_basal"] = silhouette_score_basal
-            metrics.metrics["silhouette_score_z"] = silhouette_score_z
-            metrics.metrics["difference_silhouette"] = silhouette_score_z - silhouette_score_basal
-        
+            silhouette_score_basal_drugs = compute_silhouette_coefficient(z_basal_ds, y_true_ds_drugs)
+            silhouette_score_z_drugs = compute_silhouette_coefficient(z_ds, y_true_ds_drugs)
+            metrics.metrics["silhouette_score_basal_drugs"] = silhouette_score_basal_drugs
+            metrics.metrics["silhouette_score_z_drugs"] = silhouette_score_z_drugs
+
+            silhouette_score_basal_moa = compute_silhouette_coefficient(z_basal_ds, y_true_ds_moa)
+            silhouette_score_z_moa = compute_silhouette_coefficient(z_ds, y_true_ds_moa)
+            metrics.metrics["silhouette_score_basal_moa"] = silhouette_score_basal_moa
+            metrics.metrics["silhouette_score_z_moa"] = silhouette_score_z_moa
+
     print(f'Average validation loss: {losses["loss"]}')
     if variational:
         print(f'Average validation reconstruction loss: {losses["avg_validation_recon_loss"]}')
@@ -159,7 +184,6 @@ def compute_disentanglement_score(Z, drug):
     Args:
         Z (torch.tensor): Latent representation of the validation set under the model 
         y (torch.tensor): The label assigned to each observation
-        predict_n_cells (bool): Whether the task is to predict the drug or the number of cells
 
     Returns:
         dict: dictionary with the results
@@ -176,7 +200,7 @@ def compute_disentanglement_score(Z, drug):
     label_to_idx = {labels: idx for idx, labels in enumerate(unique_classes)}
     # Bind each class to the number of occurrences in the test set 
     class2freq = {key:value for key, value in zip(unique_classes, freqs)}
-    # Keep only the molecules with more than 3 classes (about 42k obs out of 44k)
+    # Keep only the molecules with more than 3 instances
     class_to_keep = [key for key in class2freq if class2freq[key]>3]
 
     # Single out the indexes to keep 

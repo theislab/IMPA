@@ -15,9 +15,11 @@ class SigmaVAE(CPA):
                 seed: int = 0,
                 patience: int = 5,
                 hparams="",
-                predict_n_cells=False,
                 append_layer_width=None,
-                drug_embeddings = None) -> None:
+                drug_embeddings = None, 
+                dataset_name='cellpainting',
+                predict_moa=False,
+                n_moa=0) -> None:
      
         super(SigmaVAE, self).__init__(in_width,
                                         in_height,
@@ -28,10 +30,12 @@ class SigmaVAE(CPA):
                                         seed,
                                         patience,
                                         hparams,
-                                        predict_n_cells,
                                         append_layer_width,
                                         drug_embeddings, 
-                                        variational=True)
+                                        variational=True,
+                                        dataset_name=dataset_name,
+                                        predict_moa=predict_moa,
+                                        n_moa=n_moa)
 
 
     def ae_loss(self, X, X_hat, mu, log_sigma):
