@@ -4,7 +4,10 @@ import numpy as np
 import torch
 
 from .modules.building_blocks import *
-from .modules.vqvae.vqvae_architecture import Encoder, Decoder
+from .modules.convnet.convnet_architecture import Encoder, Decoder
+from .modules.resnet.resnet_encoder import *
+from .modules.resnet.resnet_decoder import *
+
 from .template_model import *
 
 import sys
@@ -36,7 +39,7 @@ class CPA(TemplateModel):
             n_moa: int = 0):     
 
         super(CPA, self).__init__() 
-        self.adversarial = False  # If a normal model or an adversarial network must be trained (starting at false)
+        self.adversarial = False  # If a normal adversarial network must be trained (starting at false)
         self.in_width = in_width  # Image width 
         self.in_height = in_height  # Image height
         self.in_channels = in_channels  # Image channels (5 in this case)
@@ -76,33 +79,7 @@ class CPA(TemplateModel):
         self.n_moa = n_moa
 
         # Instantiate the convolutional encoder and decoder modules
-        self.encoder = Encoder(
-            in_channels = self.in_channels,
-            latent_dim = self.hparams["latent_dim"],
-            init_fm = self.hparams["init_fm"],
-            n_conv = self.hparams["n_conv"],
-            n_residual_blocks = self.hparams["n_residual_blocks"], 
-            in_width = self.in_width,
-            in_height = self.in_height,
-            variational = self.variational,
-            batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
-            dropout_ae = self.hparams["dropout_ae"],
-            dropout_rate_ae = self.hparams["dropout_rate_ae"]
-        )
-
-        self.decoder = Decoder(
-            out_channels = self.in_channels,
-            latent_dim = self.hparams["latent_dim"],
-            init_fm = self.hparams["init_fm"],
-            n_conv = self.hparams["n_conv"],
-            n_residual_blocks = self.hparams["n_residual_blocks"],  
-            out_width = self.in_width,
-            out_height = self.in_height,
-            variational = self.variational,
-            batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
-            dropout_ae = self.hparams["dropout_ae"],
-            dropout_rate_ae = self.hparams["dropout_rate_ae"]
-        ) 
+        self.encoder, self.decoder = self.initialize_autoencoder(hparams)
 
         # Initialize warmup params
         self.warmup_steps = self.hparams["warmup_steps"]
@@ -164,7 +141,7 @@ class CPA(TemplateModel):
         # Set the drug embedding to a fixed or trainable status depending on whether a pre-trained model is used 
         if self.drug_embeddings is None:
             self.drug_embeddings = torch.nn.Embedding(
-                self.num_drugs, self.hparams["latent_dim"])
+                self.num_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
             embedding_requires_grad = True
         else:
             self.drug_embeddings = self.drug_embeddings  # From pre-trained 
@@ -173,8 +150,8 @@ class CPA(TemplateModel):
         # Drug embedding encoder 
         self.drug_embedding_encoder = MLP(
             [self.drug_embeddings.embedding_dim]
-            + [self.hparams["embedding_encoder_width"]]
-            * self.hparams["embedding_encoder_depth"]
+            + [self.hparams["drug_embedding_encoder_width"]]
+            * self.hparams["drug_embedding_encoder_depth"]
             + [self.hparams["latent_dim"]],
             last_layer_act="linear",
         ).to(self.device)
@@ -183,8 +160,7 @@ class CPA(TemplateModel):
         # Embed the MOA
         if self.predict_moa:
             self.moa_embeddings = torch.nn.Embedding(
-                self.n_moa, self.hparams["latent_dim"])
-            embedding_requires_grad = True
+                self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
 
             # MOA embedding encoder 
             self.moa_embedding_encoder = MLP(
@@ -245,7 +221,6 @@ class CPA(TemplateModel):
             step_size=self.hparams["step_size_lr"],
             gamma=0.5,
         )
-
         # Turn adversarial to True
         self.adversarial = True
 
@@ -260,6 +235,8 @@ class CPA(TemplateModel):
         torch.manual_seed(seed)
         np.random.seed(seed)
         self.hparams = {
+            "autoencoder_type": 'convnet' if default else np.random.choice(['resnet', 'convnet']),
+            "resnet_type": 'resnet18' if default else np.random.choice(['resnet18', 'convnet34', 'convnet50']), 
             "latent_dim": 512 if default else int(np.random.choice([256, 512, 1024])),
             "init_fm": 64 if default else int(np.random.choice([32, 64, 128])),  # Will be upsampled depth times
             "n_conv": 3 if default else int(np.random.choice([3, 4, 5])),
@@ -272,25 +249,31 @@ class CPA(TemplateModel):
             "reg_adversary": 5 if default else float(10 ** np.random.uniform(-2, 2)),  # Regularization 
             "penalty_adversary": 3 if default else float(10 ** np.random.uniform(-2, 1)),
             
+            "dropout_ae": False if default else np.random.choice([True, False]),
+            "dropout_rate_ae": 0.1 if default else np.random.choice([0.1, 0.5, 0.8]),
+
             "autoencoder_lr": 1e-4 if default else float(10 ** np.random.uniform(-5, -3)),
             "adversary_lr": 3e-4 if default else float(10 ** np.random.uniform(-5, -3)),
             "autoencoder_wd": 1e-6 if default else float(10 ** np.random.uniform(-8, -4)),
             "adversary_wd": 1e-4 if default else float(10 ** np.random.uniform(-6, -3)),
             "adversary_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),  # To not be confused: the number of adversary steps before the next VAE step 
-            "batch_size": 128 if default else int(np.random.choice([64, 128, 256, 512])),
             "step_size_lr": 45 if default else int(np.random.choice([15, 25, 45])),
-            "embedding_encoder_width": 512,
-            "embedding_encoder_depth": 0,
+            "concat_embeddding": False if default else np.random.choice([False, True]),
+            "drug_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),
+            "drug_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),
+            "moa_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),   
+            "moa_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),        
+            "drug_embedding_dimension": 128 if default else int(np.random.choice([128, 256, 512])),
+            "moa_embedding_dimension": 128 if default else int(np.random.choice([128, 256, 512])),
+
             "warmup_steps": 5 if default else int(np.random.choice([0, 5, 10, 15])), 
             "data_driven_sigma": True if default else np.random.choice([True, False]),
             "ae_pretrain": True if default else np.random.choice([True, False]),
-            "ae_pretrain_steps": 5,
+            "ae_pretrain_steps": 5 if default else np.random.choice([1, 3, 5]),
 
             "batch_norm_adversarial_drug": True if default else np.random.choice([True, False]),
             "batch_norm_adversarial_moa": True if default else np.random.choice([True, False]),
             "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
-            "dropout_ae": False if default else np.random.choice([True, False]),
-            "dropout_rate_ae": 0.1 if default else np.random.choice([0.1, 0.5, 0.8])
         }
         # the user may fix some hparams
         if hparams != "":
@@ -377,8 +360,8 @@ class CPA(TemplateModel):
         out = self.decoder(z) 
 
         # Compute the adversarial loss
-        adv_loss_drug = self.loss_adversary_drugs(y_adv_hat_drug, y_adv_drug)
-        adv_loss_moa = self.loss_adversary_moas(y_adv_hat_moa, y_adv_moa) if self.predict_moa else 0
+        adv_loss_drug = self.loss_adversary_drugs(y_adv_hat_drug, y_adv_drug.argmax(1))
+        adv_loss_moa = self.loss_adversary_moas(y_adv_hat_moa, y_adv_moa.argmax(1)) if self.predict_moa else 0
 
         # The autoencoder loss 
         if self.variational:
@@ -529,7 +512,7 @@ class CPA(TemplateModel):
                 # MOA data are present only on one of the two datasets                 
                 if self.dataset_name == 'BBBC021':
                     y_adv_moa = batch['moa_one_hot'].to(self.device).long()
-                    moa_id = batch['moa_id']
+                    moa_id = batch['moa_id'].to(self.device)
                 else:
                     y_adv_moa = None
                     moa_id = None 
@@ -584,6 +567,7 @@ class CPA(TemplateModel):
             else:
                 avg_recon_loss = tot_ae_loss/len(train_loader)
 
+        # Update the bit per dimension metric
         self.metrics.update_bpd(avg_recon_loss)
 
         # The average RMSE between the evaluated images for all seen batches
@@ -645,6 +629,66 @@ class CPA(TemplateModel):
                 self.history[fold][metric] = [metrics[metric]]
             else:
                 self.history[fold][metric].append(metrics[metric])
+
+
+    def initialize_autoencoder(self, hparams):
+        """Initialize encoder and decoder architectures 
+
+        Args:
+            hparams (dict): dictionary of hyperparameters 
+
+        Returns:
+            tuple: Encoder and decoder modules  
+        """
+        if hparams["autoencoder_type"] == 'resnet':
+            # The different kinds of resnet
+            resnet_types = {'resnet18': (resnet18, decoder18),
+                            'resnet34': (resnet34, decoder34),
+                            'resnet50': (resnet50, decoder50)}
+
+            encoder = resnet_types[hparams['resnet_type']][0](in_channels = self.in_channels,
+                    latent_dim = self.hparams["latent_dim"],
+                    init_fm = self.hparams["init_fm"],
+                    in_width = self.in_width,
+                    in_height = self.in_height,
+                    variational = self.variational)
+
+            decoder = resnet_types[hparams['resnet_type']][1](out_channels = self.in_channels,
+                    latent_dim = self.hparams["latent_dim"],
+                    init_fm = self.hparams["init_fm"],
+                    out_width = self.in_width,
+                    out_height = self.in_height,
+                    variational = self.variational)
+
+        else:
+            encoder = Encoder(
+                in_channels = self.in_channels,
+                latent_dim = self.hparams["latent_dim"],
+                init_fm = self.hparams["init_fm"],
+                n_conv = self.hparams["n_conv"],
+                n_residual_blocks = self.hparams["n_residual_blocks"], 
+                in_width = self.in_width,
+                in_height = self.in_height,
+                variational = self.variational,
+                batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
+                dropout_ae = self.hparams["dropout_ae"],
+                dropout_rate_ae = self.hparams["dropout_rate_ae"]
+            )
+
+            decoder = Decoder(
+                out_channels = self.in_channels,
+                latent_dim = self.hparams["latent_dim"],
+                init_fm = self.hparams["init_fm"],
+                n_conv = self.hparams["n_conv"],
+                n_residual_blocks = self.hparams["n_residual_blocks"],  
+                out_width = self.in_width,
+                out_height = self.in_height,
+                variational = self.variational,
+                batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
+                dropout_ae = self.hparams["dropout_ae"],
+                dropout_rate_ae = self.hparams["dropout_rate_ae"]
+            ) 
+        return encoder, decoder 
 
 
 # Auxiliary functions 

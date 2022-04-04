@@ -96,13 +96,13 @@ class Trainer:
             eval_every (int): How often validation takes place 
             n_workers_loader (int): Number of workers for batch loading
             generate (bool): Whether to perform a sampling + decoding experiment during evaluation (only variational)
-            model_name (str): Name of model to run (AE or VAE)
+            model_name (str): Name of autoencoder model to run (AE or VAE)
             temperature (float): Temperature to downscale the random samples from the prior
             augment_train (bool): Whether augmentation should be carried out on the training set
             patience (int): How many steps of non-improvement of valid loss before stopping 
             seed (int): The random seed for reproducibility 
             append_layer_width (bool, optional): Controls The addition of trailing layers to the adversarial and drug embedding MLPs. Defaults to False.
-            predict_moa (book, optional): used only if the the dataset employed has MOAs annotated 
+            predict_moa (book, optional): Used only if the the dataset employed is MOA-annotated 
         """
         self.img_plot = img_plot  
         self.save_results = save_results  
@@ -159,6 +159,9 @@ class Trainer:
                                                     num_workers=self.n_workers_loader, drop_last=False)
         self.loader_ood = torch.utils.data.DataLoader(self.ood_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
+
+        # The id of the dmso to exclude from the prediction 
+        self.dmso_id = self.training_set.drugs2idx['DMSO']
         print('Successfully loaded the data')
 
     
@@ -211,7 +214,7 @@ class Trainer:
         if self.dataset_name == 'cellpainting':
             dataset = CellPaintingDataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
                                                     return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train)
-            self.dim = 5
+            self.dim = 5  # The number of channels
         else:
             dataset = BBBC021Dataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
                                                     return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train) 
@@ -223,7 +226,7 @@ class Trainer:
         else:
             self.drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
 
-        # Collect the number of total drugs ans the one of seen drugs separately 
+        # Collect the number of total drugs ans the one of seen (they correspond in the fluorescent microscopy dataset)
         self.num_drugs = dataset.num_drugs
         # The ood set in the BBC021 dataset does not leave out entire compoinds but only compound dosage combinations 
         if self.dataset_name == 'BBBC021':
@@ -247,7 +250,7 @@ class Trainer:
         print(self.hparams)
 
         if self.save_results:
-            # Setup plotter and writer 
+            # Setup plotting object
             self.plotter = Plotter(self.dest_dir)
         
         # The variable `end` determines whether we are at the end of the training loop and therefore if disentanglement and clustering stats
@@ -280,7 +283,7 @@ class Trainer:
 
                 # Get the validation results 
                 val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
-                                                        self.model.module.metrics, self.device, end, 
+                                                        self.model.module.metrics, self.dmso_id, self.device, end, 
                                                         variational=self.model.module.variational, predict_moa=self.predict_moa)
 
                 if self.save_results:
@@ -326,18 +329,18 @@ class Trainer:
             
             # Scheduler step at the end of the epoch 
             if epoch <= self.hparams["warmup_steps"]:
-                self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., self.model.module.warmup_steps/epoch)
+                self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., epoch/self.model.module.warmup_steps)
             else:
                 self.model.module.scheduler_autoencoder.step()
             
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
-
+        
         self.model.eval()
         # # Perform last evaluation on TEST SET   
         end = True
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
-                                                self.model.module.metrics, self.device, end, 
+                                                self.model.module.metrics, self.dmso_id, self.device, end, 
                                                 variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa)
         if self.save_results:
             self.write_results(test_losses, test_metrics, self.writer, epoch, ' test')
@@ -345,7 +348,7 @@ class Trainer:
 
         # Perform last evaluation on OOD SET
         ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
-                                                metrics=self.model.module.metrics, device=self.device, end=end, 
+                                                metrics=self.model.module.metrics, dmso_id=self.dmso_id, device=self.device, end=end, 
                                                 variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa)
         if self.save_results:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
@@ -359,9 +362,9 @@ class Trainer:
     def write_results(self, losses, metrics, writer, epoch, fold='train'):
         """Write results to tensorboard
         Args:
-            losses (dict): _description_
-            metrics (dict): _description_
-            writer (torch.utils.tensorboard.SummaryWriter): summary statistics writer 
+            losses (dict): Dictiornay with the loss metrics  
+            metrics (dict): Dictionary with the evaluation metrics
+            writer (torch.utils.tensorboard.SummaryWriter): Summary statistics writer 
         """
         for key in losses:
             writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=losses[key], 

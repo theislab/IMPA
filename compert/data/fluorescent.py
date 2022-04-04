@@ -31,9 +31,8 @@ class CustomTransform:
         # Perform augmentation step
         if self.augment:
             transform = T.Compose([
-                T.RandomHorizontalFlip(p=0.5),
-                T.RandomRotation(np.random.randint(0,90)),
-                T.RandomVerticalFlip(p=0.5)]
+                T.RandomHorizontalFlip(p=0.3),
+                T.RandomVerticalFlip(p=0.3)]
             )
             return transform(X)
         else:
@@ -202,7 +201,6 @@ class BBBC021Fold(Dataset):
         self.use_pretrained = use_pretrained
 
         # One-hot encode molecules and moas
-        print(self.mol_names)
         self.one_hot_drugs = self.drug_encoder.transform(np.array(self.mol_names.reshape((-1,1))))
         self.one_hot_moa = self.moa_encoder.transform(np.array(self.moa.reshape((-1,1))))
         
@@ -237,9 +235,10 @@ class BBBC021Fold(Dataset):
         if self.return_labels:
             return dict(X=img, 
                         mol_one_hot=self.one_hot_drugs[idx],
-                        moa_one_hot=self.one_hot_drugs[idx],
+                        moa_one_hot=self.one_hot_moa[idx],
                         smile_id=self.drugs2idx[self.mol_names[idx]],
-                        moa_id=self.moa2idx[self.moa[idx]]
+                        moa_id=self.moa2idx[self.moa[idx]],
+                        dose = self.dose[idx]
                     )
         else:
             return dict(X=img)
@@ -266,21 +265,24 @@ class BBBC021Fold(Dataset):
         subset_moa_one_hot = []
         subset_smile_id = []
         subset_moa_id = []
+        subset_dose = []
         
         for i in idx_sample:
-            X, mol_one_hot, smile_id, moa_id = self.__getitem__(i).values()
+            X, mol_one_hot, smile_id, moa_id, dose = self.__getitem__(i).values()
             
             imgs.append(X.unsqueeze(0))  # Unsqueeze barch dimension
             subset_mol_one_hot.append(mol_one_hot)
             subset_smile_id.append(smile_id)
             subset_moa_id.append(moa_id)
+            subset_dose.append(dose)
 
         imgs = torch.cat(imgs, dim=0)
         return dict(X = imgs,
                     mol_one_hot = subset_mol_one_hot,
                     moa_one_hot = subset_moa_one_hot, 
                     smile_id = subset_smile_id,
-                    moa_id = subset_moa_id) 
+                    moa_id = subset_moa_id,
+                    dose = self.dose[idx]) 
 
     
     def get_drug_by_name(self, drug_name):
@@ -293,14 +295,45 @@ class BBBC021Fold(Dataset):
         drug_idxs = [idx for idx in range(len(self.mol_names)) if self.mol_names[idx]==drug_name]
 
         # Collect the drug images from the file repository 
+        doses = []
+        moas = []
         drug_images = []
         for drug_idx in drug_idxs:
             #X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
-            X, mol_one_hot, moa_one_hot, smile_id, moa_id = self.__getitem__(drug_idx).values()
+            X, mol_one_hot, moa_one_hot, smile_id, moa_id, dose = self.__getitem__(drug_idx).values()
             drug_images.append(X.unsqueeze(0))
+            doses.append(dose)
+            moas.append(moa_id)
 
         return dict(X=torch.cat(drug_images, dim=0), 
                 mol_one_hot=mol_one_hot,
                 moa_one_hot=moa_one_hot,
                 smile_id=smile_id,
-                moa_id=moa_id) 
+                moa_id=moas,
+                dose=doses) 
+    
+
+    def get_moa_by_name(self, moa_name):
+        """Load the images of specific moa by name
+
+        Args:
+            moa_name (str): The name of the moa of interest  
+        """
+        # Get the indexes in the specific set of all the drugs with a specific name
+        moa_idxs = [idx for idx in range(len(self.moa)) if self.moa[idx]==moa_name]
+
+        # Collect the drug images from the file repository 
+        moa_images = []
+        doses = []
+        for drug_idx in moa_idxs:
+            #X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
+            X, mol_one_hot, moa_one_hot, smile_id, moa_id, dose = self.__getitem__(drug_idx).values()
+            moa_images.append(X.unsqueeze(0))
+            doses.append(dose)
+
+        return dict(X=torch.cat(moa_images, dim=0), 
+                mol_one_hot=mol_one_hot,
+                moa_one_hot=moa_one_hot,
+                smile_id=smile_id,
+                moa_id=moa_id,
+                dose=doses) 

@@ -1,5 +1,6 @@
 from tqdm import tqdm
-from sklearn.metrics import silhouette_score
+import sklearn
+from sklearn.metrics import silhouette_score, f1_score
 from sklearn import model_selection
 import numpy as np
 import torch
@@ -11,6 +12,7 @@ def training_evaluation(model,
                         dataset_loader, 
                         adversarial, 
                         metrics, 
+                        dmso_id,
                         device, end=False, variational=True, ood=False, predict_moa=False):
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
@@ -48,7 +50,7 @@ def training_evaluation(model,
         y_true_ds_moa = []
         y_hat_ds_moa = []
     
-    # If we are at the last iteration of a CPA-like model we also store z_basal predictions 
+    # If we are at the last iteration of a CPA-like model we also store z_basal predictions for disentanglement metrics
     if end:
         z_basal_ds = []  # Will contain the basal latent representation (no drug effect)
         z_ds = []  # Will contain the total drug representation (with added drug effect)
@@ -74,12 +76,12 @@ def training_evaluation(model,
 
         if not adversarial:
             res = model.evaluate(X)
-            out, z, ae_loss = res.values()
+            out, z_basal, ae_loss = res.values()
         else:
             # Get evaluation results
             drug_id = observation["smile_id"].to(device)
             if predict_moa:
-                moa_id = observation["moa_id"]
+                moa_id = observation["moa_id"].to(device)
             else: 
                 moa_id = None 
 
@@ -87,16 +89,18 @@ def training_evaluation(model,
             out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
 
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
-            # Collect the labels 
+            # Collect the predicted labels 
             if not ood or predict_moa:
                 y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
                 if predict_moa:
-                    y_hat_ds_moa.append(y_hat_moa)
+                    y_hat_ds_moa.append(torch.argmax(y_hat_moa, dim=1).item())
             
-            # Only at the end of training we store the latent vectors for analysis 
-            if end:
-                z_basal_ds.append(z_basal)
+        # Only at the end of training we store the latent vectors for analysis 
+        if end:
+            if adversarial:
                 z_ds.append(z)
+            z_basal_ds.append(z_basal)
+            
 
         # Update the losses and the metrics 
         val_loss += ae_loss['total_loss'].item()
@@ -104,21 +108,24 @@ def training_evaluation(model,
             val_recon_loss += ae_loss['reconstruction_loss'].item()
             val_kl_loss += ae_loss['KLD'].item()
         
-        # Perform optimizer step depending on the iteration
+        # Update RMSE on valid set
         metrics.update_rmse(X, out)
 
     if not ood and adversarial:
         if X.shape[0]>1:
             # Update metric for drug prediction
             y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-            y_hat_drug = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
-            metrics.compute_classification_report(y_true_ds_drugs, y_hat_drug, '_drug')
-            
-            # Update the metric for the moa prediction, if applicable
+            y_hat_ds_drug = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
             if predict_moa:
                 y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
                 y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
-                metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
+        
+        # Check classification report on the labels
+        metrics.compute_classification_report(y_true_ds_drugs, y_hat_ds_drugs, '_drug')
+        
+        # Update the metric for the moa prediction, if applicable
+        if predict_moa: 
+            metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
                     
     # Print loss results 
     losses["loss"] = val_loss/len(dataset_loader)
@@ -136,37 +143,46 @@ def training_evaluation(model,
 
     # Disentanglement and clustering evaluated only at the end
     if end:
-        z_ds = torch.cat(z_ds, dim=0)
+        # Exclude the DMSO from the predictions 
+        y_true_ds_drugs = np.array(y_true_ds_drugs)
+        idx_not_dmso = np.where(y_true_ds_drugs!=dmso_id)
+
         z_basal_ds = torch.cat(z_basal_ds, dim=0)
-        
-        # Disentanglement score before and after drug addition 
-        disentanglement_score_basal_drug = compute_disentanglement_score(z_basal_ds, y_true_ds_drugs)
-        disentanglement_score_z_drug = compute_disentanglement_score(z_ds, y_true_ds_drugs)
-        metrics.metrics["disentanglement_score_basal_drug"] = disentanglement_score_basal_drug
-        metrics.metrics["disentanglement_score_z_drug"] = disentanglement_score_z_drug
-        metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_drug - disentanglement_score_basal_drug
+        disentanglement_score_basal_drug = compute_disentanglement_score(z_basal_ds[idx_not_dmso], y_true_ds_drugs[idx_not_dmso])  # Evaluate on the non-controls
+        metrics.metrics["disentanglement_score_basal_drug"] = disentanglement_score_basal_drug  
 
+        if adversarial:
+            z_ds = torch.cat(z_ds, dim=0)
+            disentanglement_score_z_drug = compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_drugs[idx_not_dmso])
+            metrics.metrics["disentanglement_score_z_drug"] = disentanglement_score_z_drug
+            metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_drug - disentanglement_score_basal_drug
+    
         if predict_moa:
-            disentanglement_score_basal_moa = compute_disentanglement_score(z_basal_ds, y_true_ds_moa)
-            disentanglement_score_z_moa= compute_disentanglement_score(z_ds, y_true_ds_moa)
+            y_true_ds_moa = np.array(y_true_ds_moa)
+            disentanglement_score_basal_moa = compute_disentanglement_score(z_basal_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso])
             metrics.metrics["disentanglement_score_basal_moa"] = disentanglement_score_basal_moa
-            metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
-            metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
+            if adversarial:
+                disentanglement_score_z_moa= compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso]) 
+                metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
+                metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
 
-        z_ds = z_ds.to('cpu').numpy()
         z_basal_ds = z_basal_ds.to('cpu').numpy()
+        if adversarial:
+            z_ds = z_ds.to('cpu').numpy()
 
         if not ood or predict_moa:
-            # Silhouette score before and after drug addition 
+            # Silhouette score before and after drug (and moa) additions
             silhouette_score_basal_drugs = compute_silhouette_coefficient(z_basal_ds, y_true_ds_drugs)
-            silhouette_score_z_drugs = compute_silhouette_coefficient(z_ds, y_true_ds_drugs)
             metrics.metrics["silhouette_score_basal_drugs"] = silhouette_score_basal_drugs
-            metrics.metrics["silhouette_score_z_drugs"] = silhouette_score_z_drugs
-
-            silhouette_score_basal_moa = compute_silhouette_coefficient(z_basal_ds, y_true_ds_moa)
-            silhouette_score_z_moa = compute_silhouette_coefficient(z_ds, y_true_ds_moa)
-            metrics.metrics["silhouette_score_basal_moa"] = silhouette_score_basal_moa
-            metrics.metrics["silhouette_score_z_moa"] = silhouette_score_z_moa
+            if adversarial:
+                silhouette_score_z_drugs = compute_silhouette_coefficient(z_ds, y_true_ds_drugs)
+                metrics.metrics["silhouette_score_z_drugs"] = silhouette_score_z_drugs
+            if predict_moa:
+                silhouette_score_basal_moa = compute_silhouette_coefficient(z_basal_ds, y_true_ds_moa)
+                metrics.metrics["silhouette_score_basal_moa"] = silhouette_score_basal_moa
+                if adversarial:
+                    silhouette_score_z_moa = compute_silhouette_coefficient(z_ds, y_true_ds_moa)
+                    metrics.metrics["silhouette_score_z_moa"] = silhouette_score_z_moa
 
     print(f'Average validation loss: {losses["loss"]}')
     if variational:
@@ -177,7 +193,7 @@ def training_evaluation(model,
     return losses, metrics.metrics
 
 
-def compute_disentanglement_score(Z, drug):
+def compute_disentanglement_score(Z, drug, return_misclass_report=False):
     """Train a classifier that evaluates the disentanglement of the latents space from the information
     on the drug
 
@@ -215,7 +231,7 @@ def compute_disentanglement_score(Z, drug):
     y_train_tensor = torch.tensor(
         [label_to_idx[label] for label in y_train], dtype=torch.long, device="cuda")
     y_test_tensor = torch.tensor(
-        [label_to_idx[label] for label in y_test], dtype=torch.long, device="cuda")
+        [label_to_idx[label] for label in y_test], dtype=torch.long, device="cpu")
 
     # Create loader and dataset
     dataset = torch.utils.data.TensorDataset(X_train, y_train_tensor)
@@ -236,19 +252,10 @@ def compute_disentanglement_score(Z, drug):
             optimizer.step()
     
     test_pred = net(X_test.to('cuda'))
-    return accuracy(y_test_tensor, test_pred.argmax(1))
-
-def accuracy(y, y_hat):
-    """Simple accuracy function between two tensors 
-
-    Args:
-        y (torch.tensor): The true label tensor
-        y_hat (torch.tensor): The predicted label tensor 
-
-    Returns:
-        float: Accuracy value bewteen the two
-    """
-    return (torch.sum(y==y_hat)/len(y)).item()
+    if return_misclass_report:
+        return sklearn.metrics.classification_report(y_test_tensor.numpy(), test_pred.argmax(1).to('cpu').numpy())
+    else:
+        return f1_score(y_test_tensor.numpy(), test_pred.argmax(1).to('cpu').numpy(), average="weighted")
 
 
 def compute_silhouette_coefficient(Z, y):

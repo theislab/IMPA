@@ -4,7 +4,9 @@ import torch.nn.functional as F
 
 from torch import Tensor
 from typing import Type, Any, Callable, Union, List, Optional
+from .projections import *
 
+# Interpolation class for resizing
 
 class Interpolate(nn.Module):
     """Upsampling layer reverting the max pooling operation 
@@ -24,6 +26,8 @@ class Interpolate(nn.Module):
             return F.interpolate(x, size=(self.size, self.size), mode='nearest')
 
 
+# Basic convolutional layers
+
 def conv3x3(in_fm: int, out_fm: int, groups: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(
@@ -35,7 +39,11 @@ def conv1x1(in_fm: int, out_fm: int) -> nn.Conv2d:
     return nn.Conv2d(in_fm, out_fm, kernel_size=1, bias=True)
 
 
+# Resnet blocks and main body 
+
 class BasicBlock(nn.Module):
+    """BasicBlock is used with resnet18 and resnet34
+    """
     expansion: int = 1
 
     def __init__(
@@ -47,7 +55,9 @@ class BasicBlock(nn.Module):
         base_width: int = 64,
         upscale: Optional[nn.Module] = None,
     ) -> None:
+
         super(BasicBlock, self).__init__()
+
         if groups != 1 or base_width != 64:
             raise ValueError('BasicBlock only supports groups=1 and base_width=64')
 
@@ -128,16 +138,19 @@ class Bottleneck(nn.Module):
         return out
 
 
-class Decoder(nn.Module):
-
+class ResNetDecoder(nn.Module):
     def __init__(
         self,
-        in_channels,
+        out_channels: int, 
+        latent_dim: int, 
+        init_fm: int,
+        out_width: int,
+        out_height: int,
+        variational: bool,
+        h_dim: int,  # Latent space dimension
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
-        input_height: int = 32,  # Initial spatial dimension
-        latent_dim: int = 128,
-        h_dim: int = 2048,  # Latent space dimension 
+        # input_height: int = 32,  # Initial spatial dimension 
         groups: int = 1,
         widen: int = 1,
         width_per_group: int = 512,
@@ -145,12 +158,21 @@ class Decoder(nn.Module):
         remove_first_maxpool: bool = False
     ) -> None:
 
-        super(Decoder, self).__init__()
+        super(ResNetDecoder, self).__init__()
 
-        self.in_channels = in_channels 
+        self.in_channels = out_channels 
+        self.latent_dim = latent_dim
+        self.init_fm = init_fm  # Final number of feature maps 
+        self.variational = variational  
+        self.input_height = out_height  # Assuming that the height and width of the images is the same 
+        self.h_dim = h_dim 
+        self.groups = groups
+        self.in_planes = h_dim  # Will be modified 
+
         self.first_conv3x3 = first_conv3x3
         self.remove_first_maxpool = remove_first_maxpool
         self.upscale_factor = 8  # To what extent we upscale the features 
+        num_out_filters = width_per_group * widen
 
         if not first_conv3x3:
             self.upscale_factor *= 2
@@ -158,16 +180,8 @@ class Decoder(nn.Module):
         if not remove_first_maxpool:
             self.upscale_factor *= 2
 
-        self.input_height = input_height
-        self.h_dim = h_dim
-        self.groups = groups
-        self.inplanes = h_dim
-        self.base_width = 64  
-        num_out_filters = width_per_group * widen
-
-        # hdim is the dimension of the last layer of Resnet 
-        self.linear_projection1 = nn.Linear(latent_dim, h_dim, bias=True)
-        self.linear_projection2 = nn.Linear(h_dim, h_dim, bias=True)
+        # Projection goes from latent dimension to resenet h dimensions 
+        self.linear_projection = nn.Linear(self.latent_dim, self.h_dim, bias=True)
         self.relu = nn.ReLU(inplace=True)
 
         # Depthwise initial convolution 
@@ -187,8 +201,8 @@ class Decoder(nn.Module):
         num_out_filters /= 2
         self.layer4 = self._make_layer(block, int(num_out_filters), layers[3], Interpolate())
 
-        self.conv2 = conv3x3(int(num_out_filters) * block.expansion, self.base_width)
-        self.final_conv = conv3x3(self.base_width, self.in_channels)
+        self.conv2 = conv3x3(int(num_out_filters) * block.expansion, self.init_fm)
+        self.final_conv = conv3x3(self.init_fm, self.in_channels)
 
     def _make_layer(
         self,
@@ -199,33 +213,33 @@ class Decoder(nn.Module):
     ) -> nn.Sequential:
         upsample = None
 
-        if self.inplanes != planes * block.expansion or upscale is not None:
+        if self.in_planes != planes * block.expansion or upscale is not None:
             # this is passed into residual block for skip connection
             upsample = []
             if upscale is not None:
                 upsample.append(upscale)
-            upsample.append(conv1x1(self.inplanes, planes * block.expansion))
+            upsample.append(conv1x1(self.in_planes, planes * block.expansion))
             upsample = nn.Sequential(*upsample)
 
         layers = []
         layers.append(
             block(
-                self.inplanes,
+                self.in_planes,
                 planes,
                 upsample,
                 self.groups,
-                self.base_width,
+                self.init_fm,
                 upscale,
             )
         )
-        self.inplanes = planes * block.expansion
+        self.in_planes = planes * block.expansion
         for _ in range(1, blocks):
             layers.append(
                 block(
-                    self.inplanes,
+                    self.in_planes,
                     planes,
                     groups=self.groups,
-                    base_width=self.base_width,
+                    base_width=self.init_fm,
                     upscale=None,
                 )
             )
@@ -233,8 +247,7 @@ class Decoder(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.relu(self.linear_projection1(x))
-        x = self.relu(self.linear_projection2(x))
+        x = self.relu(self.linear_projection(x))
 
         x = x.view(x.size(0), self.h_dim // 16, 4, 4)
         x = self.conv1(x)
@@ -259,32 +272,69 @@ class Decoder(nn.Module):
         return x
 
 
-def decoder18(in_channels, **kwargs):
+def decoder18(out_channels,
+                latent_dim,
+                init_fm,
+                out_width,
+                out_height,
+                variational, 
+                h_dim=512,
+                **kwargs):
     # layers list is opposite the encoder (in this case [2, 2, 2, 2])
-    return Decoder(in_channels, BasicBlock, [2, 2, 2, 2], **kwargs)
+    return ResNetDecoder(out_channels,
+                latent_dim,
+                init_fm,
+                out_width,
+                out_height,
+                variational, 
+                h_dim, 
+                BasicBlock, [2, 2, 2, 2], **kwargs)
 
 
-def decoder34(in_channels, **kwargs):
+def decoder34(out_channels,
+                latent_dim,
+                init_fm,
+                out_width,
+                out_height,
+                variational, 
+                h_dim = 512, 
+                **kwargs):
     # layers list is opposite the encoder (in this case [3, 6, 4, 3])
-    return Decoder(in_channels, BasicBlock, [3, 6, 4, 3], **kwargs)
+    return ResNetDecoder(out_channels,
+                latent_dim,
+                init_fm,
+                out_width,
+                out_height,
+                variational, 
+                h_dim, BasicBlock, [3, 6, 4, 3], **kwargs)
 
 
-def decoder50(in_channels, **kwargs):
+def decoder50(out_channels,
+                latent_dim,
+                init_fm,
+                out_width,
+                out_height,
+                variational, 
+                h_dim=2048,
+                **kwargs):
     # layers list is opposite the encoder
-    return Decoder(in_channels, Bottleneck, [3, 6, 4, 3], **kwargs)
+    return ResNetDecoder(out_channels,
+                latent_dim,
+                init_fm,
+                out_width,
+                out_height,
+                variational, 
+                h_dim,
+                Bottleneck, [3, 6, 4, 3], **kwargs)
 
 
-def decoder50w2(in_channels, **kwargs):
-    # layers list is opposite the encoder
-    return Decoder(in_channels, Bottleneck, [3, 6, 4, 3], widen=2, **kwargs)
 
-
-def decoder50w4(in_channels, **kwargs):
-    # layers list is opposite the encoder
-    return Decoder(in_channels, Bottleneck, [3, 6, 4, 3], widen=4, **kwargs)
-
-
-if __name__ == "__main__":
-    z = torch.randn(64, 128)
-    model = decoder50(in_channels=5, input_height=96, latent_dim=128, h_dim=2048)
-    print(model(z).shape)
+# if __name__ == "__main__":
+#     z = torch.randn(64, 128)
+#     model = decoder50(out_channels = 3,
+#                     latent_dim = 128,
+#                     init_fm = 64,
+#                     out_width = 96,
+#                     out_height = 96,
+#                     variational = True)
+#     print(model(z).shape)

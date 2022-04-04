@@ -34,9 +34,6 @@ class ResidualLayer(torch.nn.Module):
 
 #-------------------------------------------------------------------------------------
 
-"""
-Encoder and Decoder classes 
-"""
 
 class Encoder(torch.nn.Module):
     def __init__(self,
@@ -72,14 +69,13 @@ class Encoder(torch.nn.Module):
         # Build convolutional layers 
         in_fm = self.in_channels 
         out_fm = self.init_fm
-        kernel_size = 3  # Initial kernel size 
+        kernel_size = 4  # Initial kernel size 
 
         # Build downsizing convolutions 
         for i in range(0, self.n_conv):
-            stride = 1 if i == 0 else 2 
             self.modules += [torch.nn.Conv2d(in_fm, out_fm,
                                 kernel_size=kernel_size, 
-                                stride=stride, padding=(kernel_size-1)//2)]    
+                                stride=2, padding=1)]    
                                 
             if i==0 or self.batch_norm_layers_ae:
                 self.modules += [torch.nn.BatchNorm2d(out_fm)]
@@ -90,7 +86,7 @@ class Encoder(torch.nn.Module):
 
             in_fm = out_fm
             out_fm = out_fm*2
-            kernel_size += 1
+            # kernel_size += 1
 
         # Add residual blocks 
         for i in range(self.n_residual_blocks):
@@ -99,8 +95,8 @@ class Encoder(torch.nn.Module):
         self.encoder = torch.nn.Sequential(*self.modules)
 
         # Add bottleneck
-        downsampling_factor_width = int(self.in_width//2**(self.n_conv-1))
-        downsampling_factor_height = int(self.in_height//2**(self.n_conv-1))
+        downsampling_factor_width = int(self.in_width//2**(self.n_conv))
+        downsampling_factor_height = int(self.in_height//2**(self.n_conv))
         self.flattened_dim = in_fm*downsampling_factor_width*downsampling_factor_height
         self.flatten = torch.nn.Flatten()   
 
@@ -152,8 +148,8 @@ class Decoder(torch.nn.Module):
         self.modules = []
 
         # Layer to upscale latent sample 
-        self.upsampling_factor_width = self.out_width//2**(self.n_conv-1)
-        self.upsampling_factor_height = self.out_height//2**(self.n_conv-1)
+        self.upsampling_factor_width = self.out_width//2**(self.n_conv)
+        self.upsampling_factor_height = self.out_height//2**(self.n_conv)
         self.flattened_dim = self.init_fm*self.upsampling_factor_width*self.upsampling_factor_height
         self.upsample_fc = torch.nn.Linear(self.latent_dim, self.flattened_dim)
         self.variational = variational
@@ -165,21 +161,20 @@ class Decoder(torch.nn.Module):
 
         in_fm = self.init_fm
         out_fm = self.init_fm//2
-        kernel_size = 6  # Initial kernel size 
+        kernel_size = 4  # Initial kernel size 
 
         # Append the residual blocks
         for _ in range(self.n_residual_blocks):
             self.modules.append(ResidualLayer(in_fm, in_fm))
 
         for i in range(0, self.n_conv):
-            stride = 2 if i < self.n_conv-1 else 1
             self.modules += [torch.nn.ConvTranspose2d(in_fm, out_fm,
-                                kernel_size=kernel_size, stride=stride, padding=2)]
+                                kernel_size=kernel_size, stride=2, padding=1)]
             if self.batch_norm_layers_ae:   
                 self.modules += [torch.nn.BatchNorm2d(out_fm)]
 
-            if i > 0:
-                kernel_size -= 1
+            # if i > 0:
+            #     kernel_size -= 1
             
             self.modules += [torch.nn.ReLU() if i<self.n_conv-1 else torch.nn.Sigmoid()]
             if self.dropout_ae and i < self.n_conv-1:
