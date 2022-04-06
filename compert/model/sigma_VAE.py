@@ -107,7 +107,7 @@ class SigmaVAE(CPA):
         drug_emb = self.drug_embeddings(drug_id) 
         z_drug = self.drug_embedding_encoder(drug_emb) if not self.hparams["concat_one_hot"] else original["drug_one_hot"][0].to(self.device).unsqueeze(0)
         # Collect the mode of action embeddings 
-        if self.hparams["predict_moa"]:
+        if self.predict_moa:
             moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
             moa_emb = self.drug_embeddings(moa_id) 
             z_moa = self.moa_embedding_encoder(moa_emb) if not self.hparams["concat_one_hot"] else original["moa_one_hot"][0].to(self.device).unsqueeze(0)

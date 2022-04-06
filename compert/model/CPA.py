@@ -151,7 +151,7 @@ class CPA(TemplateModel):
             # Drug embedding encoder 
             self.drug_embedding_encoder = MLP(
                 [self.drug_embeddings.embedding_dim]
-                + [self.hparams["drug_embedding_encoder_width"]]
+                + [self.hparams["drug_embedding_dimension"]]
                 * self.hparams["drug_embedding_encoder_depth"]
                 + [self.hparams["latent_dim"] if not self.hparams["concat_embedding"] else self.hparams["drug_embedding_dimension"]],
                 last_layer_act="linear",
@@ -165,7 +165,7 @@ class CPA(TemplateModel):
                 # MOA embedding encoder 
                 self.moa_embedding_encoder = MLP(
                     [self.moa_embeddings.embedding_dim]
-                    + [self.hparams["moa_embedding_encoder_width"]]
+                    + [self.hparams["moa_embedding_dimension"]]
                     * self.hparams["moa_embedding_encoder_depth"]
                     + [self.hparams["latent_dim"] if not self.hparams["concat_embedding"] else self.hparams["moa_embedding_dimension"]],
                     last_layer_act="linear",
@@ -263,9 +263,9 @@ class CPA(TemplateModel):
             "concat_embeddding": False if default else np.random.choice([False, True]),
             "concat_one_hot": False if default else np.random.choice([False, True]),
             "drug_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),
-            "drug_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),
+            # "drug_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),
             "moa_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),   
-            "moa_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),        
+            # "moa_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),        
             "drug_embedding_dimension": 128 if default else int(np.random.choice([128, 256, 512])),
             "moa_embedding_dimension": 128 if default else int(np.random.choice([128, 256, 512])),
 
