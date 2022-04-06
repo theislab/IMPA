@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import cv2
 from datetime import datetime 
+import torch
 
     
 def img_resize(image, width:int, height:int, interpolation:str):
@@ -134,3 +135,19 @@ def make_dirs(path, experiment_name):
     os.mkdir(os.path.join(dest_dir, 'checkpoints'))
     # os.mkdir(os.path.join(dest_dir, 'logs'))
     return dest_dir
+
+
+
+
+# Auxiliary functions 
+def gaussian_nll(mu, log_sigma, x):
+    """
+    Implement Gaussian nll loss
+    """
+    return 0.5 * torch.pow((x - mu) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
+
+
+def softclip(tensor, min):
+    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
+    result_tensor = min + torch.nn.functional.softplus(tensor - min)
+    return result_tensor

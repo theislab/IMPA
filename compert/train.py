@@ -78,8 +78,8 @@ class Trainer:
         """
         # Resume the training 
         self.resume = resume 
-        self.resume_checkpoint = resume_checkpoint  # Path to the pre-trained weights 
-        self.resume_epoch = 1  # By default, we start at epoch 1 
+        self.resume_checkpoint = resume_checkpoint  
+        self.resume_epoch = 1  
 
 
     @ex.capture(prefix="training_params")
@@ -248,8 +248,7 @@ class Trainer:
         Full training loop
         """
         print('Training with hparams')
-        print(self.hparams)
-
+        
         if self.save_results:
             # Setup plotting object
             self.plotter = Plotter(self.dest_dir)
@@ -285,7 +284,8 @@ class Trainer:
                 # Get the validation results 
                 val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
                                                         self.model.module.metrics, self.dmso_id, self.device, end, 
-                                                        variational=self.model.module.variational, predict_moa=self.predict_moa)
+                                                        variational=self.model.module.variational, predict_moa=self.predict_moa,
+                                                        ds_name=self.dataset_name)
 
                 if self.save_results:
                     self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
@@ -342,7 +342,8 @@ class Trainer:
         end = True
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.dmso_id, self.device, end, 
-                                                variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa)
+                                                variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa,
+                                                ds_name=self.dataset_name)
         if self.save_results:
             self.write_results(test_losses, test_metrics, self.writer, epoch, ' test')
         self.model.module.save_history('final_test', test_losses, test_metrics, 'test')
@@ -350,7 +351,8 @@ class Trainer:
         # Perform last evaluation on OOD SET
         ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
                                                 metrics=self.model.module.metrics, dmso_id=self.dmso_id, device=self.device, end=end, 
-                                                variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa)
+                                                variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa,
+                                                ds_name=self.dataset_name)
         if self.save_results:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
         self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')

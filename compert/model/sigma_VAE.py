@@ -65,7 +65,7 @@ class SigmaVAE(CPA):
         Samples from the latent space and return the corresponding
         image space map.
         num_samples: Number of samples
-        device: Device to run the model
+        temperature: Temperature factor for sampling 
         """
         # TODO: give the chance to add the drug of interest by ID
 
@@ -73,12 +73,13 @@ class SigmaVAE(CPA):
         z = torch.randn(num_samples,
                 self.hparams["latent_dim"])*temperature
 
-        # Check if concatenation of 0's must be performed 
-        if self.hparams["concat_embeddings"]:
-            z = torch.cat([z, torch.zeros(z.shape[0], self.n_seen_drugs)], dim = 1)
+        # Concatenate with zeros - Choose the number of dimensions depending on the kind of concatenation performed 
+        if self.hparams["concat_embedding"]:
+            drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
+            z = torch.cat([z, torch.zeros(z.shape[0], drug_dim).to(self.device)], dim = 1)
             if self.predict_moa:
-                z = torch.cat([z, torch.zeros(z.shape[0], self.n_moa)], dim = 1)
-
+                moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
+                z = torch.cat([z, torch.zeros(z.shape[0], moa_dim).to(self.device)], dim = 1)
         z = z.to(self.device)
         samples = self.decoder(z)
         return samples
@@ -97,12 +98,15 @@ class SigmaVAE(CPA):
         Given an input image x, returns the reconstructed image
         x: input image
         """
+        # Collect the data from the batch at random 
         original = next(iter(loader))
-        original_X = original['X'][0].to(self.device).unsqueeze(0)  # The data 
+        original_X = original['X'][0].to(self.device).unsqueeze(0)  
 
+        # Collect the encoders for the drug embeddings to condition the latent space 
         drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
         drug_emb = self.drug_embeddings(drug_id) 
         z_drug = self.drug_embedding_encoder(drug_emb) if not self.hparams["concat_one_hot"] else original["drug_one_hot"][0].to(self.device).unsqueeze(0)
+        # Collect the mode of action embeddings 
         if self.hparams["predict_moa"]:
             moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
             moa_emb = self.drug_embeddings(moa_id) 
@@ -113,26 +117,25 @@ class SigmaVAE(CPA):
         with torch.no_grad():
             mu_orig, log_sigma_orig = self.encoder(original_X)  # Encode image
             z_x = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
-
+            # Handle the case training is not adversarial 
             if not self.adversarial:
-                if self.hparams["concat_embeddings"]:
-                    z_x = torch.cat([z_x, torch.zeros(z_x.shape[0], self.n_seen_drugs)], dim = 1)
+                if self.hparams["concat_embedding"]:
+                    # The concatenation dimension is equal to the number of drugs if the one hot encoding is carried out 
+                    drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
+                    z = torch.cat([z, torch.zeros(z.shape[0], drug_dim).to(self.device)], dim = 1)
                     if self.predict_moa:
-                        z_x = torch.cat([z_x, torch.zeros(z.shape[0], self.n_moa)], dim = 1)
+                        moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
+                        z = torch.cat([z, torch.zeros(z.shape[0], moa_dim).to(self.device)], dim = 1)
                 reconstructed_X = self.decoder(z_x) 
 
             else:
+                # If not concat, perform the sum of embeddings 
                 if not self.hparams["concat_embeddings"]:
-                    z = z_x + z_drug + z_drug
+                    z = z_x + z_drug + z_moa
                 else:
-                    if self.hparams["concat_one_hot"]:
-                        z = torch.cat([z, drug_emb], dim = 1)
-                        if self.predict_moa:
-                            z = torch.cat([z, moa_emb], dim = 1)
-                    else:
-                        z = torch.cat([z, z_drug], dim = 1)
-                        if self.predict_moa:
-                            z = torch.cat([z, z_moa], dim = 1) 
+                    z = torch.cat([z, z_drug], dim = 1)
+                    if self.predict_moa:
+                        z = torch.cat([z, z_moa], dim = 1) 
                 reconstructed_X = self.decoder(z) 
 
         return original_X, reconstructed_X

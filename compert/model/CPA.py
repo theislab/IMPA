@@ -5,9 +5,6 @@ import numpy as np
 import torch
 
 from .modules.building_blocks import *
-from .modules.convnet.convnet_architecture import Encoder, Decoder
-from .modules.resnet.resnet_encoder import *
-from .modules.resnet.resnet_decoder import *
 
 from .template_model import *
 
@@ -156,7 +153,7 @@ class CPA(TemplateModel):
                 [self.drug_embeddings.embedding_dim]
                 + [self.hparams["drug_embedding_encoder_width"]]
                 * self.hparams["drug_embedding_encoder_depth"]
-                + [self.hparams["latent_dim"] if not self.concat_embedding else self.hparams["drug_embedding_dimension"]],
+                + [self.hparams["latent_dim"] if not self.hparams["concat_embedding"] else self.hparams["drug_embedding_dimension"]],
                 last_layer_act="linear",
             ).to(self.device)
 
@@ -170,7 +167,7 @@ class CPA(TemplateModel):
                     [self.moa_embeddings.embedding_dim]
                     + [self.hparams["moa_embedding_encoder_width"]]
                     * self.hparams["moa_embedding_encoder_depth"]
-                    + [self.hparams["latent_dim"] if not self.concat_embedding else self.hparams["moa_embedding_dimension"]],
+                    + [self.hparams["latent_dim"] if not self.hparams["concat_embedding"] else self.hparams["moa_embedding_dimension"]],
                     last_layer_act="linear",
                 ).to(self.device)
 
@@ -251,6 +248,7 @@ class CPA(TemplateModel):
             "adversary_width_moa": 128 if default else int(np.random.choice([64, 128, 256])),
             "adversary_depth_moa": 3 if default else int(np.random.choice([2, 3, 4])),
 
+            "beta": 1 if default else np.random.choice([1, 5, 10]),
             "reg_adversary": 5 if default else float(10 ** np.random.uniform(-2, 2)),  # Regularization 
             "penalty_adversary": 3 if default else float(10 ** np.random.uniform(-2, 1)),
             "dropout_ae": False if default else np.random.choice([True, False]),
@@ -262,8 +260,8 @@ class CPA(TemplateModel):
             "adversary_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),  # To not be confused: the number of adversary steps before the next VAE step 
             "step_size_lr": 45 if default else int(np.random.choice([15, 25, 45])),
 
-            "concat_one_hot": False if default else np.random.choice([False, True]),
             "concat_embeddding": False if default else np.random.choice([False, True]),
+            "concat_one_hot": False if default else np.random.choice([False, True]),
             "drug_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),
             "drug_embedding_encoder_width": 512 if default else int(np.random.choice([128, 256, 512])),
             "moa_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),   
@@ -311,17 +309,21 @@ class CPA(TemplateModel):
         Returns:
             dict: The reconstructed input, the latent representation and the losses  
         """
+        # Compute prediction by the encoder 
         if not self.variational:
             z = self.encoder(X)
         else:
             mu, log_sigma = self.encoder(X)
             # Apply reparametrization trick
             z = self.reparameterize(mu, log_sigma)
-        # Decode z, if concat_embeddings is true, add the dimensions (as 0) of the 
-        if self.hparams["concat_embeddings"]:
-            z = torch.cat([z, torch.zeros(z.shape[0], self.n_seen_drugs)], dim = 1)
+        
+        # Decode z, if concat_embeddings is true, add the dimensions (as 0) of the drug and moas 
+        if self.hparams["concat_embedding"]:
+            drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
+            z = torch.cat([z, torch.zeros(z.shape[0], drug_dim).to(self.device)], dim = 1)
             if self.predict_moa:
-                z = torch.cat([z, torch.zeros(z.shape[0], self.n_moa)], dim = 1)
+                moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
+                z = torch.cat([z, torch.zeros(z.shape[0], moa_dim).to(self.device)], dim = 1)
 
         # Decode the latent 
         out = self.decoder(z)
@@ -332,12 +334,13 @@ class CPA(TemplateModel):
         return  dict(out=out, z=z, loss=ae_loss)
 
     
-    def forward_compert(self, X, y_adv_drug, drug_ids, y_adv_moa=None, moa_ids=None):
+    def forward_compert(self, X, y_adv_drug, drug_ids, y_adv_moa=None, moa_ids=None, mode='train'):
         """The forward step with adversarial training
         Args:
             X (torch.Tensor): the image data X
             y_adv (torch.Tensor): the target for the adversarial training  
             drug_embedding (torch.Tensor): The pre-computed embeddings for the drugs in the batch
+            mode (str): train or eval
         """
         # Autoencoder pass
         if self.variational:
@@ -346,141 +349,77 @@ class CPA(TemplateModel):
         else:
             z_basal = self.encoder(X)
 
+        # In the eval mode, we'll need to decode also z basal, so we must account for concatenation vs sum  
+        if mode == 'eval':
+            # Decode z, if concat_embeddings is true, add the dimensions (as 0) of the drug and moas 
+            if self.hparams["concat_embedding"]:
+                drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
+                z_basal = torch.cat([z_basal, torch.zeros(z_basal.shape[0], drug_dim).to(self.device)], dim = 1)
+                if self.predict_moa:
+                    moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
+                    z_basal = torch.cat([z_basal, torch.zeros(z_basal.shape[0], moa_dim).to(self.device)], dim = 1)
+
         # Prediction of the drug label  
-        y_adv_hat_drug = self.adversary_drugs(z_basal)
+        y_adv_hat_drug = self.adversary_drugs(z_basal[:,:self.hparams["latent_dim"]])
         # If applicable, prediction on the MOA label
         if self.predict_moa:
-            y_adv_hat_moa = self.adversary_moa(z_basal)
+            y_adv_hat_moa = self.adversary_moa(z_basal[:,:self.hparams["latent_dim"]])
 
         # Embed the drug
-        if not self.hparams["concat_one_hot"]:
-            drug_embedding = self.drug_embeddings(drug_ids)  # Embedding weights from drug id 
-            z_drug = self.drug_embedding_encoder(drug_embedding)  # Embed input drug
+        drug_embedding = self.drug_embeddings(drug_ids) if not self.hparams["concat_one_hot"] else None # Embedding weights from drug id 
+        z_drug = self.drug_embedding_encoder(drug_embedding) if not self.hparams["concat_one_hot"] else y_adv_drug.float() # Embed input drug
 
-            #Embed moa if applicable 
-            if self.predict_moa:
-                moa_embedding = self.moa_embeddings(moa_ids)
-                z_moa = self.moa_embedding_encoder(moa_embedding)
-            else:
-                z_moa = 0  # If no moa in the dataset, z_moa set to null
+        #Embed moa if applicable 
+        if self.predict_moa:
+            moa_embedding = self.moa_embeddings(moa_ids) if not self.hparams["concat_one_hot"] else None
+            z_moa = self.moa_embedding_encoder(moa_embedding) if not self.hparams["concat_one_hot"] else y_adv_moa.float()
+        else:
+            z_moa = 0  # If no moa in the dataset, z_moa set to null
 
         # Sum the latents of the drug and the image
         if not self.hparams["concat_embedding"]:
             z = z_basal + z_drug + z_moa  
         else:
-            if self.hparams["concat_one_hot"]:
-                z = torch.cat([z, y_adv_drug], dim = 1)
-                if self.predict_moa:
-                    z = torch.cat([z, y_adv_moa], dim = 1)
-            else:
-                z = torch.cat([z, z_drug], dim = 1)
-                if self.predict_moa:
-                    z = torch.cat([z, z_moa], dim = 1)                
-    
+            z = torch.cat([z_basal[:,:self.hparams["latent_dim"]], z_drug], dim = 1)
+            if self.predict_moa:
+                z = torch.cat([z, z_moa], dim = 1)  
+        
         # Decode z for the output 
-        out = self.decoder(z) 
+        out = self.decoder(z.float()) 
 
         # Compute the adversarial loss
-        adv_loss_drug = self.loss_adversary_drugs(y_adv_hat_drug, y_adv_drug.argmax(1))
-        adv_loss_moa = self.loss_adversary_moas(y_adv_hat_moa, y_adv_moa.argmax(1)) if self.predict_moa else 0
+        if mode == 'train':
+            adv_loss_drug = self.loss_adversary_drugs(y_adv_hat_drug, y_adv_drug.argmax(1))
+            adv_loss_moa = self.loss_adversary_moas(y_adv_hat_moa, y_adv_moa.argmax(1)) if self.predict_moa else 0
 
         # The autoencoder loss 
         if self.variational:
             ae_loss = self.ae_loss(X, out, mu, log_sigma)
         else:
             ae_loss = self.ae_loss(X, out)
-
-        # Check whether to perform adversarial training 
-        if (self.iteration % self.hparams["adversary_steps"]) != 0:
-            # Compute the gradient penalty for the drug regularization term 
-            adv_drugs_grad_penalty = self.compute_gradient_penalty(y_adv_hat_drug.sum(), z_basal)
-            # Compute the gradient penalty for the moa term, if applicable
-            if self.predict_moa:
-                adv_moa_grad_penalty = self.compute_gradient_penalty(y_adv_hat_moa.sum(), z_basal)
-
-            # The adversary component will be equal to 0 if predict_moa is false
-            loss = adv_loss_drug + self.hparams["penalty_adversary"] * adv_drugs_grad_penalty \
-                    + adv_loss_moa + self.hparams["penalty_adversary"] * adv_moa_grad_penalty
-
-        else:
-            loss = ae_loss['total_loss'] - self.hparams["reg_adversary"] * adv_loss_drug - \
-                    self.hparams["reg_adversary"] * adv_loss_moa
         
-        return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_drug, adv_loss_moa=adv_loss_moa)
+        if mode == 'train':
+        # Check whether to perform adversarial training 
+            if (self.iteration % self.hparams["adversary_steps"]) != 0:
+                # Compute the gradient penalty for the drug regularization term 
+                adv_drugs_grad_penalty = self.compute_gradient_penalty(y_adv_hat_drug.sum(), z_basal)
+                # Compute the gradient penalty for the moa term, if applicable
+                adv_moa_grad_penalty = self.compute_gradient_penalty(y_adv_hat_moa.sum(), z_basal)  if self.predict_moa else 0
 
-    
-    def evaluate(self, X, y_adv_drug, y_adv_moa ,drug_id=None, moa_id=None):
-        """Perform evaluation step
-        Args:
-            X (torch.tensor): The batch of observations
-            y_adv (torch.tensor): The drug label of the observation 
-            drug_embed (torch.tensor): The embedding of the drug 
-        """
-        with torch.no_grad():
-            # Activate autoencoder
-            if self.variational:
-                mu, log_sigma = self.encoder(X)
-                z_basal = self.reparameterize(mu, log_sigma)
+                # The adversary component will be equal to 0 if predict_moa is false
+                loss = adv_loss_drug + self.hparams["penalty_adversary"] * adv_drugs_grad_penalty \
+                        + adv_loss_moa + self.hparams["penalty_adversary"] * adv_moa_grad_penalty
+
             else:
-                z_basal = self.encoder(X)
-
-            # Check if concatenation of 0's must be performed 
-            z_basal_dim = z_basal.shape[1]  # The dimension of z basal 
-            if self.hparams["concat_embeddings"]:
-                z_basal = torch.cat([z_basal, torch.zeros(z_basal.shape[0], self.n_seen_drugs)], dim = 1)
-                if self.predict_moa:
-                    z_basal = torch.cat([z_basal, torch.zeros(z.shape[0], self.n_moa)], dim = 1)
+                loss = ae_loss['total_loss'] - self.hparams["reg_adversary"] * adv_loss_drug - \
+                        self.hparams["reg_adversary"] * adv_loss_moa
             
-            # If not adversarial training, simply return the autoencoder losses
-            if not self.adversarial:
-                out = self.decoder(z_basal)
-                if self.variational:
-                    ae_loss = self.ae_loss(X, out, mu, log_sigma)
-                else:
-                    ae_loss = self.ae_loss(X, out)
-                return dict(out=out, z=z_basal, ae_loss=ae_loss)
-
-            else:
-                # Collect adversarial prediction 
-                y_hat_drug = self.adversary_drugs(z)
-                if self.predict_moa:
-                    y_hat_moa = self.adversary_moa(z)
-
-                if not self.hparams["concat_one_hot"]:
-                    drug_embedding = self.drug_embeddings(drug_id)  # Embedding weights from drug id 
-                    z_drug = self.drug_embedding_encoder(drug_embedding)  # Embed input drug
-
-                    #Embed moa if applicable 
-                    if self.predict_moa:
-                        moa_embedding = self.moa_embeddings(moa_id)
-                        z_moa = self.moa_embedding_encoder(moa_embedding)
-                    else:
-                        z_moa = 0  # If no moa in the dataset, z_moa set to null 
-                
-                # Sum the latents of the drug and the image
-                if not self.hparams["concat_embedding"]:
-                    z = z_basal[:,:z_basal_dim] + z_drug + z_moa  
-                else:
-                    if self.hparams["concat_one_hot"]:
-                        z = torch.cat([z_basal[:,:z_basal_dim], y_adv_drug], dim = 1)
-                        if self.predict_moa:
-                            z = torch.cat([z, y_adv_moa], dim = 1)
-                    else:
-                        z = torch.cat([z, z_drug], dim = 1)
-                        if self.predict_moa:
-                            z = torch.cat([z, z_moa], dim = 1)  
-
-                # Get both the decoded versions of z and z_basal to compare them in the reconstruction 
-                out = self.decoder(z)
-                out_basal = self.decoder(z_basal)
-
-                if self.variational:
-                    ae_loss = self.ae_loss(X, out, mu, log_sigma)
-                else:
-                    ae_loss = self.ae_loss(X, out)
-
-                return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat_drug=y_hat_drug, 
-                            y_hat_moa=y_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)
+            return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_drug, adv_loss_moa=adv_loss_moa)
+        
+        else:
+            out_basal = self.decoder(z_basal)
+            return dict(out=out, out_basal=out_basal, z_basal=z_basal[:,:self.hparams["latent_dim"]], z=z, y_hat_drug=y_adv_hat_drug, 
+                        y_hat_moa=y_adv_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)
             
         
     def compute_gradient_penalty(self, output, input):
@@ -553,17 +492,10 @@ class CPA(TemplateModel):
                 else:
                     y_adv_moa = None
                     moa_id = None 
-            
                 del batch # Free memory
                 
                 # Forward pass
-                out, loss, ae_loss, adv_loss_drug, adv_loss_moa = self.forward_compert(X, y_adv_drug, drug_id, y_adv_moa, moa_id).values()
-
-                # Cumulate the separate adversarial and training losses 
-                tot_ae_loss += ae_loss['total_loss'].item()
-                tot_adv_loss_drug += adv_loss_drug.item()
-                if self.predict_moa:
-                    tot_adv_loss_moa += adv_loss_moa
+                out, loss, ae_loss, adv_loss_drug, adv_loss_moa = self.forward_compert(X, y_adv_drug, drug_id, y_adv_moa, moa_id, mode='train').values()
 
                 # Zero-grad both optimizers
                 self.optimizer_adversaries.zero_grad()
@@ -577,22 +509,29 @@ class CPA(TemplateModel):
                 else:
                     loss.backward()
                     self.optimizer_autoencoder.step()
-            
-            # Increase number of iterations
-            self.iteration += 1
 
+                # Cumulate the adversarial and the ae loss
+                tot_ae_loss += ae_loss['total_loss'].item()
+                tot_adv_loss_drug += adv_loss_drug.item()
+                if self.predict_moa:
+                    tot_adv_loss_moa += adv_loss_moa
+            
             # Update the global losses 
-            training_loss += loss.item()
+            training_loss += loss.item()  # total loss 
             if self.variational:
+                # If the AE is not variational, total_ae_loss is already the reconstruction 
                 tot_recons_loss += ae_loss['reconstruction_loss'].item()
                 tot_kl_loss += ae_loss['KLD'].item()
 
             # Update the RMSE score of the reconstruction compared to the original 
             self.metrics.update_rmse(X, out)
 
-        # Print the loss metrics 
+            # Increase number of iterations
+            self.iteration += 1
+
+
+        # Average the losses 
         avg_loss = training_loss/len(train_loader)
-        
         # Update the reconstruction loss and KL divergence according to whether we 
         # are using a variational autoencoder or a deterministic one 
         if self.variational:
@@ -610,6 +549,7 @@ class CPA(TemplateModel):
         # The average RMSE between the evaluated images for all seen batches
         self.metrics.metrics['rmse'] /= len(train_loader)
 
+        #Print the autoencoder metrics
         print(f'Mean loss after epoch {epoch}: {avg_loss}')
         if self.variational:
             print(f'Mean reconstruction loss after epoch {epoch}: {avg_recon_loss}')
@@ -619,6 +559,7 @@ class CPA(TemplateModel):
         self.metrics.print_metrics()
 
         if self.adversarial:
+            # Average the adversarial losses on the batch if variational
             avg_ae_loss = tot_ae_loss/len(train_loader)
             avg_adv_loss_drug = tot_adv_loss_drug/len(train_loader)
             if self.predict_moa:
@@ -630,13 +571,13 @@ class CPA(TemplateModel):
             print(f'Mean drug adversarial loss after epoch {epoch}: {avg_adv_loss_drug}')
             if self.predict_moa:
                 print(f'Mean moa adversarial loss after epoch {epoch}: {avg_adv_loss_moa}')
-
             if self.variational:
                 return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss, avg_ae_loss=avg_ae_loss, 
                             avg_adv_loss_drug=avg_adv_loss_drug, avg_adv_loss_moa=avg_adv_loss_moa), self.metrics.metrics
             else:
                 return dict(loss=avg_loss, avg_ae_loss=avg_recon_loss, avg_adv_loss_drug=avg_adv_loss_drug,
                             avg_adv_loss_moa=avg_adv_loss_moa), self.metrics.metrics
+
         else: 
             if self.variational:
                 return dict(loss=avg_loss, recon_loss=avg_recon_loss, kl_loss=avg_kl_loss), self.metrics.metrics
@@ -667,7 +608,7 @@ class CPA(TemplateModel):
             else:
                 self.history[fold][metric].append(metrics[metric])
 
-
+    
     def initialize_encoder_decoder(self, hparams):
         """Initialize encoder and decoder architectures 
 
@@ -684,7 +625,7 @@ class CPA(TemplateModel):
                 moa_concat_dim = self.n_moa if self.predict_moa else 0  
                 latent_dim_decoder = self.hparams["latent_dim"] +  self.n_seen_drugs + moa_concat_dim
             else:   
-                latent_dim_decoder = self.hparams["latent_dim"] +  self.hparams["adversary_width_drug"] + self.hparams["adversary_width_moa"]
+                latent_dim_decoder = self.hparams["latent_dim"] +  self.hparams["drug_embedding_dimension"] + self.hparams["moa_embedding_dimension"]
         else:
             latent_dim_decoder = self.hparams["latent_dim"]
 
@@ -736,19 +677,5 @@ class CPA(TemplateModel):
                 dropout_ae = self.hparams["dropout_ae"],
                 dropout_rate_ae = self.hparams["dropout_rate_ae"]
             ) 
-        return encoder, decoder 
-
-
-# Auxiliary functions 
-def gaussian_nll(mu, log_sigma, x):
-    """
-    Implement Gaussian nll loss
-    """
-    return 0.5 * torch.pow((x - mu) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
-
-
-def softclip(tensor, min):
-    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
-    result_tensor = min + F.softplus(tensor - min)
-    return result_tensor
+        return encoder, decoder
     

@@ -5,6 +5,7 @@ from sklearn import model_selection
 import numpy as np
 import torch
 from torch import nn
+import warnings
 from torch.nn import functional as F
 
 
@@ -13,7 +14,7 @@ def training_evaluation(model,
                         adversarial, 
                         metrics, 
                         dmso_id,
-                        device, end=False, variational=True, ood=False, predict_moa=False):
+                        device, end=False, variational=True, ood=False, predict_moa=False, ds_name=None):
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
     Args:
@@ -29,6 +30,10 @@ def training_evaluation(model,
     Returns:
         tuple: validation losses and quality metrics dictionaries 
     """
+    if (ds_name=='cellpainting' and model.hparams['concat_one_hot'] and ood):
+        warnings.warn("OOD + one-hot unsupported on Cell Painting")
+        return {}, {} 
+
     # Final dictionary containing all the losses
     losses = {}
 
@@ -59,21 +64,20 @@ def training_evaluation(model,
         # Load observation X
         X = observation['X'].to(device)
 
-        # If not number of cells prediction, store the whole drug label array      
-        y_adv_drugs = observation['mol_one_hot'].to(device)
-        # Store labels
+        # Cell Painting's ood are unseen drugs, so they are not assigned a one hot dimension 
+        y_adv_drugs = observation['mol_one_hot'].to(device) if (ds_name!='cellpainting' or not ood) else observation['smile_id'] 
         y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())
+
+        # The if statement is not required for the MOA because it is not present in the Cell Painting dataset 
         if predict_moa:
             y_adv_moa = observation['moa_one_hot'].to(device)
             y_true_ds_moa.append(torch.argmax(y_adv_moa, dim=1).item())
-
         else: 
-            # If we are evaluating the ood fold, we use drug ids and not the one-hot encoded molecules
-            y_adv_drugs = observation['smile_id'].to(device)
-            y_true_ds_drugs.append(y_adv_drugs.item())
-        
+            y_adv_moa =  None 
+
+        # Predictions 
         if not adversarial:
-            res = model.evaluate(X)
+            res = model.forward_ae(X)
             out, z_basal, ae_loss = res.values()
         else:
             # Get evaluation results
@@ -82,13 +86,13 @@ def training_evaluation(model,
                 moa_id = observation["moa_id"].to(device)
             else: 
                 moa_id = None 
-
-            res = model.evaluate(X, y_adv_drugs, y_adv_moa, drug_id=drug_id, moa_id=moa_id)
-            out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
+            with torch.no_grad():
+                res = model.forward_compert(X=X, y_adv_drug=y_adv_drugs, y_adv_moa=y_adv_moa, drug_ids=drug_id, moa_ids=moa_id, mode='eval')
+                out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
 
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
             # Collect the predicted labels 
-            if not ood or predict_moa:
+            if (ds_name!='cellpainting' or not ood):
                 y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
                 if predict_moa:
                     y_hat_ds_moa.append(torch.argmax(y_hat_moa, dim=1).item())
@@ -99,7 +103,6 @@ def training_evaluation(model,
                 z_ds.append(z)
             z_basal_ds.append(z_basal)
             
-
         # Update the losses and the metrics 
         val_loss += ae_loss['total_loss'].item()
         if variational:
@@ -109,11 +112,11 @@ def training_evaluation(model,
         # Update RMSE on valid set
         metrics.update_rmse(X, out)
 
-    if not ood and adversarial:
+    if (ds_name!='cellpainting' or not ood) and adversarial:
         if X.shape[0]>1:
             # Update metric for drug prediction
             y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-            y_hat_ds_drug = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
+            y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
             if predict_moa:
                 y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
                 y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
@@ -168,19 +171,18 @@ def training_evaluation(model,
         if adversarial:
             z_ds = z_ds.to('cpu').numpy()
 
-        if not ood or predict_moa:
-            # Silhouette score before and after drug (and moa) additions
-            silhouette_score_basal_drugs = compute_silhouette_coefficient(z_basal_ds, y_true_ds_drugs)
-            metrics.metrics["silhouette_score_basal_drugs"] = silhouette_score_basal_drugs
+        # Silhouette score before and after drug (and moa) additions
+        silhouette_score_basal_drugs = compute_silhouette_coefficient(z_basal_ds, y_true_ds_drugs)
+        metrics.metrics["silhouette_score_basal_drugs"] = silhouette_score_basal_drugs
+        if adversarial:
+            silhouette_score_z_drugs = compute_silhouette_coefficient(z_ds, y_true_ds_drugs)
+            metrics.metrics["silhouette_score_z_drugs"] = silhouette_score_z_drugs
+        if predict_moa:
+            silhouette_score_basal_moa = compute_silhouette_coefficient(z_basal_ds, y_true_ds_moa)
+            metrics.metrics["silhouette_score_basal_moa"] = silhouette_score_basal_moa
             if adversarial:
-                silhouette_score_z_drugs = compute_silhouette_coefficient(z_ds, y_true_ds_drugs)
-                metrics.metrics["silhouette_score_z_drugs"] = silhouette_score_z_drugs
-            if predict_moa:
-                silhouette_score_basal_moa = compute_silhouette_coefficient(z_basal_ds, y_true_ds_moa)
-                metrics.metrics["silhouette_score_basal_moa"] = silhouette_score_basal_moa
-                if adversarial:
-                    silhouette_score_z_moa = compute_silhouette_coefficient(z_ds, y_true_ds_moa)
-                    metrics.metrics["silhouette_score_z_moa"] = silhouette_score_z_moa
+                silhouette_score_z_moa = compute_silhouette_coefficient(z_ds, y_true_ds_moa)
+                metrics.metrics["silhouette_score_z_moa"] = silhouette_score_z_moa
 
     print(f'Average validation loss: {losses["loss"]}')
     if variational:
