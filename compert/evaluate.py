@@ -59,21 +59,19 @@ def training_evaluation(model,
         # Load observation X
         X = observation['X'].to(device)
 
-        # If not number of cells prediction, store the whole drug label array 
-        if (not ood) or predict_moa:
-            y_adv_drugs = observation['mol_one_hot'].to(device)
-            # Store labels
-            y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())
-            if predict_moa:
-                y_adv_moa = observation['moa_one_hot'].to(device)
-                y_true_ds_moa.append(torch.argmax(y_adv_moa, dim=1).item())
+        # If not number of cells prediction, store the whole drug label array      
+        y_adv_drugs = observation['mol_one_hot'].to(device)
+        # Store labels
+        y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())
+        if predict_moa:
+            y_adv_moa = observation['moa_one_hot'].to(device)
+            y_true_ds_moa.append(torch.argmax(y_adv_moa, dim=1).item())
 
         else: 
             # If we are evaluating the ood fold, we use drug ids and not the one-hot encoded molecules
             y_adv_drugs = observation['smile_id'].to(device)
             y_true_ds_drugs.append(y_adv_drugs.item())
         
-
         if not adversarial:
             res = model.evaluate(X)
             out, z_basal, ae_loss = res.values()
@@ -85,7 +83,7 @@ def training_evaluation(model,
             else: 
                 moa_id = None 
 
-            res = model.evaluate(X, drug_id=drug_id, moa_id=moa_id)
+            res = model.evaluate(X, y_adv_drugs, y_adv_moa, drug_id=drug_id, moa_id=moa_id)
             out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
 
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()

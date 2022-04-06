@@ -67,9 +67,18 @@ class SigmaVAE(CPA):
         num_samples: Number of samples
         device: Device to run the model
         """
+        # TODO: give the chance to add the drug of interest by ID
+
         # Sample random vector
         z = torch.randn(num_samples,
-                        self.hparams["latent_dim"])*temperature
+                self.hparams["latent_dim"])*temperature
+
+        # Check if concatenation of 0's must be performed 
+        if self.hparams["concat_embeddings"]:
+            z = torch.cat([z, torch.zeros(z.shape[0], self.n_seen_drugs)], dim = 1)
+            if self.predict_moa:
+                z = torch.cat([z, torch.zeros(z.shape[0], self.n_moa)], dim = 1)
+
         z = z.to(self.device)
         samples = self.decoder(z)
         return samples
@@ -89,17 +98,41 @@ class SigmaVAE(CPA):
         x: input image
         """
         original = next(iter(loader))
-        original_X = original['X'][0].to(self.device).unsqueeze(0)
-        original_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
-        original_emb = self.drug_embeddings(original_id)
-        
+        original_X = original['X'][0].to(self.device).unsqueeze(0)  # The data 
+
+        drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
+        drug_emb = self.drug_embeddings(drug_id) 
+        z_drug = self.drug_embedding_encoder(drug_emb) if not self.hparams["concat_one_hot"] else original["drug_one_hot"][0].to(self.device).unsqueeze(0)
+        if self.hparams["predict_moa"]:
+            moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
+            moa_emb = self.drug_embeddings(moa_id) 
+            z_moa = self.moa_embedding_encoder(moa_emb) if not self.hparams["concat_one_hot"] else original["moa_one_hot"][0].to(self.device).unsqueeze(0)
+        else:
+            z_moa = 0 
+
         with torch.no_grad():
             mu_orig, log_sigma_orig = self.encoder(original_X)  # Encode image
             z_x = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
-            if self.adversarial:
-                z_emb = self.drug_embedding_encoder(original_emb)
-                z = z_x + z_emb
-                reconstructed_X = self.decoder(z) 
-            else:
+
+            if not self.adversarial:
+                if self.hparams["concat_embeddings"]:
+                    z_x = torch.cat([z_x, torch.zeros(z_x.shape[0], self.n_seen_drugs)], dim = 1)
+                    if self.predict_moa:
+                        z_x = torch.cat([z_x, torch.zeros(z.shape[0], self.n_moa)], dim = 1)
                 reconstructed_X = self.decoder(z_x) 
+
+            else:
+                if not self.hparams["concat_embeddings"]:
+                    z = z_x + z_drug + z_drug
+                else:
+                    if self.hparams["concat_one_hot"]:
+                        z = torch.cat([z, drug_emb], dim = 1)
+                        if self.predict_moa:
+                            z = torch.cat([z, moa_emb], dim = 1)
+                    else:
+                        z = torch.cat([z, z_drug], dim = 1)
+                        if self.predict_moa:
+                            z = torch.cat([z, z_moa], dim = 1) 
+                reconstructed_X = self.decoder(z) 
+
         return original_X, reconstructed_X

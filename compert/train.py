@@ -104,7 +104,7 @@ class Trainer:
             append_layer_width (bool, optional): Controls The addition of trailing layers to the adversarial and drug embedding MLPs. Defaults to False.
             predict_moa (book, optional): Used only if the the dataset employed is MOA-annotated 
         """
-        self.img_plot = img_plot  
+        self.img_plot = img_plot    
         self.save_results = save_results  
 
         self.num_epochs = num_epochs  
@@ -151,8 +151,8 @@ class Trainer:
         
         # Create data loaders 
         self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, 
-                                                    num_workers=self.n_workers_loader, drop_last=False)
-        # For validation, it is better to keep the batch size as small as possible 
+                                                    num_workers=self.n_workers_loader, drop_last=True)  # Drop last batch for a better estimate of the accuracy 
+        # For validation, it is better to keep the batch size as small as possible  
         self.loader_val = torch.utils.data.DataLoader(self.validation_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
         self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=1, shuffle=True, 
@@ -226,16 +226,17 @@ class Trainer:
         else:
             self.drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
 
-        # Collect the number of total drugs ans the one of seen (they correspond in the fluorescent microscopy dataset)
+        # Collect the number of total drugs and the one of seen (they correspond in the fluorescent microscopy dataset)
         self.num_drugs = dataset.num_drugs
         # The ood set in the BBC021 dataset does not leave out entire compoinds but only compound dosage combinations 
         if self.dataset_name == 'BBBC021':
             self.n_seen_drugs = self.num_drugs
             self.num_moa = dataset.num_moa
         else:
-            self.n_seen_drugs = dataset.n_seen_drugs
-            self.num_moa = 0 
-        training_set, validation_set, test_set, ood_set = dataset.fold_datasets.values()
+            self.n_seen_drugs = dataset.n_seen_drugs  
+            self.num_moa = 0  # No MOA annotated 
+
+        training_set, validation_set, test_set, ood_set = dataset.fold_datasets.values()  
         # Free cell painting dataset memory
         del dataset
         return training_set, validation_set, test_set, ood_set
