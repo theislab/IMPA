@@ -514,7 +514,7 @@ class CPA(TemplateModel):
                 tot_ae_loss += ae_loss['total_loss'].item()
                 tot_adv_loss_drug += adv_loss_drug.item()
                 if self.predict_moa:
-                    tot_adv_loss_moa += adv_loss_moa
+                    tot_adv_loss_moa += adv_loss_moa.item()
             
             # Update the global losses 
             training_loss += loss.item()  # total loss 
