@@ -44,9 +44,9 @@ class TrainingMetrics:
 
     def compute_classification_report(self, y, y_hat, label=''):
         prec, rec, F1, _ = precision_recall_fscore_support(y, y_hat, average='macro', zero_division=0)
-        self.metrics['precision{}'] = prec 
-        self.metrics['recall{}'] = rec
-        self.metrics['F1{}'] = F1
+        self.metrics[f'precision{label}'] = prec 
+        self.metrics[f'recall_label{label}'] = rec
+        self.metrics[f'F1{label}'] = F1
         
 
     def get_metrics(self):
