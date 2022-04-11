@@ -37,6 +37,23 @@ class SigmaAE(CPA):
                                         predict_moa=predict_moa,
                                         n_moa=n_moa)
 
+        
+    def reconstruction_loss(self, X_hat, X):
+        """ Computes the likelihood of the data given the latent variable,
+        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
+        same for VAE and AE) """
+        # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
+        # ensures stable training.
+        if self.hparams["data_driven_sigma"]:
+            self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
+            self.log_scale = softclip(self.log_scale, -6)
+        # Gaussian log lik
+        if self.hparams["mean_recon_loss"]:
+            rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
+        else:
+            rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
+        return rec
+
     def ae_loss(self, X, X_hat):
         """
         Aggregate and return the reconstruction loss
@@ -52,22 +69,49 @@ class SigmaAE(CPA):
         z = self.encoder(X)
         return dict(z=z)
     
-    
+
     def generate(self, loader):
         """
-        Given a dataset, sample an image and return its reconstruction
+        Given an input image x, returns the reconstructed image
+        x: input image
         """
+        # Collect the data from the batch at random 
         original = next(iter(loader))
-        original_X = original['X'][0].to(self.device).unsqueeze(0)
-        original_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
-        original_emb = self.drug_embeddings(original_id)
-        
+        original_X = original['X'][0].to(self.device).unsqueeze(0)  
+
         with torch.no_grad():
             z_x = self.encoder(original_X)  # Encode image 
-            if self.adversarial:
-                z_emb = self.drug_embedding_encoder(original_emb)
-                z = z_x + z_emb
-                reconstructed_X = self.decoder(z) 
-            else:
+            # Handle the case training is not adversarial 
+            if not self.adversarial:
+                if self.hparams["concat_embedding"]:
+                    # The concatenation dimension is equal to the number of drugs if the one hot encoding is carried out 
+                    drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
+                    z_x = torch.cat([z_x, torch.zeros(z_x.shape[0], drug_dim).to(self.device)], dim = 1)
+                    if self.predict_moa:
+                        moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
+                        z_x = torch.cat([z_x, torch.zeros(z_x.shape[0], moa_dim).to(self.device)], dim = 1)
                 reconstructed_X = self.decoder(z_x) 
+
+            else:
+                # Collect the encoders for the drug embeddings to condition the latent space 
+                drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
+                drug_emb = self.drug_embeddings(drug_id) if not self.hparams["concat_one_hot"] else None
+                z_drug = self.drug_embedding_encoder(drug_emb) if not self.hparams["concat_one_hot"] else original["mol_one_hot"][0].to(self.device).unsqueeze(0).float()
+                # Collect the mode of action embeddings 
+                if self.predict_moa:
+                    moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
+                    moa_emb = self.moa_embeddings(moa_id) if not self.hparams["concat_one_hot"] else None
+                    z_moa = self.moa_embedding_encoder(moa_emb) if not self.hparams["concat_one_hot"] else original["moa_one_hot"][0].to(self.device).unsqueeze(0).float()
+                else:
+                    z_moa = 0 
+                
+                # If not concat, perform the sum of embeddings 
+                if not self.hparams["concat_embedding"]:
+                    z = z_x + z_drug + z_moa
+                else:
+                    z = torch.cat([z_x, z_drug], dim = 1)
+                    if self.predict_moa:
+                        z = torch.cat([z, z_moa], dim = 1) 
+                reconstructed_X = self.decoder(z) 
+
         return original_X, reconstructed_X

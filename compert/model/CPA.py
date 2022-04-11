@@ -276,6 +276,7 @@ class CPA(TemplateModel):
             "batch_norm_adversarial_drug": True if default else np.random.choice([True, False]),
             "batch_norm_adversarial_moa": True if default else np.random.choice([True, False]),
             "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
+            "mean_recon_loss": False if default else np.random.choice([True, False])
         }
         # the user may fix some hparams
         if hparams != "":
@@ -285,21 +286,6 @@ class CPA(TemplateModel):
                 self.hparams.update(hparams)
 
         return self.hparams
-
-
-    def reconstruction_loss(self, X_hat, X):
-        """ Computes the likelihood of the data given the latent variable,
-        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
-        same for VAE and AE) """
-        # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
-        # ensures stable training.
-        if self.hparams["data_driven_sigma"]:
-            self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
-            self.log_scale = softclip(self.log_scale, -6)
-        # Gaussian log lik
-        rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
-        return rec
-
 
     # Forward pass    
     def forward_ae(self, X):

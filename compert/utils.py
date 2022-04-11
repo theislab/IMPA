@@ -137,6 +137,10 @@ def make_dirs(path, experiment_name):
     return dest_dir
 
 
+def softclip(tensor, min):
+    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
+    result_tensor = min + torch.nn.functional.softplus(tensor - min)
+    return result_tensor
 
 
 # Auxiliary functions 
@@ -144,10 +148,4 @@ def gaussian_nll(mu, log_sigma, x):
     """
     Implement Gaussian nll loss
     """
-    return 0.5 * torch.pow((x - mu) / log_sigma.exp(), 2) + log_sigma + 0.5 * np.log(2 * np.pi)
-
-
-def softclip(tensor, min):
-    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
-    result_tensor = min + torch.nn.functional.softplus(tensor - min)
-    return result_tensor
+    return 0.5 * (torch.pow((x - mu) , 2)/ log_sigma.exp() + log_sigma) + 0.5 * np.log(2 * np.pi)

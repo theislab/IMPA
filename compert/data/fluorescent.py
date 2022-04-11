@@ -325,14 +325,16 @@ class BBBC021Fold(Dataset):
         # Collect the drug images from the file repository 
         moa_images = []
         doses = []
+        mols = []
         for drug_idx in moa_idxs:
             #X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
             X, mol_one_hot, moa_one_hot, smile_id, moa_id, dose = self.__getitem__(drug_idx).values()
             moa_images.append(X.unsqueeze(0))
             doses.append(dose)
+            mols.append(mol_one_hot)
 
         return dict(X=torch.cat(moa_images, dim=0), 
-                mol_one_hot=mol_one_hot,
+                mol_one_hot=mols,
                 moa_one_hot=moa_one_hot,
                 smile_id=smile_id,
                 moa_id=moa_id,

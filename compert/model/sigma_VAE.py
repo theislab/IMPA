@@ -38,15 +38,45 @@ class SigmaVAE(CPA):
                                         n_moa=n_moa)
 
 
+    def reconstruction_loss(self, X_hat, X):
+        """ Computes the likelihood of the data given the latent variable,
+        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
+        same for VAE and AE) """
+        # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
+        # ensures stable training.
+        if self.hparams["data_driven_sigma"]:
+            self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
+            self.log_scale = softclip(self.log_scale, -6)
+        # Gaussian log lik
+        if self.hparams["mean_recon_loss"]:
+            rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
+        else:
+            rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
+        return rec
+
+    
+    def kl_loss(self, mu, log_sigma):
+        """Compute KL divergence with a standard normal distribution
+
+        Args:
+            mu (torch.tensor): mean tensor
+            log_sigma (torch.tensor): log sigma tensor
+        """
+        if self.hparams["mean_recon_loss"]:
+            kl = torch.mean(-0.5 * torch.mean(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = 1), dim = 0)
+        else:
+            kl = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = 1), dim = 0)
+        return kl
+
+
     def ae_loss(self, X, X_hat, mu, log_sigma):
         """
         Aggregate the reconstruction and kl losses 
         """
         rec = self.reconstruction_loss(X_hat, X)
-        kl = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = 1), dim = 0)
+        kl = self.kl_loss(mu, log_sigma)
         loss = rec + kl
         return {'total_loss': loss, 'reconstruction_loss': rec.detach(), 'KLD': kl.detach()}
-
     
     def reparameterize(self, mu, log_sigma, **kwargs):
         """
