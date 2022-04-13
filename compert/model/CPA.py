@@ -35,7 +35,8 @@ class CPA(TemplateModel):
             dataset_name: str = 'cellpainting',
             predict_moa: bool = False,
             n_moa: int = 0,
-            total_iterations: int = None):     
+            total_iterations: int = None, 
+            class_weights: dict = None):     
 
         super(CPA, self).__init__() 
         self.adversarial = False  # If a normal adversarial network must be trained (starting at false)
@@ -71,7 +72,8 @@ class CPA(TemplateModel):
         else:
             self.log_scale = torch.nn.Parameter(torch.full((1,1,1,1), 0.0), requires_grad=True)
         
-        self.variational = variational  # True if variational inference is performed through VAE 
+        # True if variational inference is performed through VAE 
+        self.variational = variational  
 
         # The information concerning dataset and the MOA based adversarial task 
         self.dataset_name = dataset_name 
@@ -93,6 +95,9 @@ class CPA(TemplateModel):
 
         # Get the parameters of a model if a condition is verified
         self.get_params = lambda model, cond: list(model.parameters()) if cond else []  
+
+        # Class weights 
+        self.class_weights = class_weights 
 
         # Initialize the autoencoder first with adversarial equal to False
         self.initialize_ae() 
@@ -175,12 +180,12 @@ class CPA(TemplateModel):
 
 
         # Crossentropy loss for the prediction of both MOA and the drug 
-        self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(reduction = 'mean')
+        self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(weight = self.class_weight['drugs'], reduction = 'mean')
         if self.predict_moa:
-            self.loss_adversary_moas = torch.nn.CrossEntropyLoss(reduction = 'mean')
+            self.loss_adversary_moas = torch.nn.CrossEntropyLoss(weight = self.class_weight['moas'], reduction = 'mean')
 
         
-        # Collect parameters 
+        # Collect parameters of the autoencoder branch
         _parameters = (
             self.get_params(self.encoder, True)
             + self.get_params(self.decoder, True)
@@ -201,7 +206,7 @@ class CPA(TemplateModel):
             weight_decay=self.hparams["autoencoder_wd"],
         )
 
-        # Optimizer for the drug adversary. Make sure that only the right parameters are bound to it
+        # Optimizer for the drug adversary
         _parameters = self.get_params(self.adversary_drugs, True)
         if self.predict_moa:
             _parameters.extend(self.get_params(self.adversary_moa, True))
@@ -286,7 +291,7 @@ class CPA(TemplateModel):
             "batch_norm_adversarial_drug": True if default else np.random.choice([True, False]),
             "batch_norm_adversarial_moa": True if default else np.random.choice([True, False]),
             "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
-            "mean_recon_loss": False if default else np.random.choice([True, False]),
+            "mean_recon_loss": False if default else np.random.choice([True, False])
         }
 
         # the user may fix some hparams
@@ -311,7 +316,7 @@ class CPA(TemplateModel):
             z = self.encoder(X)
         else:
             mu, log_sigma = self.encoder(X)
-            # Apply reparametrization trick
+            # Apply reparametrization trick if VAE
             z = self.reparameterize(mu, log_sigma)
         
         # Decode z, if concat_embeddings is true, add the dimensions (as 0) of the drug and moas 
@@ -414,6 +419,7 @@ class CPA(TemplateModel):
             return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_drug, adv_loss_moa=adv_loss_moa)
         
         else:
+            # If validation is performed, we also decode the basal encoding to compare it to the original 
             out_basal = self.decoder(z_basal)
             return dict(out=out, out_basal=out_basal, z_basal=z_basal[:,:self.hparams["latent_dim"]], z=z, y_hat_drug=y_adv_hat_drug, 
                         y_hat_moa=y_adv_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)
@@ -436,6 +442,8 @@ class CPA(TemplateModel):
         """
         Possibly early-stops training.
         """
+        # Keep incremental count of the number of times the score detected is not better than the 
+        # so far best score 
         cond = (score > self.best_score)
         if cond:
             self.best_score = score
@@ -451,12 +459,12 @@ class CPA(TemplateModel):
         """
         training_loss = 0  # adv + ae loss
         if self.adversarial:
-            tot_ae_loss = 0
+            tot_ae_loss = 0 
             tot_adv_loss_drug = 0
             tot_adv_loss_moa = 0 
 
         if self.variational:
-            tot_recons_loss = 0
+            tot_recons_loss = 0 
             tot_kl_loss = 0
         
         # Reset the previously defined metrics
@@ -494,7 +502,7 @@ class CPA(TemplateModel):
                 # Forward pass
                 out, loss, ae_loss, adv_loss_drug, adv_loss_moa = self.forward_compert(X, y_adv_drug, drug_id, y_adv_moa, moa_id, mode='train').values()
 
-                # Zero-grad both optimizers
+                # Zero-grad both optimizers (reduce memory burden)
                 self.optimizer_adversaries.zero_grad()
                 self.optimizer_autoencoder.zero_grad()
 
@@ -526,7 +534,6 @@ class CPA(TemplateModel):
             # Increase number of iterations
             self.iteration += 1
 
-
         # Average the losses 
         avg_loss = training_loss/len(train_loader)
         # Update the reconstruction loss and KL divergence according to whether we 
@@ -541,7 +548,7 @@ class CPA(TemplateModel):
                 avg_recon_loss = tot_ae_loss/len(train_loader)
 
         # Update the bit per dimension metric
-        self.metrics.update_bpd(avg_recon_loss)
+        self.metrics.update_bpd(avg_recon_loss)  
 
         # The average RMSE between the evaluated images for all seen batches
         self.metrics.metrics['rmse'] /= len(train_loader)
@@ -675,6 +682,3 @@ class CPA(TemplateModel):
                 dropout_rate_ae = self.hparams["dropout_rate_ae"]
             ) 
         return encoder, decoder
-
-    
-    

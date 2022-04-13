@@ -5,6 +5,7 @@ import os
 from random import sample
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.utils.class_weight import compute_class_weight
 import pandas as pd
 
 from utils import *
@@ -56,7 +57,7 @@ class BBBC021Dataset:
         # Fix the training specifics 
         self.device = device 
         self.return_labels = return_labels  # Whether onehot drug labels, the assay labels and the case/control labels should be returned 
-        self.use_pretrained = use_pretrained
+        self.use_pretrained = use_pretrained  # Whether the pre-trained embeddings should be used for the drugs
 
         # Read the datasets
         self.fold_datasets = self.read_folds()
@@ -83,7 +84,7 @@ class BBBC021Dataset:
         encoder_moa.fit(np.array(self.moa_names).reshape((-1,1)))
 
         if self.use_pretrained:
-            # Each smile has an id
+            # Get the drug embedding matrix indexed by indices 
             drug_embeddings = pd.read_csv(self.embeddings_path, index_col=0).loc[self.smile_names]  # Read embedding paths sorte based on smile names 
             # Tranform the embddings to torch embeddings
             drug_embeddings  = torch.tensor(drug_embeddings.values, 
@@ -177,12 +178,12 @@ class BBBC021Fold(Dataset):
         # Free memory due to the data
         del data 
         
-        # Data paths 
+        # Image folder paths 
         self.data_path = image_path
         # Whether to perform training augmentation
         self.augment_train = augment_train
         
-        # Drug data
+        # One-hot encoders 
         self.drug_encoder = drug_encoder
         self.moa_encoder = moa_encoder
 
@@ -193,9 +194,14 @@ class BBBC021Fold(Dataset):
         # Transform only the training set and only if required
         if self.augment_train and self.fold == 'train':
             self.transform = CustomTransform(augment=True)
+            # Compute class imbalance weights
+            compute_class_imbalance_weights_drug = self.compute_class_imbalance_weights(self.mol_smiles)
+            compute_class_imbalance_weights_moa = self.compute_class_imbalance_weights(self.moa)
+            self.class_imbalances = {'drugs': compute_class_imbalance_weights_drug, 
+                                'moas': compute_class_imbalance_weights_moa}
         else:
             self.transform = CustomTransform(augment=False)
-
+        
         # Control whether the labels should be provided in the batch together with the images  
         self.return_labels = return_labels 
         self.use_pretrained = use_pretrained
@@ -238,7 +244,9 @@ class BBBC021Fold(Dataset):
                         moa_one_hot=self.one_hot_moa[idx],
                         smile_id=self.drugs2idx[self.mol_names[idx]],
                         moa_id=self.moa2idx[self.moa[idx]],
-                        dose = self.dose[idx]
+                        dose = self.dose[idx],
+                        batch_number = sample,
+                        table = table
                     )
         else:
             return dict(X=img)
@@ -268,7 +276,7 @@ class BBBC021Fold(Dataset):
         subset_dose = []
         
         for i in idx_sample:
-            X, mol_one_hot, smile_id, moa_id, dose = self.__getitem__(i).values()
+            X, mol_one_hot, smile_id, moa_id, dose, _, _ = self.__getitem__(i).values()
             
             imgs.append(X.unsqueeze(0))  # Unsqueeze barch dimension
             subset_mol_one_hot.append(mol_one_hot)
@@ -285,58 +293,42 @@ class BBBC021Fold(Dataset):
                     dose = self.dose[idx]) 
 
     
-    def get_drug_by_name(self, drug_name):
-        """Load the images of specific drugs by name
+    def drug_or_moa_by_name(self, get_moa, name):
+        """Load the images of specific drugs or moas by name
 
         Args:
+            get_moa (bool): Whether the name refers to moa
             drug_name (str): The name of the drug of interest  
         """
-        # Get the indexes in the specific set of all the drugs with a specific name
-        drug_idxs = [idx for idx in range(len(self.mol_names)) if self.mol_names[idx]==drug_name]
-
-        # Collect the drug images from the file repository 
-        doses = []
-        moas = []
-        drug_images = []
-        for drug_idx in drug_idxs:
-            #X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
-            X, mol_one_hot, moa_one_hot, smile_id, moa_id, dose = self.__getitem__(drug_idx).values()
-            drug_images.append(X.unsqueeze(0))
-            doses.append(dose)
-            moas.append(moa_id)
-
-        return dict(X=torch.cat(drug_images, dim=0), 
-                mol_one_hot=mol_one_hot,
-                moa_one_hot=moa_one_hot,
-                smile_id=smile_id,
-                moa_id=moas,
-                dose=doses) 
-    
-
-    def get_moa_by_name(self, moa_name):
-        """Load the images of specific moa by name
-
-        Args:
-            moa_name (str): The name of the moa of interest  
-        """
-        # Get the indexes in the specific set of all the drugs with a specific name
-        moa_idxs = [idx for idx in range(len(self.moa)) if self.moa[idx]==moa_name]
-
-        # Collect the drug images from the file repository 
-        moa_images = []
+        file_name_set = self.moa if get_moa else self.mol_names
         doses = []
         mols = []
-        for drug_idx in moa_idxs:
-            #X, _, mol_name, mol_one_hot, assay_label, states, smile_id, n_cells = self.__getitem__(drug_idx).values()
-            X, mol_one_hot, moa_one_hot, smile_id, moa_id, dose = self.__getitem__(drug_idx).values()
-            moa_images.append(X.unsqueeze(0))
-            doses.append(dose)
-            mols.append(mol_one_hot)
+        moas = []
+        images = []
+        idxs = [idx for idx in range(len(file_name_set)) if file_name_set[idx]==name]
 
-        return dict(X=torch.cat(moa_images, dim=0), 
-                mol_one_hot=mols,
-                moa_one_hot=moa_one_hot,
-                smile_id=smile_id,
-                moa_id=moa_id,
+        for idx in idxs:
+            X, _, _, smile_id, moa_id, dose = self.__getitem__(idx).values()
+            images.append(X.unsqueeze(0))
+            doses.append(dose)
+            mols.append(smile_id)
+            moas.append(moa_id)
+
+        return dict(X=torch.cat(images, dim=0), 
+                drugs=mols,
+                moas=moas,
                 dose=doses) 
-                
+            
+    def compute_class_imbalance_weights(self, class_vector):
+        """Compute the sklearn class imbalance weight for a determined class vector 
+
+        Args:
+            class_vector (np.array): numpy array with the classes 
+        """
+        # Unique classes
+        classes_unique = np.unique(class_vector)
+        # Compute the weight vector to make the classes balanced 
+        weight_vector = compute_class_weight('balanced', classes=classes_unique, y=class_vector)
+        return weight_vector
+
+

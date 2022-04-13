@@ -42,7 +42,6 @@ class Trainer:
     """
     Experiment wrapper around the Sacred experiment class
     """
-
     def __init__(self, init_all=True):
         if init_all:
             self.init_all()
@@ -162,6 +161,7 @@ class Trainer:
 
         # The id of the dmso to exclude from the prediction 
         self.dmso_id = self.training_set.drugs2idx['DMSO']
+        self.class_imbalance_weights = self.loader_train.class_imbalances 
         print('Successfully loaded the data')
 
     
@@ -223,9 +223,9 @@ class Trainer:
         else:
             self.drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
 
-        # Collect the number of total drugs and the one of seen (they correspond in the fluorescent microscopy dataset)
+        # Collect the number of total drugs and the one of seen (the two correspond in the fluorescent microscopy dataset)
         self.num_drugs = dataset.num_drugs
-        # The ood set in the BBC021 dataset does not leave out entire compoinds but only compound dosage combinations 
+        # The ood set in the BBC021 dataset does not leave out entire compounds but only compound dosage combinations 
         if self.dataset_name == 'BBBC021':
             self.n_seen_drugs = self.num_drugs
             self.num_moa = dataset.num_moa
@@ -261,7 +261,7 @@ class Trainer:
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
             if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
                 self.model.module.initialize_adversarial()
-                self.current_adversarial_step = self.model.module.hparams["adversary_steps"]
+                self.current_adversarial_step = self.model.module.hparams["adversary_steps"]  # How many adversarial steps per autoencoder steps (possibly annealed)
             
             print(f'Running epoch {epoch}')
             self.model.train() 
@@ -298,7 +298,7 @@ class Trainer:
                     del original
                     del reconstructed
                     
-                    # Plot generation of sampled images 
+                    # Plot generation of sampled images (only fir variational autoencoders) 
                     if self.generate and self.model.module.variational:
                         sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
                         self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot, dim=self.dim)
@@ -331,18 +331,18 @@ class Trainer:
                 self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., epoch/self.model.module.warmup_steps)
             else:
                 self.model.module.scheduler_autoencoder.step()
-            
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
             
-            # Update the number of adversarial steps 
+            # Update the number of adversarial steps performed per each autoencoder step 
             if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
+                # Update the number of adversarial steps so they do not go under a minumum 
                 self.model.module.current_adversary_steps = max(self.model.module.hparams["final_adv_steps"], self.model.module.current_adversary_steps-self.model.module.step)
                 self.model.module.iterations = 0 
-            print(np.around(self.model.module.current_adversary_steps))
+            print(f'Unrounded current adversary steps: {self.model.module.current_adversary_steps}')
         
         self.model.eval()
-        # # Perform last evaluation on TEST SET   
+        # Perform last evaluation on TEST SET   
         end = True
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.dmso_id, self.device, end, 
@@ -423,7 +423,8 @@ class Trainer:
                     dataset_name = self.dataset_name,
                     predict_moa = self.predict_moa,
                     n_moa = self.num_moa, 
-                    total_iterations = self.num_epochs)
+                    total_iterations = self.num_epochs,
+                    class_weights = self.class_imbalance_weights)
 
 
 # We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,

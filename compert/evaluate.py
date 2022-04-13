@@ -26,6 +26,7 @@ def training_evaluation(model,
         end (bool, optional): If the evaluation is performed at the end of the training loop. Defaults to False.
         variational (bool, optional): Whether a VAE is used over an AE. Defaults to True.
         ood (bool, optional): Whether evaluation is performed on the ood dataset. Defaults to False.
+        predict_moa (bool, optional): whether the mode of action should be predicted or not 
 
     Returns:
         tuple: validation losses and quality metrics dictionaries 
@@ -91,7 +92,7 @@ def training_evaluation(model,
                 out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
 
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
-            # Collect the predicted labels 
+            # Collect the predicted labels and argmax them  
             if (ds_name!='cellpainting' or not ood):
                 y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
                 if predict_moa:
@@ -99,6 +100,7 @@ def training_evaluation(model,
             
         # Only at the end of training we store the latent vectors for analysis 
         if end:
+            # If the training is not adversarial, we only have Z basal
             if adversarial:
                 z_ds.append(z)
             z_basal_ds.append(z_basal)
@@ -113,13 +115,12 @@ def training_evaluation(model,
         metrics.update_rmse(X, out)
 
     if (ds_name!='cellpainting' or not ood) and adversarial:
-        if X.shape[0]>1:
-            # Update metric for drug prediction
-            y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-            y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
-            if predict_moa:
-                y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
-                y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
+        # Update metric for drug prediction
+        y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
+        y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
+        if predict_moa:
+            y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
+            y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
         
         # Check classification report on the labels
         metrics.compute_classification_report(y_true_ds_drugs, y_hat_ds_drugs, '_drug')
@@ -128,7 +129,7 @@ def training_evaluation(model,
         if predict_moa: 
             metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
                     
-    # Print loss results 
+    # Derive the average losses acr
     losses["loss"] = val_loss/len(dataset_loader)
     if variational:
         losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
@@ -144,7 +145,7 @@ def training_evaluation(model,
 
     # Disentanglement and clustering evaluated only at the end
     if end:
-        # Exclude the DMSO from the predictions 
+        # Exclude the DMSO from the predictions to make the prediction balanced 
         y_true_ds_drugs = np.array(y_true_ds_drugs)
         idx_not_dmso = np.where(y_true_ds_drugs!=dmso_id)
 
@@ -165,7 +166,7 @@ def training_evaluation(model,
             if adversarial:
                 disentanglement_score_z_moa= compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso]) 
                 metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
-                metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
+                metrics.metrics["difference_disentanglement_moa"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
 
         z_basal_ds = z_basal_ds.to('cpu').numpy()
         if adversarial:
@@ -193,7 +194,7 @@ def training_evaluation(model,
     return losses, metrics.metrics
 
 
-def compute_disentanglement_score(Z, drug, return_misclass_report=False):
+def compute_disentanglement_score(Z, y, return_misclass_report=False):
     """Train a classifier that evaluates the disentanglement of the latents space from the information
     on the drug
 
@@ -212,7 +213,7 @@ def compute_disentanglement_score(Z, drug, return_misclass_report=False):
     normalized_basal = (Z - mean) / stddev
 
     # Fetch unique molecules and their counts  
-    unique_classes, freqs = np.unique(drug, return_counts=True)  # Given a class vector y, reduce it to unique definitions 
+    unique_classes, freqs = np.unique(y, return_counts=True)  # Given a class vector y, reduce it to unique definitions 
     label_to_idx = {labels: idx for idx, labels in enumerate(unique_classes)}
     # Bind each class to the number of occurrences in the test set 
     class2freq = {key:value for key, value in zip(unique_classes, freqs)}
@@ -220,11 +221,11 @@ def compute_disentanglement_score(Z, drug, return_misclass_report=False):
     class_to_keep = [key for key in class2freq if class2freq[key]>3]
 
     # Single out the indexes to keep 
-    idx_to_keep = np.array([i for i in np.arange(len(drug)) if drug[i] in class_to_keep])
+    idx_to_keep = np.array([i for i in np.arange(len(y)) if y[i] in class_to_keep])
 
     # Filter the inputs and the labels
     X = normalized_basal[idx_to_keep]
-    y = np.array(drug)[idx_to_keep]
+    y = np.array(y)[idx_to_keep]
 
     # Split into training and test set 
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.30, stratify=y, random_state=42)

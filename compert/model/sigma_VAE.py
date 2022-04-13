@@ -20,7 +20,8 @@ class SigmaVAE(CPA):
                 dataset_name='cellpainting',
                 predict_moa=False,
                 n_moa=0, 
-                total_iterations=None) -> None:
+                total_iterations=None,
+                class_weights: dict = None) -> None:
      
         super(SigmaVAE, self).__init__(in_width,
                                         in_height,
@@ -37,7 +38,8 @@ class SigmaVAE(CPA):
                                         dataset_name=dataset_name,
                                         predict_moa=predict_moa,
                                         n_moa=n_moa, 
-                                        total_iterations=total_iterations)
+                                        total_iterations=total_iterations, 
+                                        class_weight = class_weights)
 
 
     def reconstruction_loss(self, X_hat, X):
