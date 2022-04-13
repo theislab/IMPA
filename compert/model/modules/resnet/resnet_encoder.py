@@ -224,7 +224,7 @@ class ResNetEncoder(nn.Module):
             self.projection_layer = ProjectionHeadVAE(input_dim=self.h_dim,
                                                         output_dim=self.latent_dim)
         else:
-            self.projection_layer = ProjectionHeadVAE(input_dim=self.h_dim,
+            self.projection_layer = ProjectionHeadAE(input_dim=self.h_dim,
                                                         output_dim=self.latent_dim)
 
 
