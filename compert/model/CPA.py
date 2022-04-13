@@ -34,7 +34,8 @@ class CPA(TemplateModel):
             variational: bool = True, 
             dataset_name: str = 'cellpainting',
             predict_moa: bool = False,
-            n_moa: int = 0):     
+            n_moa: int = 0,
+            total_iterations: int = None):     
 
         super(CPA, self).__init__() 
         self.adversarial = False  # If a normal adversarial network must be trained (starting at false)
@@ -88,6 +89,7 @@ class CPA(TemplateModel):
 
         # Iterations to decide when to perform adversarial training 
         self.iteration = 0
+        self.total_iterations = total_iterations
 
         # Get the parameters of a model if a condition is verified
         self.get_params = lambda model, cond: list(model.parameters()) if cond else []  
@@ -225,6 +227,11 @@ class CPA(TemplateModel):
         # Turn adversarial to True
         self.adversarial = True
 
+        # Initialize total iterations and linear annealing schedule
+        if self.hparams['anneal_adv_steps']:
+            self.total_iterations = self.total_iterations//2  # Reach the minimum halfway through the iterations
+            self.step = (self.hparams["adversary_steps"]-self.hparams["final_adv_steps"])//self.total_iterations
+
     
     def set_hparams_(self, seed, hparams):
         """
@@ -258,6 +265,8 @@ class CPA(TemplateModel):
             "autoencoder_wd": 1e-6 if default else float(10 ** np.random.uniform(-8, -4)),
             "adversary_wd": 1e-4 if default else float(10 ** np.random.uniform(-6, -3)),
             "adversary_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),  # To not be confused: the number of adversary steps before the next VAE step 
+            "anneal_adv_steps": True if default else np.random.choice([True, False]),
+            "final_adv_steps": 1 if default else np.random.choice([1, 10, 20]),
             "step_size_lr": 45 if default else int(np.random.choice([15, 25, 45])),
 
             "concat_embeddding": False if default else np.random.choice([False, True]),
@@ -276,8 +285,9 @@ class CPA(TemplateModel):
             "batch_norm_adversarial_drug": True if default else np.random.choice([True, False]),
             "batch_norm_adversarial_moa": True if default else np.random.choice([True, False]),
             "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
-            "mean_recon_loss": False if default else np.random.choice([True, False])
+            "mean_recon_loss": False if default else np.random.choice([True, False]),
         }
+
         # the user may fix some hparams
         if hparams != "":
             if isinstance(hparams, str):
@@ -664,4 +674,6 @@ class CPA(TemplateModel):
                 dropout_rate_ae = self.hparams["dropout_rate_ae"]
             ) 
         return encoder, decoder
+
+    
     

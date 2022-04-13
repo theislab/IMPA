@@ -19,7 +19,8 @@ class SigmaVAE(CPA):
                 drug_embeddings = None, 
                 dataset_name='cellpainting',
                 predict_moa=False,
-                n_moa=0) -> None:
+                n_moa=0, 
+                total_iterations=None) -> None:
      
         super(SigmaVAE, self).__init__(in_width,
                                         in_height,
@@ -35,7 +36,8 @@ class SigmaVAE(CPA):
                                         variational=True,
                                         dataset_name=dataset_name,
                                         predict_moa=predict_moa,
-                                        n_moa=n_moa)
+                                        n_moa=n_moa, 
+                                        total_iterations=total_iterations)
 
 
     def reconstruction_loss(self, X_hat, X):

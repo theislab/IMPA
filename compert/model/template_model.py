@@ -71,7 +71,7 @@ class TemplateModel(nn.Module):
         for metric in metrics:
             print(f'{metric}: {metrics[metric]}')
         
-        return epoch, dest_dir
+        return epoch
 
     
 

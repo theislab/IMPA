@@ -180,13 +180,10 @@ class Trainer:
         """
         # Create result folder
         if self.save_results:
-            if not self.resume:
+            if self.resume:
                 print('Create output directories for the experiment')
-                self.dest_dir = make_dirs(self.result_path, self.experiment_name)
-            # If training is resumed from a checkpoint
-            else:
-                self.resume_epoch, self.dest_dir = self.model.module.load_checkpoints(self.resume_checkpoint)
-            
+                self.resume_epoch = self.model.module.load_checkpoints(self.resume_checkpoint)
+            self.dest_dir = make_dirs(self.result_path, self.experiment_name)
             # Setup logger in any case
             self.writer = SummaryWriter(os.path.join(self.result_path, 'logs'))
 
@@ -259,11 +256,12 @@ class Trainer:
 
         print(f'Beginning training with epochs {self.num_epochs}')
 
-        for epoch in range(self.resume_epoch, self.num_epochs+1):
+        for epoch in range(self.resume_epoch, self.resume_epoch+self.num_epochs+1):
 
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
-            if epoch == self.model.module.hparams["ae_pretrain_steps"] + 1:
+            if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
                 self.model.module.initialize_adversarial()
+                self.current_adversarial_step = self.model.module.hparams["adversary_steps"]
             
             print(f'Running epoch {epoch}')
             self.model.train() 
@@ -336,6 +334,12 @@ class Trainer:
             
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
+            
+            if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
+                self.current_adv_steps = self.current_adversarial_step-self.model.module.step
+                self.model.module.hparams['anneal_adv_steps'] = max(0, np.around(self.current_adv_steps)) 
+                self.model.module.iterations = 0 
+            print(self.model.module.hparams['anneal_adv_steps'])
         
         self.model.eval()
         # # Perform last evaluation on TEST SET   
@@ -418,7 +422,8 @@ class Trainer:
                     drug_embeddings = self.drug_embeddings,
                     dataset_name = self.dataset_name,
                     predict_moa = self.predict_moa,
-                    n_moa = self.num_moa)
+                    n_moa = self.num_moa, 
+                    total_iterations = self.num_epochs)
 
 
 # We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,
