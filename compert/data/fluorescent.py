@@ -194,13 +194,15 @@ class BBBC021Fold(Dataset):
         # Transform only the training set and only if required
         if self.augment_train and self.fold == 'train':
             self.transform = CustomTransform(augment=True)
+        else:
+            self.transform = CustomTransform(augment=False)
+        
+        if self.fold ==  'train':
             # Compute class imbalance weights
             compute_class_imbalance_weights_drug = self.compute_class_imbalance_weights(self.mol_smiles)
             compute_class_imbalance_weights_moa = self.compute_class_imbalance_weights(self.moa)
             self.class_imbalances = {'drugs': compute_class_imbalance_weights_drug, 
                                 'moas': compute_class_imbalance_weights_moa}
-        else:
-            self.transform = CustomTransform(augment=False)
         
         # Control whether the labels should be provided in the batch together with the images  
         self.return_labels = return_labels 

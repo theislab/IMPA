@@ -72,7 +72,3 @@ class TemplateModel(nn.Module):
             print(f'{metric}: {metrics[metric]}')
         
         return epoch
-
-    
-
-    

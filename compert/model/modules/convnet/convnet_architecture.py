@@ -86,7 +86,6 @@ class Encoder(torch.nn.Module):
 
             in_fm = out_fm
             out_fm = out_fm*2
-            # kernel_size += 1
 
         # Add residual blocks 
         for i in range(self.n_residual_blocks):
@@ -172,9 +171,6 @@ class Decoder(torch.nn.Module):
                                 kernel_size=kernel_size, stride=2, padding=1)]
             if self.batch_norm_layers_ae:   
                 self.modules += [torch.nn.BatchNorm2d(out_fm)]
-
-            # if i > 0:
-            #     kernel_size -= 1
             
             self.modules += [torch.nn.ReLU() if i<self.n_conv-1 else torch.nn.Sigmoid()]
             if self.dropout_ae and i < self.n_conv-1:
