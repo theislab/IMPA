@@ -231,6 +231,7 @@ class CPA(TemplateModel):
         if self.hparams['anneal_adv_steps']:
             self.total_iterations = self.total_iterations//2  # Reach the minimum halfway through the iterations
             self.step = (self.hparams["adversary_steps"]-self.hparams["final_adv_steps"])//self.total_iterations
+            self.current_adversary_steps = self.hparams["adversary_steps"]
 
     
     def set_hparams_(self, seed, hparams):
@@ -396,7 +397,7 @@ class CPA(TemplateModel):
         
         if mode == 'train':
         # Check whether to perform adversarial training 
-            if (self.iteration % self.hparams["adversary_steps"]) != 0:
+            if (self.iteration % np.around(self.current_adversary_steps)) != 0:
                 # Compute the gradient penalty for the drug regularization term 
                 adv_drugs_grad_penalty = self.compute_gradient_penalty(y_adv_hat_drug.sum(), z_basal)
                 # Compute the gradient penalty for the moa term, if applicable
@@ -498,7 +499,7 @@ class CPA(TemplateModel):
                 self.optimizer_autoencoder.zero_grad()
 
                 # Optimizer step - adversarial training 
-                if (self.iteration % self.hparams["adversary_steps"]) != 0: 
+                if (self.iteration % np.around(self.current_adversary_steps)) != 0: 
                     loss.backward()
                     self.optimizer_adversaries.step()
                 # Optimizer step - non-adversarial training 

@@ -335,11 +335,11 @@ class Trainer:
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
             
+            # Update the number of adversarial steps 
             if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
-                self.current_adv_steps = self.current_adversarial_step-self.model.module.step
-                self.model.module.hparams['anneal_adv_steps'] = max(0, np.around(self.current_adv_steps)) 
+                self.model.module.current_adversary_steps = max(self.model.module.hparams["final_adv_steps"], self.model.module.current_adversary_steps-self.model.module.step)
                 self.model.module.iterations = 0 
-            print(self.model.module.hparams['anneal_adv_steps'])
+            print(np.around(self.model.module.current_adversary_steps))
         
         self.model.eval()
         # # Perform last evaluation on TEST SET   
