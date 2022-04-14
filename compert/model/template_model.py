@@ -3,9 +3,6 @@ from torch import nn
 
 import sys 
 sys.path.insert(0, '..')
-from .modules.convnet.convnet_architecture import Encoder, Decoder
-from .modules.resnet.resnet_encoder import *
-from .modules.resnet.resnet_decoder import *
 
 from metrics.metrics import *
 import os

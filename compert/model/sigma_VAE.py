@@ -39,7 +39,7 @@ class SigmaVAE(CPA):
                                         predict_moa=predict_moa,
                                         n_moa=n_moa, 
                                         total_iterations=total_iterations, 
-                                        class_weight = class_weights)
+                                        class_weights = class_weights)
 
 
     def reconstruction_loss(self, X_hat, X):

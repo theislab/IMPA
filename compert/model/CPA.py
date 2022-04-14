@@ -1,5 +1,4 @@
 import json
-from termios import N_MOUSE
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -180,9 +179,16 @@ class CPA(TemplateModel):
 
 
         # Crossentropy loss for the prediction of both MOA and the drug 
-        self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(weight = self.class_weight['drugs'], reduction = 'mean')
-        if self.predict_moa:
-            self.loss_adversary_moas = torch.nn.CrossEntropyLoss(weight = self.class_weight['moas'], reduction = 'mean')
+        if self.hparams["weigh_loss"]:
+            self.lLSoss_adversary_drugs = torch.nn.CrossEntropyLoss(weight = torch.tensor(self.class_weights['drugs']).float().to(self.device), 
+                                                                    reduction = 'mean')
+            if self.predict_moa:
+                self.loss_adversary_moas = torch.nn.CrossEntropyLoss(weight = torch.tensor(self.class_weights['moas']).float().to(self.device), 
+                                                                    reduction = 'mean')
+        else:
+            self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(reduction = 'mean')
+            if self.predict_moa:
+                self.loss_adversary_moas = torch.nn.CrossEntropyLoss(reduction = 'mean')
 
         
         # Collect parameters of the autoencoder branch
@@ -231,12 +237,13 @@ class CPA(TemplateModel):
         )
         # Turn adversarial to True
         self.adversarial = True
+        self.current_adversary_steps = self.hparams["adversary_steps"]
 
         # Initialize total iterations and linear annealing schedule
         if self.hparams['anneal_adv_steps']:
             self.total_iterations = self.total_iterations//2  # Reach the minimum halfway through the iterations
             self.step = (self.hparams["adversary_steps"]-self.hparams["final_adv_steps"])//self.total_iterations
-            self.current_adversary_steps = self.hparams["adversary_steps"]
+            
 
     
     def set_hparams_(self, seed, hparams):
@@ -291,7 +298,8 @@ class CPA(TemplateModel):
             "batch_norm_adversarial_drug": True if default else np.random.choice([True, False]),
             "batch_norm_adversarial_moa": True if default else np.random.choice([True, False]),
             "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
-            "mean_recon_loss": False if default else np.random.choice([True, False])
+            "mean_recon_loss": False if default else np.random.choice([True, False]), 
+            "weigh_loss": False if default else np.random.choice([True, False])
         }
 
         # the user may fix some hparams
@@ -613,72 +621,4 @@ class CPA(TemplateModel):
                 self.history[fold][metric].append(metrics[metric])
 
     
-    def initialize_encoder_decoder(self, hparams):
-        """Initialize encoder and decoder architectures 
 
-        Args:
-            hparams (dict): dictionary of hyperparameters 
-
-        Returns:
-            tuple: Encoder and decoder modules  
-        """
-        # If the embeddings are concatenated and not summed we have to increase the input latent dimension of the decoder 
-        if self.hparams["concat_embedding"]:
-            # If we concatenate the drug/moa one hot --> sum the latent dim by the number of drugs or moas in the dataset 
-            if self.hparams["concat_one_hot"]:
-                moa_concat_dim = self.n_moa if self.predict_moa else 0  
-                latent_dim_decoder = self.hparams["latent_dim"] +  self.n_seen_drugs + moa_concat_dim
-            else:   
-                latent_dim_decoder = self.hparams["latent_dim"] +  self.hparams["drug_embedding_dimension"] + self.hparams["moa_embedding_dimension"]
-        else:
-            latent_dim_decoder = self.hparams["latent_dim"]
-
-        if hparams["autoencoder_type"] == 'resnet':
-            # The different kinds of resnet
-            resnet_types = {'resnet18': (resnet18, decoder18),
-                            'resnet34': (resnet34, decoder34),
-                            'resnet50': (resnet50, decoder50)}
-
-            encoder = resnet_types[hparams['resnet_type']][0](in_channels = self.in_channels,
-                    latent_dim = self.hparams["latent_dim"],
-                    init_fm = self.hparams["init_fm"],
-                    in_width = self.in_width,
-                    in_height = self.in_height,
-                    variational = self.variational)
-
-            decoder = resnet_types[hparams['resnet_type']][1](out_channels = self.in_channels,
-                    latent_dim = latent_dim_decoder,
-                    init_fm = self.hparams["init_fm"],
-                    out_width = self.in_width,
-                    out_height = self.in_height,
-                    variational = self.variational)
-
-        else:
-            encoder = Encoder(
-                in_channels = self.in_channels,
-                latent_dim = self.hparams["latent_dim"],
-                init_fm = self.hparams["init_fm"],
-                n_conv = self.hparams["n_conv"],
-                n_residual_blocks = self.hparams["n_residual_blocks"], 
-                in_width = self.in_width,
-                in_height = self.in_height,
-                variational = self.variational,
-                batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
-                dropout_ae = self.hparams["dropout_ae"],
-                dropout_rate_ae = self.hparams["dropout_rate_ae"]
-            )
-
-            decoder = Decoder(
-                out_channels = self.in_channels,
-                latent_dim = latent_dim_decoder,
-                init_fm = self.hparams["init_fm"],
-                n_conv = self.hparams["n_conv"],
-                n_residual_blocks = self.hparams["n_residual_blocks"],  
-                out_width = self.in_width,
-                out_height = self.in_height,
-                variational = self.variational,
-                batch_norm_layers_ae = self.hparams["batch_norm_layers_ae"],
-                dropout_ae = self.hparams["dropout_ae"],
-                dropout_rate_ae = self.hparams["dropout_rate_ae"]
-            ) 
-        return encoder, decoder

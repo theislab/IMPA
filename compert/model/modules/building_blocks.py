@@ -5,7 +5,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 class MLP(torch.nn.Module):
     """
     A multilayer perceptron with ReLU activations and optional BatchNorm.
