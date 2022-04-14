@@ -143,44 +143,42 @@ class CPA(TemplateModel):
                 + [self.n_moa], self.hparams["batch_norm_adversarial_moa"]
             ).to(self.device)
 
-        # If the embeddings are not meant to be one hot encoded
-        if not self.hparams["concat_one_hot"]:
-            # Create drug embeddings 
-            if self.drug_embeddings is None:
-                self.drug_embeddings = torch.nn.Embedding(
-                    self.num_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
-                embedding_requires_grad = True
-            else:
-                self.drug_embeddings = self.drug_embeddings  # From pre-trained 
-                embedding_requires_grad = False
-            
-            # Drug embedding encoder 
-            self.drug_embedding_encoder = MLP(
-                [self.drug_embeddings.embedding_dim]
-                + [self.hparams["drug_embedding_dimension"]]
-                * self.hparams["drug_embedding_encoder_depth"]
-                + [self.hparams["latent_dim"] if not self.hparams["concat_embedding"] else self.hparams["drug_embedding_dimension"]],
+        # Create drug embeddings 
+        if self.drug_embeddings is None:
+            self.drug_embeddings = torch.nn.Embedding(
+                self.num_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
+            embedding_requires_grad = True
+        else:
+            self.drug_embeddings = self.drug_embeddings  # From pre-trained 
+            embedding_requires_grad = False
+        
+        # Drug embedding encoder 
+        self.drug_embedding_encoder = MLP(
+            [self.drug_embeddings.embedding_dim]
+            + [self.hparams["drug_embedding_dimension"]]
+            * self.hparams["drug_embedding_encoder_depth"]
+            + [self.hparams["latent_dim"]],
+            last_layer_act="linear",
+        ).to(self.device)
+
+        # Embed the MOA
+        if self.predict_moa:
+            self.moa_embeddings = torch.nn.Embedding(
+                self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
+
+            # MOA embedding encoder 
+            self.moa_embedding_encoder = MLP(
+                [self.moa_embeddings.embedding_dim]
+                + [self.hparams["moa_embedding_dimension"]]
+                * self.hparams["moa_embedding_encoder_depth"]
+                + [self.hparams["latent_dim"]],
                 last_layer_act="linear",
             ).to(self.device)
-
-            # Embed the MOA
-            if self.predict_moa:
-                self.moa_embeddings = torch.nn.Embedding(
-                    self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
-
-                # MOA embedding encoder 
-                self.moa_embedding_encoder = MLP(
-                    [self.moa_embeddings.embedding_dim]
-                    + [self.hparams["moa_embedding_dimension"]]
-                    * self.hparams["moa_embedding_encoder_depth"]
-                    + [self.hparams["latent_dim"] if not self.hparams["concat_embedding"] else self.hparams["moa_embedding_dimension"]],
-                    last_layer_act="linear",
-                ).to(self.device)
 
 
         # Crossentropy loss for the prediction of both MOA and the drug 
         if self.hparams["weigh_loss"]:
-            self.lLSoss_adversary_drugs = torch.nn.CrossEntropyLoss(weight = torch.tensor(self.class_weights['drugs']).float().to(self.device), 
+            self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(weight = torch.tensor(self.class_weights['drugs']).float().to(self.device), 
                                                                     reduction = 'mean')
             if self.predict_moa:
                 self.loss_adversary_moas = torch.nn.CrossEntropyLoss(weight = torch.tensor(self.class_weights['moas']).float().to(self.device), 
@@ -194,16 +192,14 @@ class CPA(TemplateModel):
         # Collect parameters of the autoencoder branch
         _parameters = (
             self.get_params(self.encoder, True)
-            + self.get_params(self.decoder, True)
+            + self.get_params(self.decoder, True) +
+            self.get_params(self.drug_embeddings, embedding_requires_grad)
+            + self.get_params(self.drug_embedding_encoder, True)
         )
 
-        if not self.hparams["concat_one_hot"]:
-            _parameters.extend(self.get_params(self.drug_embeddings, embedding_requires_grad)
-            + self.get_params(self.drug_embedding_encoder, True))
-
-            if self.predict_moa:
-                _parameters.extend(self.get_params(self.moa_embeddings, True) + 
-                                    self.get_params(self.moa_embedding_encoder, True))
+        if self.predict_moa:
+            _parameters.extend(self.get_params(self.moa_embeddings, True) + 
+                                self.get_params(self.moa_embedding_encoder, True))
 
         # Optimizer for the autoencoder 
         self.optimizer_autoencoder = torch.optim.Adam(
@@ -323,17 +319,10 @@ class CPA(TemplateModel):
         if not self.variational:
             z = self.encoder(X)
         else:
-            mu, log_sigma = self.encoder(X)
+            z = self.encoder(X)
+            mu, log_sigma = z[-1]
             # Apply reparametrization trick if VAE
-            z = self.reparameterize(mu, log_sigma)
-        
-        # Decode z, if concat_embeddings is true, add the dimensions (as 0) of the drug and moas 
-        if self.hparams["concat_embedding"]:
-            drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
-            z = torch.cat([z, torch.zeros(z.shape[0], drug_dim).to(self.device)], dim = 1)
-            if self.predict_moa:
-                moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
-                z = torch.cat([z, torch.zeros(z.shape[0], moa_dim).to(self.device)], dim = 1)
+            z[-1] = self.reparameterize(mu, log_sigma)
 
         # Decode the latent 
         out = self.decoder(z)
@@ -354,48 +343,36 @@ class CPA(TemplateModel):
         """
         # Autoencoder pass
         if self.variational:
-            mu, log_sigma = self.encoder(X)  # Encode image
-            z_basal = self.reparameterize(mu, log_sigma)  # Reparametrization trick 
+            z_basal = self.encoder(X)
+            mu, log_sigma = z_basal[-1]
+            # Apply reparametrization trick if VAE
+            z_basal[-1] = self.reparameterize(mu, log_sigma)
         else:
             z_basal = self.encoder(X)
 
-        # In the eval mode, we'll need to decode also z basal, so we must account for concatenation vs sum  
-        if mode == 'eval':
-            # Decode z, if concat_embeddings is true, add the dimensions (as 0) of the drug and moas 
-            if self.hparams["concat_embedding"]:
-                drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
-                z_basal = torch.cat([z_basal, torch.zeros(z_basal.shape[0], drug_dim).to(self.device)], dim = 1)
-                if self.predict_moa:
-                    moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
-                    z_basal = torch.cat([z_basal, torch.zeros(z_basal.shape[0], moa_dim).to(self.device)], dim = 1)
-
         # Prediction of the drug label  
-        y_adv_hat_drug = self.adversary_drugs(z_basal[:,:self.hparams["latent_dim"]])
+        y_adv_hat_drug = self.adversary_drugs(z_basal[-1][:,:self.hparams["latent_dim"]])
         # If applicable, prediction on the MOA label
         if self.predict_moa:
-            y_adv_hat_moa = self.adversary_moa(z_basal[:,:self.hparams["latent_dim"]])
+            y_adv_hat_moa = self.adversary_moa(z_basal[-1][:,:self.hparams["latent_dim"]])
 
         # Embed the drug
-        drug_embedding = self.drug_embeddings(drug_ids) if not self.hparams["concat_one_hot"] else None # Embedding weights from drug id 
-        z_drug = self.drug_embedding_encoder(drug_embedding) if not self.hparams["concat_one_hot"] else y_adv_drug.float() # Embed input drug
+        drug_embedding = self.drug_embeddings(drug_ids) 
+        z_drug = self.drug_embedding_encoder(drug_embedding) 
 
         #Embed moa if applicable 
         if self.predict_moa:
-            moa_embedding = self.moa_embeddings(moa_ids) if not self.hparams["concat_one_hot"] else None
-            z_moa = self.moa_embedding_encoder(moa_embedding) if not self.hparams["concat_one_hot"] else y_adv_moa.float()
+            moa_embedding = self.moa_embeddings(moa_ids) 
+            z_moa = self.moa_embedding_encoder(moa_embedding) 
         else:
             z_moa = 0  # If no moa in the dataset, z_moa set to null
 
         # Sum the latents of the drug and the image
-        if not self.hparams["concat_embedding"]:
-            z = z_basal + z_drug + z_moa  
-        else:
-            z = torch.cat([z_basal[:,:self.hparams["latent_dim"]], z_drug], dim = 1)
-            if self.predict_moa:
-                z = torch.cat([z, z_moa], dim = 1)  
+        z = z_basal[:]
+        z[-1] = z_basal[-1] + z_drug + z_moa    
         
         # Decode z for the output 
-        out = self.decoder(z.float()) 
+        out = self.decoder(z) 
 
         # Compute the adversarial loss
         if mode == 'train':

@@ -74,5 +74,25 @@ def initialize_encoder_decoder(self, hparams):
         ) 
     
     else:
+        encoder = UNetEncoder(
+            in_channels = self.in_channels,
+            latent_dim = self.hparams["latent_dim"],
+            init_fm = self.hparams["init_fm"],
+            n_conv = self.hparams["n_conv"],
+            n_residual_blocks = self.hparams["n_residual_blocks"], 
+            in_width = self.in_width,
+            in_height = self.in_height,
+            variational = self.variational,
+        )
 
+        decoder = UNetDecoder(
+            out_channels = self.in_channels,
+            latent_dim = latent_dim_decoder,
+            init_fm = self.hparams["init_fm"],
+            n_conv = self.hparams["n_conv"],
+            n_residual_blocks = self.hparams["n_residual_blocks"],  
+            out_width = self.in_width,
+            out_height = self.in_height,
+            variational = self.variational,
+        ) 
     return encoder, decoder
