@@ -247,7 +247,6 @@ class ResNetDecoder(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = x[0]
         x = self.relu(self.linear_projection(x))
 
         x = x.view(x.size(0), self.h_dim // 16, 4, 4)

@@ -298,7 +298,7 @@ class ResNetEncoder(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.shape[0], -1)
         x = self.projection_layer(x)
-        return [x]
+        return x
 
 
 def resnet18(in_channels, 

@@ -108,13 +108,6 @@ class SigmaVAE(CPA):
                 self.hparams["latent_dim"])*temperature
         z = z.to(self.device)
 
-        # Concatenate with zeros - Choose the number of dimensions depending on the kind of concatenation performed 
-        if self.hparams["concat_embedding"]:
-            drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
-            z = torch.cat([z, torch.zeros(z.shape[0], drug_dim).to(self.device)], dim = 1)
-            if self.predict_moa:
-                moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
-                z = torch.cat([z, torch.zeros(z.shape[0], moa_dim).to(self.device)], dim = 1)
         samples = self.decoder(z)
         return samples
 
@@ -137,12 +130,11 @@ class SigmaVAE(CPA):
         original_X = original['X'][0].to(self.device).unsqueeze(0)  
 
         with torch.no_grad():
-            z_basal = self.encoder(original_X)
-            mu_orig, log_sigma_orig = z_basal[-1] # Encode image
-            z_basal[-1] = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
+            mu_orig, log_sigma_orig = self.encoder(original_X) # Encode image
+            z_basal = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
             # Handle the case training is not adversarial 
             if not self.adversarial:
-                reconstructed_X = self.decoder(z_basal[-1]) 
+                reconstructed_X = self.decoder(z_basal) 
 
             else:
                 # Collect the encoders for the drug embeddings to condition the latent space 
@@ -158,7 +150,7 @@ class SigmaVAE(CPA):
                     z_moa = 0 
                 
                 # If not concat, perform the sum of embeddings 
-                z = z_basal[:]
-                z[-1] = z_basal[-1] + z_drug + z_moa
+                z = z_basal + z_drug + z_moa
+                reconstructed_X = self.decoder(z) 
 
         return original_X, reconstructed_X

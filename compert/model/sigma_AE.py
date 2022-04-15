@@ -84,17 +84,10 @@ class SigmaAE(CPA):
         original_X = original['X'][0].to(self.device).unsqueeze(0)  
 
         with torch.no_grad():
-            z_x = self.encoder(original_X)  # Encode image 
+            z_basal = self.encoder(original_X)  # Encode image 
             # Handle the case training is not adversarial 
             if not self.adversarial:
-                if self.hparams["concat_embedding"]:
-                    # The concatenation dimension is equal to the number of drugs if the one hot encoding is carried out 
-                    drug_dim = self.n_seen_drugs if self.hparams["concat_one_hot"] else self.hparams["drug_embedding_dimension"]
-                    z_x = torch.cat([z_x, torch.zeros(z_x.shape[0], drug_dim).to(self.device)], dim = 1)
-                    if self.predict_moa:
-                        moa_dim = self.n_moa if self.hparams["concat_one_hot"] else self.hparams["moa_embedding_dimension"]
-                        z_x = torch.cat([z_x, torch.zeros(z_x.shape[0], moa_dim).to(self.device)], dim = 1)
-                reconstructed_X = self.decoder(z_x) 
+                reconstructed_X = self.decoder(z_basal) 
 
             else:
                 # Collect the encoders for the drug embeddings to condition the latent space 
@@ -110,12 +103,7 @@ class SigmaAE(CPA):
                     z_moa = 0 
                 
                 # If not concat, perform the sum of embeddings 
-                if not self.hparams["concat_embedding"]:
-                    z = z_x + z_drug + z_moa
-                else:
-                    z = torch.cat([z_x, z_drug], dim = 1)
-                    if self.predict_moa:
-                        z = torch.cat([z, z_moa], dim = 1) 
+                z = z_basal + z_drug + z_moa
                 reconstructed_X = self.decoder(z) 
 
         return original_X, reconstructed_X

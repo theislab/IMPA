@@ -114,10 +114,10 @@ class Encoder(torch.nn.Module):
         if self.variational:
             mu = self.fc_mu(X)
             log_sigma = self.fc_var(X)
-            return [[mu, log_sigma]]
+            return mu, log_sigma
         else:
             z = self.fc_z(X)
-            return [z]
+            return z
 
 
 class Decoder(torch.nn.Module):
@@ -187,7 +187,6 @@ class Decoder(torch.nn.Module):
         self.decoder = torch.nn.Sequential(*self.modules)
     
     def forward(self, z):
-        z = z[0]
         X = self.upsample_fc(z)
         # Reshape to height x width
         X = X.view(-1, self.init_fm, self.upsampling_factor_width, self.upsampling_factor_height)

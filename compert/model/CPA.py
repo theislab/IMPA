@@ -243,7 +243,7 @@ class CPA(TemplateModel):
         # Initialize total iterations and linear annealing schedule
         if self.hparams['anneal_adv_steps']:
             self.total_iterations = self.total_iterations//2  # Reach the minimum halfway through the iterations
-            self.step = (self.hparams["adversary_steps"]-self.hparams["final_adv_steps"])//self.total_iterations
+            self.step = (self.hparams["adversary_steps"]-self.hparams["final_adv_steps"])/self.total_iterations
             
 
     
@@ -324,10 +324,9 @@ class CPA(TemplateModel):
         if not self.variational:
             z = self.encoder(X)
         else:
-            z = self.encoder(X)
-            mu, log_sigma = z[-1]
+            mu, log_sigma = self.encoder(X)
             # Apply reparametrization trick if VAE
-            z[-1] = self.reparameterize(mu, log_sigma)
+            z = self.reparameterize(mu, log_sigma)
 
         # Decode the latent 
         out = self.decoder(z)
@@ -348,18 +347,17 @@ class CPA(TemplateModel):
         """
         # Autoencoder pass
         if self.variational:
-            z_basal = self.encoder(X)
-            mu, log_sigma = z_basal[-1]
+            mu, log_sigma = self.encoder(X)
             # Apply reparametrization trick if VAE
-            z_basal[-1] = self.reparameterize(mu, log_sigma)
+            z_basal = self.reparameterize(mu, log_sigma)
         else:
             z_basal = self.encoder(X)
 
         # Prediction of the drug label  
-        y_adv_hat_drug = self.adversary_drugs(z_basal[-1])
+        y_adv_hat_drug = self.adversary_drugs(z_basal)
         # If applicable, prediction on the MOA label
         if self.predict_moa:
-            y_adv_hat_moa = self.adversary_moa(z_basal[-1])
+            y_adv_hat_moa = self.adversary_moa(z_basal)
 
         # Embed the drug
         drug_embedding = self.drug_embeddings(drug_ids) 
@@ -373,8 +371,7 @@ class CPA(TemplateModel):
             z_moa = 0  # If no moa in the dataset, z_moa set to null
 
         # Sum the latents of the drug and the image
-        z = z_basal[:]
-        z[-1] = z[-1] + z_drug + z_moa    
+        z = z_basal + z_drug + z_moa    
         
         # Decode z for the output 
         out = self.decoder(z) 
@@ -411,7 +408,7 @@ class CPA(TemplateModel):
         else:
             # If validation is performed, we also decode the basal encoding to compare it to the original 
             out_basal = self.decoder(z_basal)
-            return dict(out=out, out_basal=out_basal, z_basal=z_basal[:,:self.hparams["latent_dim"]], z=z, y_hat_drug=y_adv_hat_drug, 
+            return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat_drug=y_adv_hat_drug, 
                         y_hat_moa=y_adv_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)
             
         
