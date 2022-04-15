@@ -10,6 +10,7 @@ from .template_model import *
 import sys
 sys.path.insert(0, '..')
 
+from .autoencoders import initialize_encoder_decoder
 from metrics.metrics import *
 
 
@@ -80,7 +81,11 @@ class CPA(TemplateModel):
         self.n_moa = n_moa
 
         # Instantiate the convolutional encoder and decoder modules
-        self.encoder, self.decoder = self.initialize_encoder_decoder(hparams)
+        self.encoder, self.decoder = initialize_encoder_decoder(self.in_channels, 
+                                                                self.in_width, 
+                                                                self.in_height, 
+                                                                self.variational, 
+                                                                self.hparams)
 
         # Initialize warmup params
         self.warmup_steps = self.hparams["warmup_steps"]
@@ -351,10 +356,10 @@ class CPA(TemplateModel):
             z_basal = self.encoder(X)
 
         # Prediction of the drug label  
-        y_adv_hat_drug = self.adversary_drugs(z_basal[-1][:,:self.hparams["latent_dim"]])
+        y_adv_hat_drug = self.adversary_drugs(z_basal[-1])
         # If applicable, prediction on the MOA label
         if self.predict_moa:
-            y_adv_hat_moa = self.adversary_moa(z_basal[-1][:,:self.hparams["latent_dim"]])
+            y_adv_hat_moa = self.adversary_moa(z_basal[-1])
 
         # Embed the drug
         drug_embedding = self.drug_embeddings(drug_ids) 
@@ -369,7 +374,7 @@ class CPA(TemplateModel):
 
         # Sum the latents of the drug and the image
         z = z_basal[:]
-        z[-1] = z_basal[-1] + z_drug + z_moa    
+        z[-1] = z[-1] + z_drug + z_moa    
         
         # Decode z for the output 
         out = self.decoder(z) 

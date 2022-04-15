@@ -1,6 +1,7 @@
 """ Full assembly of the parts to form the complete network """
 
-from unet_modules import *
+from .unet_modules import *
+import torch
 
 class UNetEncoder(nn.Module):
     def __init__(self, in_channels, latent_dim, init_fm, n_conv, in_width, in_height, variational):
@@ -21,6 +22,7 @@ class UNetEncoder(nn.Module):
             self.modules.append(Down(in_fm, in_fm*2))
             in_fm*=2
 
+        self.module = torch.nn.Sequential(*self.modules)
         # Flattening layer 
         self.flatten = torch.nn.Flatten(start_dim=1, end_dim=-1)
 
@@ -67,6 +69,7 @@ class UNetDecoder(nn.Module):
             self.modules.append(Up(in_fm, in_fm // 2, False))
             in_fm //= 2
         self.modules.append(OutConv(in_fm, self.out_channels))
+        self.module = torch.nn.Sequential(*self.modules)
 
     def forward(self, xs):
         """Given a list of images xs and a latent vector, the network reconstructs the original image
@@ -84,7 +87,7 @@ class UNetDecoder(nn.Module):
             x = self.modules[i](xs_out[-1], xs_reverse[i+2])
             xs_out.append(x)
         xs_out.append(self.modules[-1](x))
-        return xs_out[-1]
+        return torch.nn.Sigmoid()(xs_out[-1])
 
 
 
