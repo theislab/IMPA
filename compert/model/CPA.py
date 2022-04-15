@@ -246,7 +246,7 @@ class CPA(TemplateModel):
             self.step = (self.hparams["adversary_steps"]-self.hparams["final_adv_steps"])/self.total_iterations
             
 
-    
+
     def set_hparams_(self, seed, hparams):
         """
         Set hyper-parameters to (i) default values if `seed=0`, (ii) random
