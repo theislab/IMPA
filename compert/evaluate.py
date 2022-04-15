@@ -115,12 +115,13 @@ def training_evaluation(model,
         metrics.update_rmse(X, out)
 
     if (ds_name!='cellpainting' or not ood) and adversarial:
-        # Update metric for drug prediction
-        y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-        y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
-        if predict_moa:
-            y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
-            y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
+        if X.shape[0]>1:
+            # Update metric for drug prediction
+            y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
+            y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
+            if predict_moa:
+                y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
+                y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
         
         # Check classification report on the labels
         metrics.compute_classification_report(y_true_ds_drugs, y_hat_ds_drugs, '_drug')

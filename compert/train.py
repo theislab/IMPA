@@ -161,7 +161,7 @@ class Trainer:
 
         # The id of the dmso to exclude from the prediction 
         self.dmso_id = self.training_set.drugs2idx['DMSO']
-        self.class_imbalance_weights = self.loader_train.class_imbalances 
+        self.class_imbalance_weights = self.training_set.class_imbalances 
         print('Successfully loaded the data')
 
     
@@ -172,6 +172,7 @@ class Trainer:
         self.hparams = hparams  # Dictionary with model hyperparameters 
         # Initialize model 
         self.model =  self.load_model().to(self.device)
+        print(self.model)
         self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present
     
 
@@ -261,7 +262,6 @@ class Trainer:
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
             if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
                 self.model.module.initialize_adversarial()
-                self.current_adversarial_step = self.model.module.hparams["adversary_steps"]  # How many adversarial steps per autoencoder steps (possibly annealed)
             
             print(f'Running epoch {epoch}')
             self.model.train() 
@@ -339,7 +339,6 @@ class Trainer:
                 # Update the number of adversarial steps so they do not go under a minumum 
                 self.model.module.current_adversary_steps = max(self.model.module.hparams["final_adv_steps"], self.model.module.current_adversary_steps-self.model.module.step)
                 self.model.module.iterations = 0 
-            print(f'Unrounded current adversary steps: {self.model.module.current_adversary_steps}')
         
         self.model.eval()
         # Perform last evaluation on TEST SET   
