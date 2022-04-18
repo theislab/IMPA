@@ -78,8 +78,9 @@ def training_evaluation(model,
 
         # Predictions 
         if not adversarial:
-            res = model.forward_ae(X)
-            out, z_basal, ae_loss = res.values()
+            with torch.no_grad():
+                res = model.forward_ae(X)
+                out, z_basal, ae_loss = res.values()
         else:
             # Get evaluation results
             drug_id = observation["smile_id"].to(device)
