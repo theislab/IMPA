@@ -162,10 +162,6 @@ class Decoder(torch.nn.Module):
         out_fm = self.init_fm//2
         kernel_size = 4  # Initial kernel size 
 
-        # Append the residual blocks
-        for _ in range(self.n_residual_blocks):
-            self.modules.append(ResidualLayer(in_fm, in_fm))
-
         for i in range(0, self.n_conv):
             self.modules += [torch.nn.ConvTranspose2d(in_fm, out_fm,
                                 kernel_size=kernel_size, stride=2, padding=1)]
