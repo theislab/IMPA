@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from torch import Tensor
 from typing import Type, Any, Callable, Union, List, Optional
-from .projections import *
+from projections import *
 
 # Basic convolutional layers
 
@@ -355,12 +355,13 @@ def resnet50(in_channels,
 
 if __name__ == "__main__":
     imgs = torch.rand(16, 3, 96, 96)
-    encoder = resnet18(in_channels=3, 
-            latent_dim = 128,
-            init_fm = 128,
+    encoder = resnet50(in_channels=3, 
+            latent_dim = 512,
+            init_fm = 64,
             in_width = 96,
             in_height = 96,
             variational= True)
+    print(encoder)
     
-    # print(encoder)
-    print(encoder(imgs)[0].shape)
+    # # print(encoder)
+    # print(encoder(imgs)[0].shape)

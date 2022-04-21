@@ -1,6 +1,6 @@
 """ Full assembly of the parts to form the complete network """
 
-from .unet_modules import *
+from unet_modules import *
 import torch
 
 class UNetEncoder(nn.Module):
@@ -16,10 +16,11 @@ class UNetEncoder(nn.Module):
 
         # The initial feature maps equate the number of channels of the 
         in_fm = self.init_fm
-        # Initialize the first convolution
+
+        # First convolution from the input channels to the first feature map 
         self.modules = [DoubleConv(in_channels, in_fm)]
         for _ in range(self.n_conv):
-            self.modules.append(Down(in_fm, in_fm*2))
+            self.modules.append(Down(in_fm, in_fm*2))  # Feature maps double each time 
             in_fm*=2
 
         self.module = torch.nn.Sequential(*self.modules)
@@ -27,8 +28,8 @@ class UNetEncoder(nn.Module):
         self.flatten = torch.nn.Flatten(start_dim=1, end_dim=-1)
 
         # Define a latent encoding 
-        spatial_dim = self.in_width//(2**self.n_conv)
-        self.flattened_dim = int(in_fm*(spatial_dim**2))
+        spatial_dim = self.in_width//(2**self.n_conv)  # The image gets downsampled for each convolution performed 
+        self.flattened_dim = int(in_fm*(spatial_dim**2))  
         if self.variational:
             self.projection_layer = ProjectionHeadVAE(input_dim=self.flattened_dim,
                                                         output_dim=self.latent_dim)
@@ -37,13 +38,10 @@ class UNetEncoder(nn.Module):
                                                         output_dim=self.latent_dim) 
 
     def forward(self, x):
-        xs = []
-        for layer in self.modules:
-            x = layer(x)
-            xs.append(x)
+        x = self.module(x)
         x = self.flatten(x)
-        xs.append(self.projection_layer(x))
-        return xs 
+        x = self.projection_layer(x)
+        return x
 
 
 class UNetDecoder(nn.Module):
@@ -63,31 +61,36 @@ class UNetDecoder(nn.Module):
         self.flattened_dim = int(self.in_channels*(self.spatial_dim**2))
         self.upsampling_layer = nn.Linear(self.latent_dim, self.flattened_dim, bias=True)
 
+        # Build upampling convolutions 
         in_fm = self.in_channels
         self.modules = []
         for _ in range(self.n_conv):
-            self.modules.append(Up(in_fm, in_fm // 2, False))
+            self.modules.append(Up(in_fm, in_fm // 2))
             in_fm //= 2
         self.modules.append(OutConv(in_fm, self.out_channels))
         self.module = torch.nn.Sequential(*self.modules)
 
-    def forward(self, xs):
+        self.activation_last = torch.nn.Sigmoid()
+
+    def forward(self, z):
         """Given a list of images xs and a latent vector, the network reconstructs the original image
 
         Args:
             xs (list): A list of latent images output of the encoder
         """
-        xs_out = []
-        # Take the last layer of the xs and upsample it to image 
-        x = self.upsampling_layer(xs[-1])
+        # Go up from z
+        x = self.upsampling_layer(z)
         x = x.view(-1, self.in_channels, self.spatial_dim, self.spatial_dim)
-        xs_out.append(x)
-        xs_reverse = xs[::-1]
-        for i in range(len(self.modules)-1):  # For i in reverse
-            x = self.modules[i](xs_out[-1], xs_reverse[i+2])
-            xs_out.append(x)
-        xs_out.append(self.modules[-1](x))
-        return torch.nn.Sigmoid()(xs_out[-1])
+        x = self.module(x)
+        return self.activation_last(x)
 
+
+if __name__ == '__main__':
+    enc = UNetEncoder(3, 512, 64, 4, 96, 96, False)
+    dec = UNetDecoder(3, 512, 64, 4, 96, 96, False)
+    x = torch.rand(64, 3, 96, 96)
+    z = enc(x)
+    x_out = dec(z)
+    print(x_out.shape)
 
 
