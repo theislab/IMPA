@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from torch import Tensor
 from typing import Type, Any, Callable, Union, List, Optional
-from projections import *
+from .projections import *
 
 # Basic convolutional layers
 

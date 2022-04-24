@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from turtle import forward
 
 import numpy as np
 import torch
@@ -48,6 +49,7 @@ class Encoder(torch.nn.Module):
                 batch_norm_layers_ae: bool = False,
                 dropout_ae: bool = False,
                 dropout_rate_ae: float = 0 ) -> None:
+                
         super(Encoder, self).__init__() 
     
         self.in_channels = in_channels
@@ -67,57 +69,45 @@ class Encoder(torch.nn.Module):
         self.modules = []
 
         # Build convolutional layers 
-        in_fm = self.in_channels 
-        out_fm = self.init_fm
-        kernel_size = 4  # Initial kernel size 
+        in_fm = self.in_channels  # 3
+        out_fm = self.init_fm  # Feature maps in the first convolutional layer   
 
         # Build downsizing convolutions 
         for i in range(0, self.n_conv):
             self.modules += [torch.nn.Conv2d(in_fm, out_fm,
-                                kernel_size=kernel_size, 
+                                kernel_size=4, 
                                 stride=2, padding=1)]    
-                                
+
+            # BN                    
             if i==0 or self.batch_norm_layers_ae:
                 self.modules += [torch.nn.BatchNorm2d(out_fm)]
 
+            # Activation 
             self.modules += [torch.nn.ReLU()]
+
+            # Dropout 
             if self.dropout_ae:
                 self.modules += [torch.nn.Dropout(p=self.dropout_rate_ae, inplace=True)]
 
-            in_fm = out_fm
-            out_fm = out_fm*2
+            # Update feature maps
+            in_fm = out_fm 
+            out_fm = out_fm*2 if not (self.variational and i == self.n_conv-2) else out_fm*4
 
         # Add residual blocks 
         for i in range(self.n_residual_blocks):
             self.modules.append(ResidualLayer(in_fm, in_fm))
 
-        self.encoder = torch.nn.Sequential(*self.modules)
-
-        # Add bottleneck
-        downsampling_factor_width = int(self.in_width//2**(self.n_conv))
-        downsampling_factor_height = int(self.in_height//2**(self.n_conv))
-        self.flattened_dim = in_fm*downsampling_factor_width*downsampling_factor_height
-        self.flatten = torch.nn.Flatten()   
-
-        # Can select either a variational autoencoder or a deterministic one 
-        if variational:
-            self.fc_mu = torch.nn.Linear(self.flattened_dim, self.latent_dim)  # Mean encoding
-            self.fc_var = torch.nn.Linear(self.flattened_dim, self.latent_dim)  # Log-var encodings 
-        else:
-            self.fc_z = torch.nn.Linear(self.flattened_dim, self.latent_dim)
+        self.encoder = torch.nn.Sequential(*self.modules) 
 
     def forward(self, X):
-        X = self.encoder(X)  # Encode the image 
-        X = self.flatten(X)  
-
+        z = self.encoder(X)  # Encode the image 
+        
         # Derive the encodings for the mean and the log variance
         if self.variational:
-            mu = self.fc_mu(X)
-            log_sigma = self.fc_var(X)
+            mu, log_sigma = z.chunk(2, dim=1)
             return mu, log_sigma
-        else:
-            z = self.fc_z(X)
-            return z
+
+        return z
 
 
 class Decoder(torch.nn.Module):
@@ -130,9 +120,8 @@ class Decoder(torch.nn.Module):
                 out_width: int = 64,
                 out_height: int = 64,
                 variational: bool = True,
-                batch_norm_layers_ae: bool = False,
-                dropout_ae: bool = False,
-                dropout_rate_ae: float = 0) -> None:
+                decoding_style = 'sum',
+                extra_fm=0) -> None:
 
         super(Decoder, self).__init__() 
         
@@ -142,50 +131,93 @@ class Decoder(torch.nn.Module):
         self.init_fm = init_fm*(2**(self.n_conv-1))  # The first number of feature vectors 
         self.n_residual_blocks = n_residual_blocks
         self.out_width, self.out_height = out_width, out_height
+        self.decoding_style = decoding_style
+        self.extra_fm = extra_fm    
         
         # Build convolutional dimensions
         self.modules = []
 
         # Layer to upscale latent sample 
-        self.upsampling_factor_width = self.out_width//2**(self.n_conv)
-        self.upsampling_factor_height = self.out_height//2**(self.n_conv)
-        self.flattened_dim = self.init_fm*self.upsampling_factor_width*self.upsampling_factor_height
-        self.upsample_fc = torch.nn.Linear(self.latent_dim, self.flattened_dim)
         self.variational = variational
 
-        # Batch norm and dropout 
-        self.batch_norm_layers_ae = batch_norm_layers_ae
-        self.dropout_ae = dropout_ae
-        self.dropout_rate_ae = dropout_rate_ae
-
+        # The feature map values 
         in_fm = self.init_fm
         out_fm = self.init_fm//2
-        kernel_size = 4  # Initial kernel size 
+
+        # Append the residual blocks
+        for _ in range(self.n_residual_blocks):
+            self.modules.append(ResidualLayer(in_fm+self.extra_fm, in_fm))
 
         for i in range(0, self.n_conv):
-            self.modules += [torch.nn.ConvTranspose2d(in_fm, out_fm,
-                                kernel_size=kernel_size, stride=2, padding=1)]
-            if self.batch_norm_layers_ae:   
-                self.modules += [torch.nn.BatchNorm2d(out_fm)]
+            # Convolutional layer
+            self.modules += [torch.nn.ConvTranspose2d(in_fm+self.extra_fm, out_fm,
+                                kernel_size=4, stride=2, padding=1)]
             
+            # Activation 
             self.modules += [torch.nn.ReLU() if i<self.n_conv-1 else torch.nn.Sigmoid()]
-            if self.dropout_ae and i < self.n_conv-1:
-                self.modules += [torch.nn.Dropout(p=self.dropout_rate_ae, inplace=True)]
 
+            # Update the number of feature maps
             in_fm = out_fm
             if i == self.n_conv-2:
                 out_fm = self.out_channels
             else:
                 out_fm = out_fm//2 
-    
 
         # Assemble the decoder
         self.decoder = torch.nn.Sequential(*self.modules)
-    
-    def forward(self, z):
-        X = self.upsample_fc(z)
+
+    def forward_sum(self, z):
         # Reshape to height x width
-        X = X.view(-1, self.init_fm, self.upsampling_factor_width, self.upsampling_factor_height)
-        X = self.decoder(X)
+        X = self.decoder(z)
         return X 
-        
+    
+    def forward_concat(self, z, y_drug, y_moa):
+        # Reshape to height x width
+        for layer in self.decoder[:-1]:
+            # Upsample drug labs
+            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+
+            # Upsample moa labs
+            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+
+            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+        X = self.decoder[-1](z)
+        return X 
+
+    def forward(self, z, y_drug, y_moa):
+        if self.decoding_style == 'sum':
+            return self.forward_sum(z)
+        else:
+            return self.forward_concat(z, y_drug, y_moa)   
+
+
+# if __name__ == '__main__':
+#     enc = Encoder(in_channels = 3,
+#                 init_fm = 64,
+#                 n_conv = 3,
+#                 n_residual_blocks = 6, 
+#                 in_width = 96,
+#                 in_height = 96,
+#                 variational = True, 
+#                 batch_norm_layers_ae = False,
+#                 dropout_ae = False,
+#                 dropout_rate_ae = 0)
+
+#     dec = Decoder(out_channels = 3,
+#                 init_fm = 64,
+#                 n_conv = 3,
+#                 n_residual_blocks = 6, 
+#                 out_width = 96,
+#                 out_height = 96,
+#                 variational = False,
+#                 batch_norm_layers_ae = False,
+#                 dropout_ae = False,
+#                 dropout_rate_ae = 0) 
+    
+#     x = torch.Tensor(64, 3, 96, 96)
+#     print(enc)
+#     print(dec)
+#     # x_hat = dec(res)
+#     # print(x_hat.shape)

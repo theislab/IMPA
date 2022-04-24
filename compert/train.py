@@ -233,7 +233,8 @@ class Trainer:
         else:
             self.n_seen_drugs = dataset.n_seen_drugs  
             self.num_moa = 0  # No MOA annotated 
-
+        
+        # Collect training, test and validation sets
         training_set, validation_set, test_set, ood_set = dataset.fold_datasets.values()  
         # Free cell painting dataset memory
         del dataset
@@ -245,8 +246,9 @@ class Trainer:
         """
         Full training loop
         """
-        print('Training with hparams')
-        
+        print('Training with hparams:')
+        print(self.hparams)
+
         if self.save_results:
             # Setup plotting object
             self.plotter = Plotter(self.dest_dir)
@@ -331,6 +333,7 @@ class Trainer:
                 self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., epoch/self.model.module.warmup_steps)
             else:
                 self.model.module.scheduler_autoencoder.step()
+            # We do not warmup the adversaries
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
             
