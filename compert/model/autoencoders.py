@@ -5,7 +5,7 @@ from .modules.resnet.resnet_cyclegan.resnet_cyclegan import ResnetEncoderCycleGA
 
 
 
-def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hparams, decoding_style, extra_fm):
+def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hparams, extra_fm):
     """Initialize encoder and decoder architectures 
 
     Args:
@@ -14,14 +14,14 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
     Returns:
         tuple: Encoder and decoder modules  
     """
-
+    decoding_style = hparams["decoding_style"]
     if hparams["autoencoder_type"] == 'resnet_drit':
         encoder = ResnetDritEncoder(in_channels = in_channels,
                 init_fm = hparams["init_fm"],
                 n_conv = hparams["n_conv"],
                 n_residual_blocks = hparams["n_residual_blocks"], 
                 in_width = in_width,
-                in_height = in_width,
+                in_height = in_height,
                 variational = variational)
 
         decoder = ResnetDritDecoder(out_channels = 3,
@@ -29,15 +29,14 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 n_conv = hparams["n_conv"],
                 n_residual_blocks = hparams["n_residual_blocks"], 
                 out_width = in_width,
-                out_height = in_width,
+                out_height = in_height,
                 decoding_style = decoding_style, 
-                extra_dim = extra_fm) 
+                extra_fm = extra_fm) 
 
 
     elif hparams["autoencoder_type"] == 'convnet':
         encoder = Encoder(
             in_channels = in_channels,
-            latent_dim =  hparams["latent_dim"],
             init_fm =  hparams["init_fm"],
             n_conv =  hparams["n_conv"],
             n_residual_blocks =  hparams["n_residual_blocks"], 
@@ -51,7 +50,6 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
 
         decoder = Decoder(
             out_channels =  in_channels,
-            latent_dim = hparams["latent_dim"],
             init_fm =  hparams["init_fm"],
             n_conv =  hparams["n_conv"],
             n_residual_blocks =  hparams["n_residual_blocks"],  
@@ -94,6 +92,7 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 out_width = in_width,
                 out_height = in_height,
                 variational = variational, 
+                decoding_style = decoding_style,
                 extra_fm = extra_fm)        
 
     else:

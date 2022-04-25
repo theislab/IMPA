@@ -39,7 +39,6 @@ class ResidualLayer(torch.nn.Module):
 class Encoder(torch.nn.Module):
     def __init__(self,
                 in_channels: int = 5,
-                latent_dim: int = 512,
                 init_fm: int = 64,
                 n_conv: int = 3,
                 n_residual_blocks: int = 6, 
@@ -53,7 +52,6 @@ class Encoder(torch.nn.Module):
         super(Encoder, self).__init__() 
     
         self.in_channels = in_channels
-        self.latent_dim = latent_dim
         self.init_fm = init_fm  # First number of feature maps
         self.n_conv = n_conv 
         self.n_residual_blocks = n_residual_blocks
@@ -113,7 +111,6 @@ class Encoder(torch.nn.Module):
 class Decoder(torch.nn.Module):
     def __init__(self,
                 out_channels: int = 5,
-                latent_dim: int = 512,
                 init_fm: int = 64,
                 n_conv: int = 3,
                 n_residual_blocks: int = 6, 
@@ -126,7 +123,6 @@ class Decoder(torch.nn.Module):
         super(Decoder, self).__init__() 
         
         self.out_channels = out_channels
-        self.latent_dim = latent_dim
         self.n_conv = n_conv 
         self.init_fm = init_fm*(2**(self.n_conv-1))  # The first number of feature vectors 
         self.n_residual_blocks = n_residual_blocks

@@ -24,7 +24,7 @@ class CustomTransform:
         
     def __call__(self, X):
         """
-        Transform the image at the time of loading by rescaling and turning into a tensor
+        By random horizontal and vertical flip
         """
         # Add random noise and rescale pixels between 0 and 1 
         random_noise = torch.rand_like(X)
@@ -199,7 +199,7 @@ class BBBC021Fold(Dataset):
         
         if self.fold ==  'train':
             # Compute class imbalance weights
-            compute_class_imbalance_weights_drug = self.compute_class_imbalance_weights(self.mol_smiles)
+            compute_class_imbalance_weights_drug = self.compute_class_imbalance_weights(self.mol_names)
             compute_class_imbalance_weights_moa = self.compute_class_imbalance_weights(self.moa)
             self.class_imbalances = {'drugs': compute_class_imbalance_weights_drug, 
                                 'moas': compute_class_imbalance_weights_moa}
@@ -332,5 +332,3 @@ class BBBC021Fold(Dataset):
         # Compute the weight vector to make the classes balanced 
         weight_vector = compute_class_weight('balanced', classes=classes_unique, y=class_vector)
         return weight_vector
-
-

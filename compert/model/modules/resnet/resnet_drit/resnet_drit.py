@@ -31,7 +31,7 @@ class ResnetDritEncoder(torch.nn.Module):
         in_fm = self.init_fm
 
         # Add the first module convolution with leaky relu and a kernel size of 7
-        self.modules += [LeakyReLUConv2d(self.in_channels, in_fm, kernel_size=7, stride=1, padding=3)]
+        self.modules += [LeakyReLUConv2d(self.in_channels, in_fm, kernel_size=7, stride=2, padding=3)]
 
         # Add an additional number of convolutions with reduced kernel size 
         for i in range(1, self.n_conv):
@@ -53,7 +53,6 @@ class ResnetDritEncoder(torch.nn.Module):
 class ResnetDritDecoder(nn.Module):
     def __init__(self, 
                 out_channels: int = 5,
-                latent_dim: int = 512,
                 init_fm: int = 64,
                 n_conv: int = 3,
                 n_residual_blocks: int = 6, 
@@ -64,8 +63,7 @@ class ResnetDritDecoder(nn.Module):
 
         super(ResnetDritDecoder, self).__init__()
 
-        self.out_channels = out_channels #self.c_dim 
-        self.latent_dim = latent_dim
+        self.out_channels = out_channels
         self.n_conv = n_conv 
         self.init_fm = init_fm*(2**(self.n_conv-1))  # The first number of feature vectors 
         self.n_residual_blocks = n_residual_blocks
@@ -75,6 +73,7 @@ class ResnetDritDecoder(nn.Module):
         
         # Initial number of feature maps
         in_fm = self.init_fm
+        self.modules = []
 
         # Residual blocks
         for i in range(0, self.n_residual_blocks):
@@ -96,13 +95,14 @@ class ResnetDritDecoder(nn.Module):
         for layer in self.deconv[:-1]:
             # Upsample drug labs
             y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
             # Upsample moa labs
             y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
             z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+
         X = self.deconv[-1](z)
         return X 
 
@@ -117,27 +117,24 @@ class ResnetDritDecoder(nn.Module):
 if __name__ == '__main__':
     enc = ResnetDritEncoder(in_channels = 3,
                 init_fm = 64,
-                n_conv = 5,
+                n_conv = 3,
                 n_residual_blocks = 4, 
                 in_width = 96,
                 in_height = 96,
-                variational = False, 
-                batch_norm_layers_ae = False,
-                dropout_ae = False,
-                dropout_rate_ae = 0)
+                variational = False)
 
-    dec = ResnetDritDecoder(out_channels = 3,
-                init_fm = 64,
-                n_conv = 5,
-                n_residual_blocks = 4, 
-                out_width = 96,
-                out_height = 96,
-                variational = False,
-                batch_norm_layers_ae = False,
-                dropout_ae = False,
-                dropout_rate_ae = 0) 
+    # dec = ResnetDritDecoder(out_channels = 3,
+    #             init_fm = 64,
+    #             n_conv = 5,
+    #             n_residual_blocks = 4, 
+    #             out_width = 96,
+    #             out_height = 96,
+    #             variational = False,
+    #             batch_norm_layers_ae = False,
+    #             dropout_ae = False,
+    #             dropout_rate_ae = 0) 
     
     x = torch.Tensor(64, 3, 96, 96)
     res = enc(x)
-    x = dec(res)
-    print(x.shape)
+    # x = dec(res)
+    print(res.shape)

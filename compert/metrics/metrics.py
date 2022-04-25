@@ -6,11 +6,10 @@ import numpy as np
 from sklearn.metrics import precision_recall_fscore_support
 
 class TrainingMetrics:
-    def __init__(self, height, width, channels, latent_dimension, device='cuda'):
+    def __init__(self, height, width, channels, device='cuda'):
         self.height = height
         self.width = width
         self.channels = channels
-        self.latent_dimension = latent_dimension
 
         self.metrics = dict(rmse=0) 
         self.device = device

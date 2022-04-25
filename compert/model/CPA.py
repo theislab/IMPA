@@ -12,7 +12,7 @@ sys.path.insert(0, '..')
 
 from .autoencoders import initialize_encoder_decoder
 from .modules.discriminator.discriminator_net import *
-from ..metrics.metrics import *
+from metrics.metrics import *
 
 
 """
@@ -65,7 +65,7 @@ class CPA(TemplateModel):
             self.set_hparams_(0, hparams)
 
         # Setup metrics object
-        self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, self.hparams["latent_dim"], device = self.device)
+        self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, device = self.device)
 
         # The log sigma as an external parameter of the sigma vae training paradigm 
         if self.hparams["data_driven_sigma"]:
@@ -93,7 +93,6 @@ class CPA(TemplateModel):
                                                                 self.in_height, 
                                                                 self.variational, 
                                                                 self.hparams, 
-                                                                self.hparams["decoding_style"],
                                                                 self.extra_fm)
 
         # Initialize warmup params
@@ -144,10 +143,10 @@ class CPA(TemplateModel):
         print('Initalize adversarial training')
 
         # Adversary is a convolutional net on the latent
-        init_fm = 2**self.hparams["n_conv"]*self.hparams["init_fm"]  # Feature maps in the latent space 
-        downsample_dim = self.hparams["in_width"]//(2**self.hparams["n_conv"])  # Spatial dimension in the latent 
-        depth = downsample_dim//3  # Number of 3x3 convolutions needed to reduce the spatial dimension to 1
-        
+        init_fm = 2**(self.hparams["n_conv"]-1)*self.hparams["init_fm"]  # Feature maps in the latent space 
+        downsample_dim = self.in_width//(2**self.hparams["n_conv"])  # Spatial dimension in the latent 
+        depth = int(np.around(np.log2(downsample_dim)))  # Number of 3x3 convolutions needed to reduce the spatial dimension to 1
+
         # Initialize the discriminator for the drugs and the moa 
         self.adversary_drugs = DiscriminatorNet(
             init_fm, self.hparams["adversary_width_drug"], depth, self.n_seen_drugs
@@ -170,7 +169,7 @@ class CPA(TemplateModel):
                 embedding_requires_grad = False
         
             # Drug embedding encoder 
-            self.drug_embedding_encoder = LabelEncoder(downsample_dim, init_fm, self.hparams["drug_embedding_dimension"]
+            self.drug_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["drug_embedding_dimension"], init_fm
             ).to(self.device)
 
             # Embed the MOA
@@ -179,7 +178,7 @@ class CPA(TemplateModel):
                     self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
 
                 # MOA embedding encoder 
-                self.moa_embedding_encoder = LabelEncoder(downsample_dim, init_fm, self.hparams["moa_embedding_dimension"]
+                self.moa_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["moa_embedding_dimension"], init_fm, 
                 ).to(self.device)
 
 
@@ -350,7 +349,7 @@ class CPA(TemplateModel):
         return  dict(out=out, z=z, loss=ae_loss)
 
     
-    def forward_compert(self, X, y_adv_drug, drug_ids, y_adv_moa=None, moa_ids=None, mode='train'):
+    def forward_compert(self, X, y_adv_drug, drug_ids, y_adv_moa=None, moa_ids=None, mode='train', device ='cuda'):
         """The forward step with adversarial training
         Args:
             X (torch.Tensor): the image data X
@@ -425,7 +424,9 @@ class CPA(TemplateModel):
         
         else:
             # If validation is performed, we also decode the basal encoding to compare it to the original 
-            out_basal = self.decoder(z_basal, y_adv_drug, y_adv_moa)
+            y_drug_basal = torch.zeros(X.shape[0], self.n_seen_drugs).to(device)
+            y_moa_basal = torch.zeros(X.shape[0], self.n_moa).to(device)
+            out_basal = self.decoder(z_basal, y_drug_basal, y_moa_basal)
             return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat_drug=y_adv_hat_drug, 
                         y_hat_moa=y_adv_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)
             
@@ -496,7 +497,7 @@ class CPA(TemplateModel):
                 drug_id = batch["smile_id"].to(self.device)
 
                 # MOA data are present only on one of the two datasets                 
-                if self.hparams["predict_moa"]:
+                if self.predict_moa:
                     y_adv_moa = batch['moa_one_hot'].to(self.device).long()
                     moa_id = batch['moa_id'].to(self.device)
                 else:

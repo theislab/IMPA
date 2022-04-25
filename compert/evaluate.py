@@ -7,6 +7,8 @@ import torch
 from torch import nn
 import warnings
 from torch.nn import functional as F
+# from .model.modules.discriminator.discriminator_net import *
+from model.modules.discriminator.discriminator_net import *
 
 
 def training_evaluation(model,  
@@ -89,7 +91,7 @@ def training_evaluation(model,
             else: 
                 moa_id = None 
             with torch.no_grad():
-                res = model.forward_compert(X=X, y_adv_drug=y_adv_drugs, y_adv_moa=y_adv_moa, drug_ids=drug_id, moa_ids=moa_id, mode='eval')
+                res = model.forward_compert(X=X, y_adv_drug=y_adv_drugs, y_adv_moa=y_adv_moa, drug_ids=drug_id, moa_ids=moa_id, mode='eval', device=device)
                 out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
 
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
@@ -131,7 +133,7 @@ def training_evaluation(model,
         if predict_moa: 
             metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
                     
-    # Derive the average losses acr
+    # Derive the average losses 
     losses["loss"] = val_loss/len(dataset_loader)
     if variational:
         losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
@@ -174,19 +176,6 @@ def training_evaluation(model,
         if adversarial:
             z_ds = z_ds.to('cpu').numpy()
 
-        # Silhouette score before and after drug (and moa) additions
-        silhouette_score_basal_drugs = compute_silhouette_coefficient(z_basal_ds, y_true_ds_drugs)
-        metrics.metrics["silhouette_score_basal_drugs"] = silhouette_score_basal_drugs
-        if adversarial:
-            silhouette_score_z_drugs = compute_silhouette_coefficient(z_ds, y_true_ds_drugs)
-            metrics.metrics["silhouette_score_z_drugs"] = silhouette_score_z_drugs
-        if predict_moa:
-            silhouette_score_basal_moa = compute_silhouette_coefficient(z_basal_ds, y_true_ds_moa)
-            metrics.metrics["silhouette_score_basal_moa"] = silhouette_score_basal_moa
-            if adversarial:
-                silhouette_score_z_moa = compute_silhouette_coefficient(z_ds, y_true_ds_moa)
-                metrics.metrics["silhouette_score_z_moa"] = silhouette_score_z_moa
-
     print(f'Average validation loss: {losses["loss"]}')
     if variational:
         print(f'Average validation reconstruction loss: {losses["avg_validation_recon_loss"]}')
@@ -209,11 +198,6 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
     """
     print('Training discriminator network on drug latent space')
 
-    # Normalize the latent descriptors 
-    mean = Z.mean(dim=0, keepdim=True)
-    stddev = Z.std(0, unbiased=False, keepdim=True)
-    normalized_basal = (Z - mean) / stddev
-
     # Fetch unique molecules and their counts  
     unique_classes, freqs = np.unique(y, return_counts=True)  # Given a class vector y, reduce it to unique definitions 
     label_to_idx = {labels: idx for idx, labels in enumerate(unique_classes)}
@@ -226,7 +210,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
     idx_to_keep = np.array([i for i in np.arange(len(y)) if y[i] in class_to_keep])
 
     # Filter the inputs and the labels
-    X = normalized_basal[idx_to_keep]
+    X = Z[idx_to_keep]
     y = np.array(y)[idx_to_keep]
 
     # Split into training and test set 
@@ -241,7 +225,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=True)
 
     # initialize nwtwork and training hyperparameters 
-    net = torch.nn.Linear(X_train.shape[1], len(unique_classes)).to('cuda')
+    net = DisentanglementClassifier(X_train.shape[2], X_train.shape[1], 256, len(unique_classes))
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 
@@ -261,12 +245,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
         return f1_score(y_test_tensor.numpy(), test_pred.argmax(1).to('cpu').numpy(), average="weighted")
 
 
-def compute_silhouette_coefficient(Z, y):
-    """Compute the silhouette score of the dataset given the labels y
-
-    Args:
-        Z (torch.tensor): A matrix of latent oservations
-        y (torch.tensor): The labels of the matrix
-    """
-    return silhouette_score(Z, y, metric='euclidean')
-    
+if __name__ == '__main__':
+    Z = torch.rand(20, 256, 12, 12)
+    y = torch.randint(low=0, high=3, size=20 )
+    print(compute_disentanglement_score(Z, y, return_misclass_report=False))

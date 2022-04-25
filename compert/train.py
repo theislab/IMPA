@@ -218,7 +218,7 @@ class Trainer:
                                                     return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train) 
             self.dim = 3
 
-        #Extract matrix of embeddings only if the embedding option is chosen 
+        # Extract matrix of embeddings only if the embedding option is chosen 
         if self.use_embeddings:
             self.drug_embeddings = dataset.drug_embeddings
         else:
@@ -259,90 +259,94 @@ class Trainer:
 
         print(f'Beginning training with epochs {self.num_epochs}')
 
-        for epoch in range(self.resume_epoch, self.resume_epoch+self.num_epochs+1):
+        # for epoch in range(self.resume_epoch, self.resume_epoch+self.num_epochs+1):
 
-            # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
-            if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
-                self.model.module.initialize_adversarial()
+        #     # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
+        #     if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
+        #         self.model.module.initialize_adversarial()
             
-            print(f'Running epoch {epoch}')
-            self.model.train() 
+        #     print(f'Running epoch {epoch}')
+        #     self.model.train() 
             
-            # Losses and metrics dictionaries from the epoch 
-            train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
+        #     # Losses and metrics dictionaries from the epoch 
+        #     train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
             
-            # Save results to tensorboard and to model's history  
-            if self.save_results:
-                self.write_results(train_losses, train_metrics, self.writer, epoch, 'train')
-            self.model.module.save_history(epoch, train_losses, train_metrics, 'train')
+        #     # Save results to tensorboard and to model's history  
+        #     if self.save_results:
+        #         self.write_results(train_losses, train_metrics, self.writer, epoch, 'train')
+        #     self.model.module.save_history(epoch, train_losses, train_metrics, 'train')
 
-            # Evaluate
-            if epoch % self.eval_every == 0 and self.eval:
-                # Switch the model to evaluate mode 
-                self.model.eval()
+        #     # Evaluate
+        #     if epoch % self.eval_every == 0 and self.eval:
+        #         # Switch the model to evaluate mode 
+        #         self.model.eval()
 
-                # Get the validation results 
-                val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
-                                                        self.model.module.metrics, self.dmso_id, self.device, end, 
-                                                        variational=self.model.module.variational, predict_moa=self.predict_moa,
-                                                        ds_name=self.dataset_name)
+        #         # Get the validation results 
+        #         val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
+        #                                                 self.model.module.metrics, self.dmso_id, self.device, end, 
+        #                                                 variational=self.model.module.variational, predict_moa=self.predict_moa,
+        #                                                 ds_name=self.dataset_name)
 
-                if self.save_results:
-                    self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
-                self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
+        #         if self.save_results:
+        #             self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
+        #         self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
 
-                # Plot reconstruction of a random image 
-                if self.save_results:
-                    with torch.no_grad():
-                        original, reconstructed = self.model.module.generate(self.loader_val)
-                    self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim)
-                    del original
-                    del reconstructed
+        #         # Plot reconstruction of a random image 
+        #         if self.save_results:
+        #             with torch.no_grad():
+        #                 original, reconstructed = self.model.module.generate(self.loader_val)
+        #             self.plotter.plot_reconstruction(tensor_to_image(original), 
+        #                                             tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim)
+        #             del original
+        #             del reconstructed
                     
-                    # Plot generation of sampled images (only fir variational autoencoders) 
-                    if self.generate and self.model.module.variational:
-                        sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
-                        self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot, dim=self.dim)
-                        del sampled_img
+        #             # Plot generation of sampled images (only fir variational autoencoders) 
+        #             if self.generate and self.model.module.variational:
+        #                 sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
+        #                 self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot, dim=self.dim)
+        #                 del sampled_img
 
-                # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                score = val_metrics['bpd']
+        #         # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
+        #         score = val_metrics['bpd']
                 
-                # Evaluate early-stopping 
-                cond, early_stopping = self.model.module.early_stopping(score) 
+        #         # Evaluate early-stopping 
+        #         cond, early_stopping = self.model.module.early_stopping(score) 
 
-                # Save the model if it is the best performing one 
-                if cond and self.save_results:
-                    print(f'New best score is {self.model.module.best_score}')
-                    # Save the model with lowest validation loss 
-                    self.model.module.save_checkpoints(epoch, 
-                                                        val_metrics, 
-                                                        train_losses, 
-                                                        val_losses, 
-                                                        self.dest_dir)
+        #         # Save the model if it is the best performing one 
+        #         if cond and self.save_results:
+        #             print(f'New best score is {self.model.module.best_score}')
+        #             # Save the model with lowest validation loss 
+        #             self.model.module.save_checkpoints(epoch, 
+        #                                                 val_metrics, 
+        #                                                 train_losses, 
+        #                                                 val_losses, 
+        #                                                 self.dest_dir)
 
-                    print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
+        #             print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
 
-            # If we overcome the patience, we break the loop
-            if early_stopping:
-                break 
+        #     # If we overcome the patience, we break the loop
+        #     if early_stopping:
+        #         break 
             
-            # Scheduler step at the end of the epoch 
-            if epoch <= self.hparams["warmup_steps"]:
-                self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., epoch/self.model.module.warmup_steps)
-            else:
-                self.model.module.scheduler_autoencoder.step()
-            # We do not warmup the adversaries
-            if self.model.module.adversarial:
-                self.model.module.scheduler_adversaries.step()
+        #     # Scheduler step at the end of the epoch 
+        #     if epoch <= self.hparams["warmup_steps"]:
+        #         self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., epoch/self.model.module.warmup_steps)
+        #     else:
+        #         self.model.module.scheduler_autoencoder.step()
+        #     # We do not warmup the adversaries
+        #     if self.model.module.adversarial:
+        #         self.model.module.scheduler_adversaries.step()
             
-            # Update the number of adversarial steps performed per each autoencoder step 
-            if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
-                # Update the number of adversarial steps so they do not go under a minumum 
-                self.model.module.current_adversary_steps = max(self.model.module.hparams["final_adv_steps"], self.model.module.current_adversary_steps-self.model.module.step)
-                self.model.module.iterations = 0 
+        #     # Update the number of adversarial steps performed per each autoencoder step 
+        #     if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
+        #         # Update the number of adversarial steps so they do not go under a minumum 
+        #         self.model.module.current_adversary_steps = max(self.model.module.hparams["final_adv_steps"], self.model.module.current_adversary_steps-self.model.module.step)
+        #         self.model.module.iterations = 0 
         
+
+        epoch = 1
+        self.model.module.initialize_adversarial()
+
         self.model.eval()
         # Perform last evaluation on TEST SET   
         end = True

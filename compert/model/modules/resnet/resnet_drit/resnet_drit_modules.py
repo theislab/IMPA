@@ -9,15 +9,11 @@ import torch.nn.functional as F
 
 # Basic blocks encoder
 class LeakyReLUConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='None', sn=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='None'):
         super(LeakyReLUConv2d, self).__init__()
         model = []
-        model += [nn.ReflectionPad2d(padding)]
-        if sn:
-            model += [spectral_norm(nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True))]
-        else:
-            model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
-        if 'norm' == 'Instance':
+        model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
+        if norm == 'Instance':
             model += [nn.InstanceNorm2d(out_channels, affine=False)]
         model += [nn.LeakyReLU(inplace=True)]
         self.model = nn.Sequential(*model)
@@ -30,7 +26,6 @@ class ReLUINSConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0):
         super(ReLUINSConv2d, self).__init__()
         model = []
-        model += [nn.ReflectionPad2d(padding)]
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
         model += [nn.InstanceNorm2d(out_channels, affine=False)]
         model += [nn.ReLU(inplace=True)]
@@ -42,7 +37,7 @@ class ReLUINSConv2d(nn.Module):
 
 class INSResBlock(nn.Module):
     def conv3x3(self, in_channels, out_channels, stride=1):
-        return [nn.ReflectionPad2d(1), nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride)]
+        return [nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)]
 
     def __init__(self, in_channels, out_channels, stride=1, dropout=0.0):
         super(INSResBlock, self).__init__()
@@ -59,13 +54,14 @@ class INSResBlock(nn.Module):
     def forward(self, x):
         residual = x
         out = self.model(x)
-        out += residual
+        out += residual[:,:out.shape[1],:,:]
         return out
 
 
 class GaussianNoiseLayer(nn.Module):
-    def __init__(self,):
+    def __init__(self):
         super(GaussianNoiseLayer, self).__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def forward(self, x):
         if self.training == False:

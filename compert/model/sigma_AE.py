@@ -82,28 +82,34 @@ class SigmaAE(CPA):
         # Collect the data from the batch at random 
         original = next(iter(loader))
         original_X = original['X'][0].to(self.device).unsqueeze(0)  
+        y_drug = original['mol_one_hot'].to(self.device).float()
+        y_moa = original['moa_one_hot'].to(self.device).float()
 
         with torch.no_grad():
             z_basal = self.encoder(original_X)  # Encode image 
             # Handle the case training is not adversarial 
             if not self.adversarial:
-                reconstructed_X = self.decoder(z_basal) 
+                y_drug = torch.zeros(original_X.shape[0], self.n_seen_drugs).to(self.device)
+                y_moa = torch.zeros(original_X.shape[0], self.n_moa).to(self.device)
+                reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
 
             else:
                 # Collect the encoders for the drug embeddings to condition the latent space 
                 drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
-                drug_emb = self.drug_embeddings(drug_id) if not self.hparams["concat_one_hot"] else None
-                z_drug = self.drug_embedding_encoder(drug_emb) if not self.hparams["concat_one_hot"] else original["mol_one_hot"][0].to(self.device).unsqueeze(0).float()
+                drug_emb = self.drug_embeddings(drug_id) 
+                z_drug = self.drug_embedding_encoder(drug_emb) 
                 # Collect the mode of action embeddings 
                 if self.predict_moa:
                     moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
-                    moa_emb = self.moa_embeddings(moa_id) if not self.hparams["concat_one_hot"] else None
-                    z_moa = self.moa_embedding_encoder(moa_emb) if not self.hparams["concat_one_hot"] else original["moa_one_hot"][0].to(self.device).unsqueeze(0).float()
+                    moa_emb = self.moa_embeddings(moa_id) 
+                    z_moa = self.moa_embedding_encoder(moa_emb)
                 else:
                     z_moa = 0 
                 
-                # If not concat, perform the sum of embeddings 
-                z = z_basal + z_drug + z_moa
-                reconstructed_X = self.decoder(z) 
+                if self.hparams["decoding_style"] == 'sum':
+                    # If not concat, perform the sum of embeddings 
+                    z = z_basal + z_drug + z_moa
+                
+                reconstructed_X = self.decoder(z, y_drug, y_moa) 
 
         return original_X, reconstructed_X

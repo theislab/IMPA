@@ -31,7 +31,7 @@ class ResnetEncoderCycleGAN(nn.Module):
         self.norm_layer = nn.BatchNorm2d
 
         # Initial layer with a large convolutional kernel
-        self.model = [nn.ReflectionPad2d(3),
+        self.model = [nn.ReflectionPad2d(3),  # padding +3 to half the spatial dimension
                  nn.Conv2d(self.in_channels, self.init_fm, kernel_size=7, padding=0, bias=False),
                  self.norm_layer(self.init_fm),
                  nn.ReLU(True)]
@@ -43,7 +43,7 @@ class ResnetEncoderCycleGAN(nn.Module):
                       nn.ReLU(True)]
 
         mult = 2 ** self.n_conv
-        for i in range(self.n_residual_blocks):       # add ResNet blocks
+        for i in range(self.n_residual_blocks):  # add ResNet blocks
             self.model += [ResnetBlock(self.init_fm * mult, norm_layer=self.norm_layer, use_dropout=False, use_bias=False)]
         
         self.resnet = nn.Sequential(*self.model)
