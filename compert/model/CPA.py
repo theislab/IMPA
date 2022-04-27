@@ -85,7 +85,10 @@ class CPA(TemplateModel):
         if self.hparams["decoding_style"] == 'sum':
             self.extra_fm = 0
         else:
-            self.extra_fm = self.n_seen_drugs + self.n_moa
+            if self.hparams["concat_one_hot"]:
+                self.extra_fm = self.n_seen_drugs + self.n_moa
+            else:
+                self.extra_fm = self.hparams["drug_embedding_dimension"] + self.hparams["moa_embedding_dimension"]
 
         # Instantiate the convolutional encoder and decoder modules
         self.encoder, self.decoder = initialize_encoder_decoder(self.in_channels, 
@@ -291,6 +294,7 @@ class CPA(TemplateModel):
             "weigh_loss": False if default else np.random.choice([True, False]),
 
             "decoding_style": 'sum' if default else np.random.choice(['sum', 'concat']),  # If label must be encoded or added as one-hot
+            "concatenate_one_hot": True if default else np.random.choice([True, False]),
             "batch_norm_layers_ae": True if default else np.random.choice([True, False]),
             "dropout_ae": False if default else np.random.choice([True, False]),
             "dropout_rate_ae": 0.1 if default else np.random.choice([0.1, 0.5, 0.8]),
@@ -371,27 +375,32 @@ class CPA(TemplateModel):
         if self.predict_moa:
             y_adv_hat_moa = self.adversary_moa(z_basal)
 
+        # Embed the drug
+        drug_embedding = self.drug_embeddings(drug_ids) 
+        z_drug = self.drug_embedding_encoder(drug_embedding) 
+
+        #Embed moa if applicable 
+        if self.predict_moa:
+            moa_embedding = self.moa_embeddings(moa_ids) 
+            z_moa = self.moa_embedding_encoder(moa_embedding) 
+        else:
+            moa_embedding = torch.zero_like(drug_embedding)
+            z_moa = 0  # If no moa in the dataset, z_moa set to null
 
         if self.hparams["decoding_style"] == 'sum':
-            # Embed the drug
-            drug_embedding = self.drug_embeddings(drug_ids) 
-            z_drug = self.drug_embedding_encoder(drug_embedding) 
-
-            #Embed moa if applicable 
-            if self.predict_moa:
-                moa_embedding = self.moa_embeddings(moa_ids) 
-                z_moa = self.moa_embedding_encoder(moa_embedding) 
-            else:
-                z_moa = 0  # If no moa in the dataset, z_moa set to null
-
             # Sum the latents of the drug and the image
             z = z_basal + z_drug + z_moa    
         
         else:
             z = z_basal  # We will concatenate to it in the decoder part 
+            z_drug = None
+            z_moa = None 
         
         # Decode z for the output 
-        out = self.decoder(z, y_adv_drug, y_adv_moa) 
+        if self.hparams['concatenate_one_hot']:
+            out = self.decoder(z, y_adv_drug, y_adv_moa) 
+        else:
+            out = self.decoder(z, drug_embedding, moa_embedding) 
 
         # Compute the adversarial loss
         if mode == 'train':
@@ -423,9 +432,14 @@ class CPA(TemplateModel):
             return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_drug, adv_loss_moa=adv_loss_moa)
         
         else:
-            # If validation is performed, we also decode the basal encoding to compare it to the original 
-            y_drug_basal = torch.zeros(X.shape[0], self.n_seen_drugs).to(device)
-            y_moa_basal = torch.zeros(X.shape[0], self.n_moa).to(device)
+            # If validation is performed, we also decode the basal encoding to compare it to the original
+            if self.hparams['concatenate_one_hot']:
+                y_drug_basal = torch.zeros(X.shape[0], self.n_seen_drugs).to(device)
+                y_moa_basal = torch.zeros(X.shape[0], self.n_moa).to(device)
+            else:
+                y_drug_basal = torch.zeros(X.shape[0], self.hparams["drug_embedding_dimension"]).to(device)
+                y_moa_basal = torch.zeros(X.shape[0], self.hparams["moa_embedding_dimension"]).to(device)
+
             out_basal = self.decoder(z_basal, y_drug_basal, y_moa_basal)
             return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat_drug=y_adv_hat_drug, 
                         y_hat_moa=y_adv_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)

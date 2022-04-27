@@ -58,6 +58,14 @@ class SigmaAE(CPA):
             rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
         return rec
 
+    # def reconstruction_loss(self, X_hat, X):
+    #     """ Computes the likelihood of the data given the latent variable,
+    #     in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
+    #     same for VAE and AE) """
+    #     # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
+    #     # ensures stable training.
+    #     return torch.mean((X_hat - X)**2)
+
     def ae_loss(self, X, X_hat):
         """
         Aggregate and return the reconstruction loss
@@ -86,6 +94,18 @@ class SigmaAE(CPA):
         y_moa = original['moa_one_hot'].to(self.device).float()
 
         with torch.no_grad():
+            # Collect the encoders for the drug embeddings to condition the latent space 
+            drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
+            drug_emb = self.drug_embeddings(drug_id) 
+            z_drug = self.drug_embedding_encoder(drug_emb) 
+            # Collect the mode of action embeddings 
+            if self.predict_moa:
+                moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
+                moa_emb = self.moa_embeddings(moa_id) 
+                z_moa = self.moa_embedding_encoder(moa_emb)
+            else:
+                z_moa = 0 
+            
             z_basal = self.encoder(original_X)  # Encode image 
             # Handle the case training is not adversarial 
             if not self.adversarial:
@@ -94,22 +114,15 @@ class SigmaAE(CPA):
                 reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
 
             else:
-                # Collect the encoders for the drug embeddings to condition the latent space 
-                drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
-                drug_emb = self.drug_embeddings(drug_id) 
-                z_drug = self.drug_embedding_encoder(drug_emb) 
-                # Collect the mode of action embeddings 
-                if self.predict_moa:
-                    moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
-                    moa_emb = self.moa_embeddings(moa_id) 
-                    z_moa = self.moa_embedding_encoder(moa_emb)
-                else:
-                    z_moa = 0 
-                
                 if self.hparams["decoding_style"] == 'sum':
                     # If not concat, perform the sum of embeddings 
                     z = z_basal + z_drug + z_moa
                 
+                else:
+                    if not self.hparams["concatenate_one_hot"]:
+                        y_drug = drug_emb
+                        y_moa = moa_emb
+                            
                 reconstructed_X = self.decoder(z, y_drug, y_moa) 
 
         return original_X, reconstructed_X

@@ -300,7 +300,7 @@ class BBBC021Fold(Dataset):
 
         Args:
             get_moa (bool): Whether the name refers to moa
-            drug_name (str): The name of the drug of interest  
+            name (str): The name of the drug of interest  
         """
         file_name_set = self.moa if get_moa else self.mol_names
         doses = []
@@ -310,7 +310,7 @@ class BBBC021Fold(Dataset):
         idxs = [idx for idx in range(len(file_name_set)) if file_name_set[idx]==name]
 
         for idx in idxs:
-            X, _, _, smile_id, moa_id, dose = self.__getitem__(idx).values()
+            X, _, _, smile_id, moa_id, dose, _, _ = self.__getitem__(idx).values()
             images.append(X.unsqueeze(0))
             doses.append(dose)
             mols.append(smile_id)

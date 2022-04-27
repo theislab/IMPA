@@ -225,7 +225,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=True)
 
     # initialize nwtwork and training hyperparameters 
-    net = DisentanglementClassifier(X_train.shape[2], X_train.shape[1], 256, len(unique_classes))
+    net = DisentanglementClassifier(X_train.shape[2], X_train.shape[1], 256, len(unique_classes)).to('cuda')
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 
@@ -247,5 +247,5 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
 
 if __name__ == '__main__':
     Z = torch.rand(20, 256, 12, 12)
-    y = torch.randint(low=0, high=3, size=20 )
+    y = torch.randint(low=0, high=3, size=(20,) )
     print(compute_disentanglement_score(Z, y, return_misclass_report=False))

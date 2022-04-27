@@ -19,9 +19,12 @@ class UNetEncoder(nn.Module):
 
         # First convolution from the input channels to the first feature map 
         self.modules = [DoubleConv(in_channels, in_fm)]
-        for _ in range(self.n_conv):
-            self.modules.append(Down(in_fm, in_fm*2))  # Feature maps double each time 
-            in_fm*=2
+        for i in range(self.n_conv):
+            if i == 0:
+                self.modules.append(Down(in_fm, in_fm))  # Feature maps double each time 
+            else:
+                self.modules.append(Down(in_fm, in_fm*2))  # Feature maps double each time 
+                in_fm*=2                
 
         self.module = torch.nn.Sequential(*self.modules)
 
@@ -43,7 +46,7 @@ class UNetDecoder(nn.Module):
         self.extra_fm = extra_fm 
 
         # The initial feature maps equate the number of channels of the         
-        self.in_channels = self.init_fm*(2**self.n_conv)
+        self.in_channels = self.init_fm*2**(self.n_conv-1)
 
         # Build upampling convolutions 
         in_fm = self.in_channels
@@ -67,11 +70,11 @@ class UNetDecoder(nn.Module):
         for layer in self.deconv[:-1]:
             # Upsample drug labs
             y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
             # Upsample moa labs
             y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
             z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
         X = self.deconv[-1](z)

@@ -42,21 +42,29 @@ class SigmaVAE(CPA):
                                         class_weights = class_weights)
 
 
+    # def reconstruction_loss(self, X_hat, X):
+    #     """ Computes the likelihood of the data given the latent variable,
+    #     in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
+    #     same for VAE and AE) """
+    #     # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
+    #     # ensures stable training.
+    #     if self.hparams["data_driven_sigma"]:
+    #         self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
+    #         self.log_scale = softclip(self.log_scale, -6)
+    #     # Gaussian log lik
+    #     if self.hparams["mean_recon_loss"]:
+    #         rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
+    #     else:
+    #         rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
+    #     return rec
+
     def reconstruction_loss(self, X_hat, X):
         """ Computes the likelihood of the data given the latent variable,
         in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
         same for VAE and AE) """
         # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
         # ensures stable training.
-        if self.hparams["data_driven_sigma"]:
-            self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
-            self.log_scale = softclip(self.log_scale, -6)
-        # Gaussian log lik
-        if self.hparams["mean_recon_loss"]:
-            rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
-        else:
-            rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
-        return rec
+        return torch.mean((X_hat - X)**2)
 
     
     def kl_loss(self, mu, log_sigma):

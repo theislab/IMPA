@@ -38,7 +38,7 @@ class Plotter:
         if plot:
             plt.plot()
     
-    def plot_channel_panel(self, image, epoch, save, plot, title='Generated sample', rgb = False, size = 10, dim = 5):
+    def plot_channel_panel(self, image, epoch, save, plot, title='Generated sample', rgb = False, size = 4, dim = 5):
         """Plot a cell painting image either as a single channel or a multiple channel 
 
         Args:
