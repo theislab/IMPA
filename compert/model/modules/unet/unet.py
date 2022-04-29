@@ -23,18 +23,25 @@ class UNetEncoder(nn.Module):
             if i == 0:
                 self.modules.append(Down(in_fm, in_fm))  # Feature maps double each time 
             else:
-                self.modules.append(Down(in_fm, in_fm*2))  # Feature maps double each time 
-                in_fm*=2                
+                mult = 2 if not (self.variational and i == self.n_conv-1) else 4 
+                self.modules.append(Down(in_fm, in_fm*mult))  # Feature maps double each time 
+                in_fm*=mult                
 
         self.module = torch.nn.Sequential(*self.modules)
 
-    def forward(self, x):
-        x = self.module(x)
-        return x
+    def forward(self, X):
+        z = self.module(X)  # Encode the image 
+        
+        # Derive the encodings for the mean and the log variance
+        if self.variational:
+            mu, log_sigma = z.chunk(2, dim=1)
+            return mu, log_sigma
+
+        return z
 
 
 class UNetDecoder(nn.Module):
-    def __init__(self, out_channels, init_fm, n_conv, out_width, out_height, variational, decoding_style='sum', extra_fm=0):
+    def __init__(self, out_channels, init_fm, n_conv, out_width, out_height, variational, decoding_style='sum', concatenate_one_hot=True, extra_fm=0):
         super(UNetDecoder, self).__init__()
         self.out_channels = out_channels
         self.init_fm = init_fm
@@ -43,6 +50,7 @@ class UNetDecoder(nn.Module):
         self.in_height = out_height 
         self.variational = variational
         self.decoding_style = decoding_style
+        self.concatenate_one_hot = concatenate_one_hot
         self.extra_fm = extra_fm 
 
         # The initial feature maps equate the number of channels of the         
@@ -55,6 +63,8 @@ class UNetDecoder(nn.Module):
         for _ in range(self.n_conv):
             self.modules.append(Up(in_fm+self.extra_fm, in_fm // 2))
             in_fm //= 2
+            if not self.concatenate_one_hot:
+                self.extra_fm = 0
             
         self.modules.append(OutConv(in_fm+self.extra_fm, self.out_channels))
         self.modules.append(torch.nn.Sigmoid())
@@ -67,18 +77,25 @@ class UNetDecoder(nn.Module):
     
     def forward_concat(self, z, y_drug, y_moa):
         # Reshape to height x width
-        for layer in self.deconv[:-1]:
-            # Upsample drug labs
-            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+        if self.concatenate_one_hot:
+            for layer in self.deconv[:-1]:
+                
+                # Upsample drug labs
+                y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+                y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-            # Upsample moa labs
-            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+                # Upsample moa labs
+                y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+                y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
-        X = self.deconv[-1](z)
+                z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+            X = self.deconv[-1](z)
+
+        else:
+            z = torch.cat([z, y_drug, y_moa], dim=1)
+            X = self.deconv(z)
         return X 
+
 
     def forward(self, z, y_drug, y_moa):
         if self.decoding_style == 'sum':

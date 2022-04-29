@@ -15,6 +15,8 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
         tuple: Encoder and decoder modules  
     """
     decoding_style = hparams["decoding_style"]
+    concatenate_one_hot = hparams["concatenate_one_hot"]
+
     if hparams["autoencoder_type"] == 'resnet_drit':
         encoder = ResnetDritEncoder(in_channels = in_channels,
                 init_fm = hparams["init_fm"],
@@ -31,6 +33,7 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 out_width = in_width,
                 out_height = in_height,
                 decoding_style = decoding_style, 
+                concatenate_one_hot=concatenate_one_hot,
                 extra_fm = extra_fm) 
 
 
@@ -57,6 +60,7 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
             out_height =  in_height,
             variational =  variational,
             decoding_style = decoding_style, 
+            concatenate_one_hot=concatenate_one_hot,
             extra_fm = extra_fm
         ) 
     
@@ -76,6 +80,7 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 out_height = in_height,
                 variational = variational,
                 decoding_style = decoding_style, 
+                concatenate_one_hot=concatenate_one_hot,
                 extra_fm = extra_fm) 
 
     elif hparams["autoencoder_type"] == 'unet':
@@ -93,6 +98,7 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 out_height = in_height,
                 variational = variational, 
                 decoding_style = decoding_style,
+                concatenate_one_hot=concatenate_one_hot,
                 extra_fm = extra_fm)        
 
     else:

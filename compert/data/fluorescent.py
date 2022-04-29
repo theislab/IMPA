@@ -27,7 +27,7 @@ class CustomTransform:
         By random horizontal and vertical flip
         """
         # Add random noise and rescale pixels between 0 and 1 
-        random_noise = torch.rand_like(X)
+        random_noise = torch.rand_like(X)  # To transform the image to continuous data point
         X = (X+random_noise)/255.0
         # Perform augmentation step
         if self.augment:
@@ -85,7 +85,7 @@ class BBBC021Dataset:
 
         if self.use_pretrained:
             # Get the drug embedding matrix indexed by indices 
-            drug_embeddings = pd.read_csv(self.embeddings_path, index_col=0).loc[self.smile_names]  # Read embedding paths sorte based on smile names 
+            drug_embeddings = pd.read_csv(self.embeddings_path, index_col=0).loc[self.smile_names]  # Read embedding paths sorted based on smile names 
             # Tranform the embddings to torch embeddings
             drug_embeddings  = torch.tensor(drug_embeddings.values, 
                                                 dtype=torch.float32, device=self.device)
@@ -142,7 +142,7 @@ class BBBC021Dataset:
         associated folder
         """
         # Read the index csv file
-        dataset = pd.read_csv(os.path.join(self.data_index_path, 'dataset_splits.csv'))
+        dataset = pd.read_csv(self.data_index_path)
         # Get the file names and molecules of training, test and validation sets
         dataset_splits = dict()
         
@@ -203,6 +203,9 @@ class BBBC021Fold(Dataset):
             compute_class_imbalance_weights_moa = self.compute_class_imbalance_weights(self.moa)
             self.class_imbalances = {'drugs': compute_class_imbalance_weights_drug, 
                                 'moas': compute_class_imbalance_weights_moa}
+            # Map drugs to moas
+            drug_ids, moa_ids = [self.drugs2idx[mol] for mol in self.mol_names] , [self.moa2idx[moa] for moa in self.moa]
+            self.couples_drug_moa = {drug:moa for drug, moa in zip(drug_ids, moa_ids)}
         
         # Control whether the labels should be provided in the batch together with the images  
         self.return_labels = return_labels 

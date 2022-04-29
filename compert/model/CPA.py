@@ -83,10 +83,10 @@ class CPA(TemplateModel):
 
         # Prepare initialization of the encoder and the decoder 
         if self.hparams["decoding_style"] == 'sum':
-            self.extra_fm = 0
+            self.extra_fm = 0  # If we perform sum in the latent space 
         else:
-            if self.hparams["concat_one_hot"]:
-                self.extra_fm = self.n_seen_drugs + self.n_moa
+            if self.hparams["concatenate_one_hot"]:
+                self.extra_fm = self.n_seen_drugs + self.n_moa  # If we concatenate the one-hot encodings of the conditions, the number of added dimension is the sum of such conditions 
             else:
                 self.extra_fm = self.hparams["drug_embedding_dimension"] + self.hparams["moa_embedding_dimension"]
 
@@ -159,30 +159,30 @@ class CPA(TemplateModel):
             self.adversary_moa = DiscriminatorNet(
                 init_fm, self.hparams["adversary_width_moa"], depth, self.n_moa
             ).to(self.device)
-
-        # Create drug and moa embeddings if the decoding style is sum-based
-        if self.hparams["decoding_style"] == 'sum':
-            # Create drug and moa embeddings 
-            if self.drug_embeddings is None:
-                self.drug_embeddings = torch.nn.Embedding(
-                    self.num_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
-                embedding_requires_grad = True
-            else:
-                self.drug_embeddings = self.drug_embeddings  # From pre-trained 
-                embedding_requires_grad = False
         
-            # Drug embedding encoder 
-            self.drug_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["drug_embedding_dimension"], init_fm
+        # Create drug and moa embeddings 
+        if self.drug_embeddings is None:
+            self.drug_embeddings = torch.nn.Embedding(
+                self.num_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
+            embedding_requires_grad = True
+        else:
+            self.drug_embeddings = self.drug_embeddings  # From pre-trained 
+            embedding_requires_grad = False
+        
+        # Drug embedding encoder 
+        self.drug_embedding_encoder = LabelEncoder(downsample_dim, 
+                                        self.hparams["drug_embedding_dimension"], 
+                                        init_fm if self.hparams["decoding_style"] == 'sum' else self.hparams["drug_embedding_dimension"]).to(self.device)
+
+        # Embed the MOA
+        if self.predict_moa:
+            self.moa_embeddings = torch.nn.Embedding(
+                self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
+
+            # MOA embedding encoder 
+            self.moa_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["moa_embedding_dimension"], 
+            init_fm if self.hparams["decoding_style"] == 'sum' else self.hparams["moa_embedding_dimension"], 
             ).to(self.device)
-
-            # Embed the MOA
-            if self.predict_moa:
-                self.moa_embeddings = torch.nn.Embedding(
-                    self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
-
-                # MOA embedding encoder 
-                self.moa_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["moa_embedding_dimension"], init_fm, 
-                ).to(self.device)
 
 
         # Crossentropy loss for the prediction of both MOA and the drug 
@@ -198,7 +198,7 @@ class CPA(TemplateModel):
                 self.loss_adversary_moas = torch.nn.CrossEntropyLoss(reduction = 'mean')
 
         # Get the boolean about whether the encoders are required
-        encoded_covariates = self.hparams["decoding_style"] == 'sum'  # Only with sum the covariates are trainable embeddings 
+        encoded_covariates = (self.hparams["decoding_style"] == 'sum' or  (self.hparams['decoding_style'] == 'concat' and not self.hparams['concatenate_one_hot']))  
 
         # Collect parameters of the autoencoder branch
         _parameters = (
@@ -206,10 +206,11 @@ class CPA(TemplateModel):
             + self.get_params(self.decoder, True))
 
         if encoded_covariates:
-            _parameters.extend(self.get_params(self.drug_embeddings, embedding_requires_grad)
-                                + self.get_params(self.drug_embedding_encoder, True))      
+            _parameters.extend(self.get_params(self.drug_embeddings, embedding_requires_grad) + 
+                                self.get_params(self.drug_embedding_encoder, True)) 
+            
             if self.predict_moa:
-                _parameters.extend(self.get_params(self.moa_embeddings, True) + 
+                _parameters.extend(self.get_params(self.moa_embeddings, True)+
                                     self.get_params(self.moa_embedding_encoder, True))
 
         # Optimizer for the autoencoder 
@@ -299,11 +300,12 @@ class CPA(TemplateModel):
             "dropout_ae": False if default else np.random.choice([True, False]),
             "dropout_rate_ae": 0.1 if default else np.random.choice([0.1, 0.5, 0.8]),
 
+            "beta": 1 if default else np.random.choice([1, 5, 10]),
+
             # "resnet_type": 'resnet18' if default else np.random.choice(['resnet18', 'convnet34', 'convnet50']), 
             # "latent_dim": 512 if default else int(np.random.choice([256, 512, 1024])),
             # "adversary_depth_drug": 3 if default else int(np.random.choice([2, 3, 4])),
             # "adversary_depth_moa": 3 if default else int(np.random.choice([2, 3, 4])),
-            # "beta": 1 if default else np.random.choice([1, 5, 10]),
             # "concat_embeddding": False if default else np.random.choice([False, True]),
             # "concat_one_hot": False if default else np.random.choice([False, True]),
             # "drug_embedding_encoder_depth": 0 if default else int(np.random.choice([0, 1, 2, 3])),
@@ -331,11 +333,6 @@ class CPA(TemplateModel):
         Returns:
             dict: The reconstructed input, the latent representation and the losses  
         """
-        # In a simple encoder we don't condition on the drug and the moa, so we create 0 channels
-        if self.hparams['decoding_style'] == 'concat':
-            y_drug = torch.zeros(X.shape[0], self.n_seen_drugs)
-            y_moa = torch.zeros(X.shape[0], self.n_moa)
-
         # Compute prediction by the encoder 
         if not self.variational:
             z = self.encoder(X)
@@ -343,6 +340,14 @@ class CPA(TemplateModel):
             mu, log_sigma = self.encoder(X)
             # Apply reparametrization trick if VAE
             z = self.reparameterize(mu, log_sigma)
+        
+        # In a simple encoder we don't condition on the drug and the moa, so we create 0 channels
+        if (self.hparams['decoding_style'] == 'concat'and self.hparams['concatenate_one_hot']) or self.hparams['decoding_style'] == 'sum':
+            y_drug = torch.zeros(X.shape[0], self.n_seen_drugs).to(self.device)
+            y_moa = torch.zeros(X.shape[0], self.n_moa).to(self.device)
+        else:
+            y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
+            y_moa = torch.zeros(z.shape[0], self.hparams["moa_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
 
         # Decode the latent 
         out = self.decoder(z, y_drug, y_moa)
@@ -393,14 +398,15 @@ class CPA(TemplateModel):
         
         else:
             z = z_basal  # We will concatenate to it in the decoder part 
-            z_drug = None
-            z_moa = None 
+            if self.hparams["concatenate_one_hot"]:
+                z_drug = None
+                z_moa = None 
         
         # Decode z for the output 
         if self.hparams['concatenate_one_hot']:
             out = self.decoder(z, y_adv_drug, y_adv_moa) 
         else:
-            out = self.decoder(z, drug_embedding, moa_embedding) 
+            out = self.decoder(z, z_drug, z_moa) # z_drug and z_moa will be ignored if sum
 
         # Compute the adversarial loss
         if mode == 'train':
@@ -433,14 +439,16 @@ class CPA(TemplateModel):
         
         else:
             # If validation is performed, we also decode the basal encoding to compare it to the original
-            if self.hparams['concatenate_one_hot']:
-                y_drug_basal = torch.zeros(X.shape[0], self.n_seen_drugs).to(device)
-                y_moa_basal = torch.zeros(X.shape[0], self.n_moa).to(device)
+            # In a simple encoder we don't condition on the drug and the moa, so we create 0 channels
+            if (self.hparams['decoding_style'] == 'concat'and self.hparams['concatenate_one_hot']) or self.hparams['decoding_style'] == 'sum':
+                y_drug = torch.zeros(X.shape[0], self.n_seen_drugs).to(self.device)
+                y_moa = torch.zeros(X.shape[0], self.n_moa).to(self.device)
             else:
-                y_drug_basal = torch.zeros(X.shape[0], self.hparams["drug_embedding_dimension"]).to(device)
-                y_moa_basal = torch.zeros(X.shape[0], self.hparams["moa_embedding_dimension"]).to(device)
+                y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
+                y_moa = torch.zeros(z.shape[0], self.hparams["moa_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
 
-            out_basal = self.decoder(z_basal, y_drug_basal, y_moa_basal)
+
+            out_basal = self.decoder(z_basal, y_drug, y_moa)
             return dict(out=out, out_basal=out_basal, z_basal=z_basal, z=z, y_hat_drug=y_adv_hat_drug, 
                         y_hat_moa=y_adv_hat_moa, ae_loss=ae_loss, z_drug=z_drug, z_moa = z_moa)
             

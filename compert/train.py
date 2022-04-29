@@ -161,7 +161,9 @@ class Trainer:
 
         # The id of the dmso to exclude from the prediction 
         self.dmso_id = self.training_set.drugs2idx['DMSO']
-        self.class_imbalance_weights = self.training_set.class_imbalances 
+        self.class_imbalance_weights = self.training_set.class_imbalances
+        # Mapping drug to moa
+        self.drug2moa = self.training_set.couples_drug_moa 
         print('Successfully loaded the data')
 
     
@@ -285,7 +287,7 @@ class Trainer:
                 val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
                                                         self.model.module.metrics, self.dmso_id, self.device, end, 
                                                         variational=self.model.module.variational, predict_moa=self.predict_moa,
-                                                        ds_name=self.dataset_name)
+                                                        ds_name=self.dataset_name, drug2moa=self.drug2moa)
 
                 if self.save_results:
                     self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
@@ -296,15 +298,9 @@ class Trainer:
                     with torch.no_grad():
                         original, reconstructed = self.model.module.generate(self.loader_val)
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim)
+                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 5)
                     del original
                     del reconstructed
-                    
-                    # Plot generation of sampled images (only fir variational autoencoders) 
-                    if self.generate and self.model.module.variational:
-                        sampled_img = tensor_to_image(self.model.module.sample(1, self.temperature))
-                        self.plotter.plot_channel_panel(sampled_img, epoch, self.save_results, self.img_plot, dim=self.dim)
-                        del sampled_img
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
                 score = val_metrics['bpd']
@@ -350,7 +346,7 @@ class Trainer:
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.dmso_id, self.device, end, 
                                                 variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa,
-                                                ds_name=self.dataset_name)
+                                                ds_name=self.dataset_name, drug2moa=self.drug2moa)
         if self.save_results:
             self.write_results(test_losses, test_metrics, self.writer, epoch, ' test')
         self.model.module.save_history('final_test', test_losses, test_metrics, 'test')
@@ -359,7 +355,7 @@ class Trainer:
         ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
                                                 metrics=self.model.module.metrics, dmso_id=self.dmso_id, device=self.device, end=end, 
                                                 variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa,
-                                                ds_name=self.dataset_name)
+                                                ds_name=self.dataset_name, drug2moa=self.drug2moa)
         if self.save_results:
             self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
         self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')

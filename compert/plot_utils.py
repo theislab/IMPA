@@ -9,7 +9,7 @@ class Plotter:
     def __init__(self, dest_dir):
         self.dest_dir = dest_dir
 
-    def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False, dim = 5):
+    def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False, dim = 5, size=6):
         """Plot two images represented the original and reconstructed outputs of a neural network.
 
         Args:
@@ -19,7 +19,7 @@ class Plotter:
             save (bool, optional): Whether to save the plot. Defaults to True.
             plot (bool, optional):  Used in notebooks. Controls whetehr the image should be plot. Defaults to False.
         """
-        fig = plt.figure(constrained_layout=True, figsize = (10,10))
+        fig = plt.figure(constrained_layout=True, figsize = (size,size))
         # create 3x1 subfigs
         subfigs = fig.subfigures(nrows=2, ncols=1)
         titles = ['ORIGINAL', 'RECONSTRUCTED']

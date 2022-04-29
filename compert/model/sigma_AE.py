@@ -89,29 +89,38 @@ class SigmaAE(CPA):
         """
         # Collect the data from the batch at random 
         original = next(iter(loader))
-        original_X = original['X'][0].to(self.device).unsqueeze(0)  
+        original_X = original['X'][0].to(self.device).unsqueeze(0) 
+        # Initialize the ground truth with the one-hot vectors
         y_drug = original['mol_one_hot'].to(self.device).float()
         y_moa = original['moa_one_hot'].to(self.device).float()
 
         with torch.no_grad():
-            # Collect the encoders for the drug embeddings to condition the latent space 
-            drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
-            drug_emb = self.drug_embeddings(drug_id) 
-            z_drug = self.drug_embedding_encoder(drug_emb) 
-            # Collect the mode of action embeddings 
-            if self.predict_moa:
-                moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
-                moa_emb = self.moa_embeddings(moa_id) 
-                z_moa = self.moa_embedding_encoder(moa_emb)
-            else:
-                z_moa = 0 
+            if self.adversarial:
+                # Collect the encoders for the drug embeddings to condition the latent space 
+                drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
+                drug_emb = self.drug_embeddings(drug_id) 
+                z_drug = self.drug_embedding_encoder(drug_emb) 
+                # Collect the mode of action embeddings 
+                if self.predict_moa:
+                    moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
+                    moa_emb = self.moa_embeddings(moa_id) 
+                    z_moa = self.moa_embedding_encoder(moa_emb)
+                else:
+                    z_moa = 0 
             
-            z_basal = self.encoder(original_X)  # Encode image 
-            # Handle the case training is not adversarial 
+            # Encode image 
+            z_basal = self.encoder(original_X)  
+
+            # Handle the case training is not adversarial (append zero masks to the )
             if not self.adversarial:
-                y_drug = torch.zeros(original_X.shape[0], self.n_seen_drugs).to(self.device)
-                y_moa = torch.zeros(original_X.shape[0], self.n_moa).to(self.device)
-                reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
+                if self.hparams["decoding_style"] == 'sum' or (self.hparams["decoding_style"] == 'concat' and self.hparams["concatenate_one_hot"]):
+                    y_drug = torch.zeros(original_X.shape[0], self.n_seen_drugs).to(self.device)
+                    y_moa = torch.zeros(original_X.shape[0], self.n_moa).to(self.device)
+                    reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
+                else:
+                    y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"], z_basal.shape[2], z_basal.shape[3]).to(self.device)
+                    y_moa = torch.zeros(z_basal.shape[0], self.hparams["moa_embedding_dimension"], z_basal.shape[2], z_basal.shape[3]).to(self.device)
+                    reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
 
             else:
                 if self.hparams["decoding_style"] == 'sum':
@@ -120,9 +129,10 @@ class SigmaAE(CPA):
                 
                 else:
                     if not self.hparams["concatenate_one_hot"]:
-                        y_drug = drug_emb
-                        y_moa = moa_emb
-                            
+                        y_drug = z_drug
+                        y_moa = z_moa
+                    z = z_basal
                 reconstructed_X = self.decoder(z, y_drug, y_moa) 
 
         return original_X, reconstructed_X
+        

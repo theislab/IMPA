@@ -24,11 +24,12 @@ class ResidualLayer(torch.nn.Module):
             torch.nn.ReLU(inplace=True),
             torch.nn.Conv2d(out_channel, out_channel, kernel_size = 1)
             )
+        # Activation function 
         self.activation_out = torch.nn.LeakyReLU()
 
     def forward(self, X):
         out = self.resblock(X)
-        out += X[:,:out.shape[1],:,:]  # Residual connection 
+        out += X  # Residual connection 
         out = self.activation_out(out)
         return out
 
@@ -88,7 +89,8 @@ class Encoder(torch.nn.Module):
 
             # Update feature maps
             in_fm = out_fm 
-            out_fm = out_fm*2 if not (self.variational and i == self.n_conv-2) else out_fm*4
+            # If variational you double the number of the last feature maps ss
+            out_fm = out_fm*2 if not (self.variational and i == self.n_conv-2) else out_fm*4  
 
         # Add residual blocks 
         for i in range(self.n_residual_blocks):
@@ -117,6 +119,7 @@ class Decoder(torch.nn.Module):
                 out_height: int = 64,
                 variational: bool = True,
                 decoding_style = 'sum',
+                concatenate_one_hot = True,
                 extra_fm=0) -> None:
 
         super(Decoder, self).__init__() 
@@ -127,6 +130,7 @@ class Decoder(torch.nn.Module):
         self.n_residual_blocks = n_residual_blocks
         self.out_width, self.out_height = out_width, out_height
         self.decoding_style = decoding_style
+        self.concatenate_one_hot = concatenate_one_hot
         self.extra_fm = extra_fm    
         
         # Build convolutional dimensions
@@ -140,16 +144,21 @@ class Decoder(torch.nn.Module):
         out_fm = self.init_fm//2
 
         # Append the residual blocks
+        residual_connections = []
         for _ in range(self.n_residual_blocks):
-            self.modules.append(ResidualLayer(in_fm+self.extra_fm, in_fm))
-
+            residual_connections.append(ResidualLayer(in_fm+self.extra_fm, in_fm+self.extra_fm))
+        self.residual_connections = torch.nn.Sequential(*residual_connections)
+        self.modules.append(self.residual_connections)
+        
         for i in range(0, self.n_conv):
             # Convolutional layer
             self.modules += [torch.nn.Sequential(torch.nn.ConvTranspose2d(in_fm+self.extra_fm, out_fm, kernel_size=4, stride=2, padding=1),
                                 torch.nn.ReLU() if i<self.n_conv-1 else torch.nn.Sigmoid())]
+
+            # We only condition the residual part if we concatenate the embeddings 
+            if self.decoding_style == 'concat' and not self.concatenate_one_hot:
+                self.extra_fm = 0
             
-
-
             # Update the number of feature maps
             in_fm = out_fm
             if i == self.n_conv-2:
@@ -167,16 +176,20 @@ class Decoder(torch.nn.Module):
     
     def forward_concat(self, z, y_drug, y_moa):
         # Reshape to height x width
-        for layer in self.decoder:
-            # Upsample drug labs
-            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+        if self.concatenate_one_hot:
+            for layer in self.decoder:
 
-            # Upsample moa labs
-            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+                # Upsample drug labs
+                y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+                y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+                # Upsample moa labs
+                y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+                y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+
+                z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+        else:
+            z = self.decoder(torch.cat([z, y_drug, y_moa], dim=1))
         return z 
 
     def forward(self, z, y_drug, y_moa):

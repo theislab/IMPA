@@ -35,8 +35,9 @@ class ResnetDritEncoder(torch.nn.Module):
 
         # Add an additional number of convolutions with reduced kernel size 
         for i in range(1, self.n_conv):
-            self.modules += [ReLUINSConv2d(in_fm, in_fm * 2, kernel_size=3, stride=2, padding=1)]
-            in_fm *= 2
+            mult = 2 if not (self.variational and i == self.n_conv-1) else 4  
+            self.modules += [ReLUINSConv2d(in_fm, in_fm * mult, kernel_size=3, stride=2, padding=1)]
+            in_fm = in_fm * mult
         
         # Build residual network
         for i in range(0, self.n_residual_blocks):
@@ -46,8 +47,15 @@ class ResnetDritEncoder(torch.nn.Module):
         
         self.conv = nn.Sequential(*self.modules )
 
-    def forward(self, x):
-        return self.conv(x)
+    def forward(self, X):
+        z = self.conv(X)  # Encode the image 
+        
+        # Derive the encodings for the mean and the log variance
+        if self.variational:
+            mu, log_sigma = z.chunk(2, dim=1)
+            return mu, log_sigma
+
+        return z
 
 
 class ResnetDritDecoder(nn.Module):
@@ -59,6 +67,7 @@ class ResnetDritDecoder(nn.Module):
                 out_width: int = 64,
                 out_height: int = 64,
                 decoding_style = 'sum', 
+                concatenate_one_hot = True,
                 extra_fm = 0):
 
         super(ResnetDritDecoder, self).__init__()
@@ -69,6 +78,7 @@ class ResnetDritDecoder(nn.Module):
         self.n_residual_blocks = n_residual_blocks
         self.out_width, self.out_height = out_width, out_height 
         self.decoding_style = decoding_style
+        self.concatenate_one_hot = concatenate_one_hot
         self.extra_fm = extra_fm
         
         # Initial number of feature maps
@@ -76,12 +86,20 @@ class ResnetDritDecoder(nn.Module):
         self.modules = []
 
         # Residual blocks
+        residual_connections = []
         for i in range(0, self.n_residual_blocks):
-            self.modules += [INSResBlock(in_fm+self.extra_fm, in_fm)]
+            residual_connections += [INSResBlock(in_fm+self.extra_fm, in_fm+self.extra_fm)]
+        # Residual connections are treated as a whole layer within the module 
+        self.residual_connections = torch.nn.Sequential(*residual_connections)
+        self.modules += [self.residual_connections]
 
         for i in range(0, self.n_conv):
             self.modules += [ReLUINSConvTranspose2d(in_fm+self.extra_fm, in_fm//2, kernel_size=3, stride=2, padding=1, output_padding=1)]
             in_fm = in_fm//2
+
+            # We only condition the residual part if we concatenate the embeddings 
+            if self.decoding_style == 'concat' and not self.concatenate_one_hot:
+                self.extra_fm = 0
         
         self.modules += [nn.ConvTranspose2d(in_fm+self.extra_fm, self.out_channels, kernel_size=1, stride=1, padding=0)]+[nn.Sigmoid()]
         self.deconv = nn.Sequential(*self.modules)
@@ -91,20 +109,25 @@ class ResnetDritDecoder(nn.Module):
         return X 
     
     def forward_concat(self, z, y_drug, y_moa):
-        # Reshape to height x width
-        for layer in self.deconv[:-1]:
-            # Upsample drug labs
-            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+        if self.concatenate_one_hot:
+            for layer in self.deconv[:-1]:
+                
+                # Upsample drug labs
+                y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+                y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-            # Upsample moa labs
-            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+                # Upsample moa labs
+                y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+                y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+                z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+            X = self.deconv[-1](z)
 
-        X = self.deconv[-1](z)
+        else:
+            z = torch.cat([z, y_drug, y_moa], dim=1)
+            X = self.deconv(z)
         return X 
+
 
     def forward(self, z, y_drug, y_moa):
         if self.decoding_style == 'sum':

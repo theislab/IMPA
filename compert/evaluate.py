@@ -16,7 +16,13 @@ def training_evaluation(model,
                         adversarial, 
                         metrics, 
                         dmso_id,
-                        device, end=False, variational=True, ood=False, predict_moa=False, ds_name=None):
+                        device, 
+                        end=False, 
+                        variational=True, 
+                        ood=False, 
+                        predict_moa=False, 
+                        ds_name=None, 
+                        drug2moa=None):
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
     Args:
@@ -47,6 +53,7 @@ def training_evaluation(model,
         val_kl_loss = 0  # Total Kullback-Leibler loss
     if adversarial:
         rmse_basal_full = 0  # The difference between a decoded image with and without addition of the drug
+        conterfactual_rmse = 0 # The average difference between the image and the counterfacted version of it 
     
     # Zero out the metrics for the next step
     metrics.reset()  
@@ -59,9 +66,8 @@ def training_evaluation(model,
         y_hat_ds_moa = []
     
     # If we are at the last iteration of a CPA-like model we also store z_basal predictions for disentanglement metrics
-    if end:
-        z_basal_ds = []  # Will contain the basal latent representation (no drug effect)
-        z_ds = []  # Will contain the total drug representation (with added drug effect)
+    z_basal_ds = []  # Will contain the basal latent representation (no drug effect)
+    z_ds = []  # Will contain the total drug representation (with added drug effect)
 
     for observation in tqdm(dataset_loader):
         # Load observation X
@@ -100,13 +106,15 @@ def training_evaluation(model,
                 y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
                 if predict_moa:
                     y_hat_ds_moa.append(torch.argmax(y_hat_moa, dim=1).item())
+
+            # Update the counterfactual score 
+            conterfactual_rmse += counterfactual_score(X, z_basal, model, y_adv_drugs, y_adv_moa, drug_id, moa_id, drug2moa)
             
         # Only at the end of training we store the latent vectors for analysis 
-        if end:
-            # If the training is not adversarial, we only have Z basal
-            if adversarial:
-                z_ds.append(z)
-            z_basal_ds.append(z_basal)
+        # If the training is not adversarial, we only have Z basal
+        if adversarial:
+            z_ds.append(z)
+        z_basal_ds.append(z_basal)
             
         # Update the losses and the metrics 
         val_loss += ae_loss['total_loss'].item()
@@ -146,35 +154,33 @@ def training_evaluation(model,
     metrics.metrics['rmse'] /= len(dataset_loader)
     if adversarial:
         metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
+        metrics.metrics['conterfactual_rmse'] = conterfactual_rmse/len(dataset_loader)
 
-    # Disentanglement and clustering evaluated only at the end
-    if end:
-        # Exclude the DMSO from the predictions to make the prediction balanced 
-        y_true_ds_drugs = np.array(y_true_ds_drugs)
-        idx_not_dmso = np.where(y_true_ds_drugs!=dmso_id)
+    # Exclude the DMSO from the predictions to make the prediction balanced 
+    y_true_ds_drugs = np.array(y_true_ds_drugs)
+    idx_not_dmso = np.where(y_true_ds_drugs!=dmso_id)
 
-        z_basal_ds = torch.cat(z_basal_ds, dim=0)
-        disentanglement_score_basal_drug = compute_disentanglement_score(z_basal_ds[idx_not_dmso], y_true_ds_drugs[idx_not_dmso])  # Evaluate on the non-controls
-        metrics.metrics["disentanglement_score_basal_drug"] = disentanglement_score_basal_drug  
+    z_basal_ds = torch.cat(z_basal_ds, dim=0)
+    disentanglement_score_basal_drug = compute_disentanglement_score(z_basal_ds[idx_not_dmso], y_true_ds_drugs[idx_not_dmso])  # Evaluate on the non-controls
+    metrics.metrics["disentanglement_score_basal_drug"] = disentanglement_score_basal_drug  
 
+    if adversarial:
+        z_ds = torch.cat(z_ds, dim=0)
+        disentanglement_score_z_drug = compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_drugs[idx_not_dmso])
+        metrics.metrics["disentanglement_score_z_drug"] = disentanglement_score_z_drug
+        metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_drug - disentanglement_score_basal_drug
+
+    if predict_moa:
+        y_true_ds_moa = np.array(y_true_ds_moa)
+        disentanglement_score_basal_moa = compute_disentanglement_score(z_basal_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso])
+        metrics.metrics["disentanglement_score_basal_moa"] = disentanglement_score_basal_moa
         if adversarial:
-            z_ds = torch.cat(z_ds, dim=0)
-            disentanglement_score_z_drug = compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_drugs[idx_not_dmso])
-            metrics.metrics["disentanglement_score_z_drug"] = disentanglement_score_z_drug
-            metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_drug - disentanglement_score_basal_drug
-    
-        if predict_moa:
-            y_true_ds_moa = np.array(y_true_ds_moa)
-            disentanglement_score_basal_moa = compute_disentanglement_score(z_basal_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso])
-            metrics.metrics["disentanglement_score_basal_moa"] = disentanglement_score_basal_moa
-            if adversarial:
-                disentanglement_score_z_moa= compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso]) 
-                metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
-                metrics.metrics["difference_disentanglement_moa"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
+            disentanglement_score_z_moa= compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso]) 
+            metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
+            metrics.metrics["difference_disentanglement_moa"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
 
-        z_basal_ds = z_basal_ds.to('cpu').numpy()
-        if adversarial:
-            z_ds = z_ds.to('cpu').numpy()
+    del z_basal_ds
+    del z_ds
 
     print(f'Average validation loss: {losses["loss"]}')
     if variational:
@@ -197,7 +203,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
         dict: dictionary with the results
     """
     print('Training discriminator network on drug latent space')
-
+    
     # Fetch unique molecules and their counts  
     unique_classes, freqs = np.unique(y, return_counts=True)  # Given a class vector y, reduce it to unique definitions 
     label_to_idx = {labels: idx for idx, labels in enumerate(unique_classes)}
@@ -214,7 +220,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
     y = np.array(y)[idx_to_keep]
 
     # Split into training and test set 
-    X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.30, stratify=y, random_state=42)
+    X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.10, stratify=y)  # Make the dataset balanced 
     y_train_tensor = torch.tensor(
         [label_to_idx[label] for label in y_train], dtype=torch.long, device="cuda")
     y_test_tensor = torch.tensor(
@@ -243,6 +249,45 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
         return sklearn.metrics.classification_report(y_test_tensor.numpy(), test_pred.argmax(1).to('cpu').numpy())
     else:
         return f1_score(y_test_tensor.numpy(), test_pred.argmax(1).to('cpu').numpy(), average="weighted")
+
+
+def counterfactual_score(X, z_basal, model, y_adv_drug, y_adv_moa, drug_id, moa_id, drug2moa):
+    max_drug = np.max(list(drug2moa.keys()))+1  # Single integer representing maximum drug id
+    max_moa = np.max(list(drug2moa.values()))+1
+    drug_ids = [i for i in range(max_drug) if i!=drug_id]  # Drug ids for counterfactual (different from the data point)
+    moas = [drug2moa[i] for i in drug_ids]  # Moa ids assicuated to the drugs 
+
+    with torch.no_grad():
+        if model.hparams["decoding_style"] == 'sum' or (model.hparams["decoding_style"] == 'concat' and not model.hparams["concatenate_one_hot"]):
+            # Encode drugs and moas torch
+            drug_emb = model.drug_embeddings(torch.tensor(drug_ids).to('cuda'))
+            moa_emb = model.moa_embeddings(torch.tensor(moas).to('cuda'))
+
+            z_drug = model.drug_embedding_encoder(drug_emb)
+            z_moa = model.moa_embedding_encoder(moa_emb)
+        
+            if model.hparams["decoding_style"] == 'sum': 
+                z_counter = z_basal + z_drug + z_moa  # Broadcast automatocally
+                res = model.decoder(z_counter, None, None)
+            else:
+                res = model.decoder(z_basal.repeat(drug_emb.shape[0],1,1,1), z_drug, z_moa)  # Must repeat z on the batch dimension
+
+        elif model.hparams["decoding_style"] == 'concat':
+            # One hot encoded drugs and moas
+            y_adv_drug = torch.eye(max_drug)
+            y_adv_moa = torch.zeros(y_adv_drug.shape[0], max_moa)
+
+            y_adv_drug = torch.cat((y_adv_drug[:drug_id], y_adv_drug[drug_id+1:]))
+            y_adv_moa = torch.cat((y_adv_moa[:moa_id], y_adv_moa[moa_id+1:]))
+            y_adv_moa[torch.arange(len(y_adv_moa)), moas] = 1
+
+            res = model.decoder(z_basal.repeat(y_adv_drug.shape[0],1,1,1), y_adv_drug.to('cuda'), y_adv_moa.to('cuda'))
+        
+        # Decode the counterfactual vector
+        # res = model.decoder(z_basal, z_drug_broadcast, z_moa_broadcast)
+        rmse = torch.sqrt(torch.mean((X.repeat(res.shape[0], 1, 1, 1) - res)**2))
+    
+    return rmse
 
 
 if __name__ == '__main__':

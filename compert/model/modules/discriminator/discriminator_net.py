@@ -62,7 +62,7 @@ class LabelEncoder(nn.Module):
         self.output_fm = output_fm
         
         # Depth 
-        depth = int(np.log2(self.output_dim//3)) 
+        depth = int(np.log2(self.output_dim//3))  # Requited for upsampling
         
         # Initial feature map setup
         in_fm = self.input_fm
@@ -96,19 +96,21 @@ class DisentanglementClassifier(nn.Module):
 
         model = []
         for i in range(2):
-            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Instance')]
+            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=1, padding=1, norm='Instance')]
             if i == 0:
                 in_fm = out_fm
         
-        flattened_dim = (self.init_dim//4)**2 *  out_fm
-        # Linear classification layer 
-        model += [torch.nn.Flatten(), torch.nn.Linear(flattened_dim, self.num_outpus)]
-        
+        flattened_dim = self.init_dim *  out_fm
         # Compile model 
         self.conv = nn.Sequential(*model)
+        
+        # Linear classification layer 
+
+        self.linear = torch.nn.Linear(flattened_dim, self.num_outpus)
 
     def forward(self, x):
         out = self.conv(x)
+        out = out.view(out.shape[0], -1)
         return out
 
 
