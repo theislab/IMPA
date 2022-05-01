@@ -135,11 +135,3 @@ class SigmaAE(CPA):
 
         return original_X, reconstructed_X
 
-    def GAN_loss(X, X_hat):
-        """Compute the GAN loss (fool a discriminator on the pixel space)
-
-        Args:
-            X (torch.nn.Tensor): _description_
-            X_hat (torch.nn.Tensor()): _description_
-        """
-        

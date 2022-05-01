@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, '..')
 
 from .autoencoders import initialize_encoder_decoder
-from .modules.discriminator.discriminator_net import *
+from .modules.adversarial.adversarial_nets import *
 from metrics.metrics import *
 
 
