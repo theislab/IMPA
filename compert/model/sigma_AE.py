@@ -142,3 +142,4 @@ class SigmaAE(CPA):
             X (torch.nn.Tensor): _description_
             X_hat (torch.nn.Tensor()): _description_
         """
+        
