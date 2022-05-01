@@ -101,7 +101,7 @@ class LabelEncoderLinear(nn.Module):
 
 
 
-"""Disentanglement classifier for evaluation 
+"""Disentanglement classifier for classification 
 """
 
 class DisentanglementClassifier(nn.Module):

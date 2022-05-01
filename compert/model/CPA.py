@@ -170,9 +170,13 @@ class CPA(TemplateModel):
             embedding_requires_grad = False
         
         # Drug embedding encoder 
-        self.drug_embedding_encoder = LabelEncoder(downsample_dim, 
-                                        self.hparams["drug_embedding_dimension"], 
-                                        init_fm if self.hparams["decoding_style"] == 'sum' else self.hparams["drug_embedding_dimension"]).to(self.device)
+        if self.hparams["decoding_style"] == 'sum':
+            self.drug_embedding_encoder = LabelEncoder(downsample_dim, 
+                                            self.hparams["drug_embedding_dimension"], 
+                                            init_fm if self.hparams["decoding_style"] == 'sum' else self.hparams["drug_embedding_dimension"]).to(self.device) 
+
+        elif self.hparams['decoding_style'] == 'concat':
+            self.drug_embedding_encoder = LabelEncoderLinear(self.hparams["drug_embedding_dimension"], self.hparams["drug_embedding_dimension"]).to(self.device) 
 
         # Embed the MOA
         if self.predict_moa:
@@ -180,9 +184,13 @@ class CPA(TemplateModel):
                 self.n_moa, self.hparams["moa_embedding_dimension"]).to(self.device)
 
             # MOA embedding encoder 
-            self.moa_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["moa_embedding_dimension"], 
-            init_fm if self.hparams["decoding_style"] == 'sum' else self.hparams["moa_embedding_dimension"], 
-            ).to(self.device)
+            if self.hparams["decoding_style"] == 'sum':
+                self.moa_embedding_encoder = LabelEncoder(downsample_dim, self.hparams["moa_embedding_dimension"], 
+                                                            init_fm if self.hparams["decoding_style"] == 'sum' else self.hparams["moa_embedding_dimension"], 
+                                                            ).to(self.device)
+            
+            elif self.hparams['decoding_style'] == 'concat' :
+                self.moa_embedding_encoder = LabelEncoderLinear(self.hparams["moa_embedding_dimension"], self.hparams["moa_embedding_dimension"]).to(self.device) 
 
 
         # Crossentropy loss for the prediction of both MOA and the drug 
@@ -346,8 +354,8 @@ class CPA(TemplateModel):
             y_drug = torch.zeros(X.shape[0], self.n_seen_drugs).to(self.device)
             y_moa = torch.zeros(X.shape[0], self.n_moa).to(self.device)
         else:
-            y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
-            y_moa = torch.zeros(z.shape[0], self.hparams["moa_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
+            y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"]).to(self.device)
+            y_moa = torch.zeros(z.shape[0], self.hparams["moa_embedding_dimension"]).to(self.device)
 
         # Decode the latent 
         out = self.decoder(z, y_drug, y_moa)
@@ -444,8 +452,8 @@ class CPA(TemplateModel):
                 y_drug = torch.zeros(X.shape[0], self.n_seen_drugs).to(self.device)
                 y_moa = torch.zeros(X.shape[0], self.n_moa).to(self.device)
             else:
-                y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
-                y_moa = torch.zeros(z.shape[0], self.hparams["moa_embedding_dimension"], z.shape[2], z.shape[3]).to(self.device)
+                y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"]).to(self.device)
+                y_moa = torch.zeros(z.shape[0], self.hparams["moa_embedding_dimension"]).to(self.device)
 
 
             out_basal = self.decoder(z_basal, y_drug, y_moa)

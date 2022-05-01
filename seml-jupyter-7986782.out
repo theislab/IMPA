@@ -1,0 +1,25 @@
+Starting job 7986782
+SLURM assigned me the node(s): supergpu08
+[W 20:01:42.380 NotebookApp] WARNING: The notebook server is listening on all IP addresses and not using encryption. This is not recommended.
+[W 2022-04-29 20:01:42.980 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2022-04-29 20:01:42.980 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2022-04-29 20:01:42.980 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[I 2022-04-29 20:01:42.996 LabApp] JupyterLab extension loaded from /home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/jupyterlab
+[I 2022-04-29 20:01:42.996 LabApp] JupyterLab application directory is /mnt/home/icb/alessandro.palma/miniconda3/envs/imgCPA/share/jupyter/lab
+[I 20:01:43.006 NotebookApp] Serving notebooks from local directory: /mnt/home/icb/alessandro.palma/imCPA
+[I 20:01:43.007 NotebookApp] Jupyter Notebook 6.4.8 is running at:
+[I 20:01:43.007 NotebookApp] http://supergpu08.scidom.de:8888/?token=a5a4ab5288fbff0ad04654cfafbf2e59e3f8262edb8ad4f3
+[I 20:01:43.007 NotebookApp]  or http://127.0.0.1:8888/?token=a5a4ab5288fbff0ad04654cfafbf2e59e3f8262edb8ad4f3
+[I 20:01:43.007 NotebookApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[C 20:01:43.022 NotebookApp] 
+    
+    To access the notebook, open this file in a browser:
+        file:///mnt/home/icb/alessandro.palma/.local/share/jupyter/runtime/nbserver-9706-open.html
+    Or copy and paste one of these URLs:
+        http://supergpu08.scidom.de:8888/?token=a5a4ab5288fbff0ad04654cfafbf2e59e3f8262edb8ad4f3
+     or http://127.0.0.1:8888/?token=a5a4ab5288fbff0ad04654cfafbf2e59e3f8262edb8ad4f3
+[W 09:52:57.785 NotebookApp] Clearing invalid/expired login cookie username-supergpu08-scidom-de-8888
+[W 2022-04-30 09:52:57.792 LabApp] Clearing invalid/expired login cookie username-supergpu08-scidom-de-8888
+[I 09:52:57.793 NotebookApp] 302 GET /lab/tree/Notebooks/3.16_baselineModels_performance_analysis.ipynb (146.107.127.246) 8.380000ms
+[W 09:53:02.151 NotebookApp] 401 POST /login?next=%2Flab%2Ftree%2FNotebooks%2F3.16_baselineModels_performance_analysis.ipynb (146.107.127.246) 2.470000ms referer=http://supergpu08.scidom.de:8888/login?next=%2Flab%2Ftree%2FNotebooks%2F3.16_baselineModels_performance_analysis.ipynb
+slurmstepd: error: *** JOB 7986782 ON supergpu08 CANCELLED AT 2022-04-30T10:24:55 ***

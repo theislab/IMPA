@@ -93,13 +93,11 @@ class ResnetDritDecoder(nn.Module):
         self.residual_connections = torch.nn.Sequential(*residual_connections)
         self.modules += [self.residual_connections]
 
+        in_fm = in_fm+self.extra_fm
+
         for i in range(0, self.n_conv):
             self.modules += [ReLUINSConvTranspose2d(in_fm+self.extra_fm, in_fm//2, kernel_size=3, stride=2, padding=1, output_padding=1)]
             in_fm = in_fm//2
-
-            # We only condition the residual part if we concatenate the embeddings 
-            if self.decoding_style == 'concat' and not self.concatenate_one_hot:
-                self.extra_fm = 0
         
         self.modules += [nn.ConvTranspose2d(in_fm+self.extra_fm, self.out_channels, kernel_size=1, stride=1, padding=0)]+[nn.Sigmoid()]
         self.deconv = nn.Sequential(*self.modules)
@@ -109,23 +107,19 @@ class ResnetDritDecoder(nn.Module):
         return X 
     
     def forward_concat(self, z, y_drug, y_moa):
-        if self.concatenate_one_hot:
-            for layer in self.deconv[:-1]:
-                
-                # Upsample drug labs
-                y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-                y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+        for layer in self.deconv[:-1]:
 
-                # Upsample moa labs
-                y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-                y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+            # Upsample drug labs
+            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-                z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
-            X = self.deconv[-1](z)
+            # Upsample moa labs
+            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-        else:
-            z = torch.cat([z, y_drug, y_moa], dim=1)
-            X = self.deconv(z)
+            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+        X = self.deconv[-1](z)
+
         return X 
 
 

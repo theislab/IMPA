@@ -154,10 +154,6 @@ class Decoder(torch.nn.Module):
             # Convolutional layer
             self.modules += [torch.nn.Sequential(torch.nn.ConvTranspose2d(in_fm+self.extra_fm, out_fm, kernel_size=4, stride=2, padding=1),
                                 torch.nn.ReLU() if i<self.n_conv-1 else torch.nn.Sigmoid())]
-
-            # We only condition the residual part if we concatenate the embeddings 
-            if self.decoding_style == 'concat' and not self.concatenate_one_hot:
-                self.extra_fm = 0
             
             # Update the number of feature maps
             in_fm = out_fm
@@ -176,20 +172,17 @@ class Decoder(torch.nn.Module):
     
     def forward_concat(self, z, y_drug, y_moa):
         # Reshape to height x width
-        if self.concatenate_one_hot:
-            for layer in self.decoder:
+        for layer in self.decoder:
 
-                # Upsample drug labs
-                y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-                y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+            # Upsample drug labs
+            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-                # Upsample moa labs
-                y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-                y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+            # Upsample moa labs
+            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-                z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
-        else:
-            z = self.decoder(torch.cat([z, y_drug, y_moa], dim=1))
+            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
         return z 
 
     def forward(self, z, y_drug, y_moa):

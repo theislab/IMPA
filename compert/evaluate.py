@@ -287,7 +287,7 @@ def counterfactual_score(X, z_basal, model, y_adv_drug, y_adv_moa, drug_id, moa_
         # res = model.decoder(z_basal, z_drug_broadcast, z_moa_broadcast)
         rmse = torch.sqrt(torch.mean((X.repeat(res.shape[0], 1, 1, 1) - res)**2))
     
-    return rmse
+    return rmse.item()
 
 
 if __name__ == '__main__':

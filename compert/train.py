@@ -309,20 +309,19 @@ class Trainer:
                 cond, early_stopping = self.model.module.early_stopping(score) 
 
                 # Save the model if it is the best performing one 
-                if cond and self.save_results:
-                    print(f'New best score is {self.model.module.best_score}')
-                    # Save the model with lowest validation loss 
-                    self.model.module.save_checkpoints(epoch, 
-                                                        val_metrics, 
-                                                        train_losses, 
-                                                        val_losses, 
-                                                        self.dest_dir)
+                print(f'New best score is {self.model.module.best_score}')
+                # Save the model with lowest validation loss 
+                self.model.module.save_checkpoints(epoch, 
+                                                    val_metrics, 
+                                                    train_losses, 
+                                                    val_losses, 
+                                                    self.dest_dir)
 
-                    print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
+                print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
 
-            # If we overcome the patience, we break the loop
-            if early_stopping:
-                break 
+            # # If we overcome the patience, we break the loop
+            # if early_stopping:
+            #     break 
             
             # Scheduler step at the end of the epoch 
             if epoch <= self.hparams["warmup_steps"]:

@@ -42,29 +42,29 @@ class SigmaAE(CPA):
                                         class_weights=class_weights)
 
         
-    def reconstruction_loss(self, X_hat, X):
-        """ Computes the likelihood of the data given the latent variable,
-        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
-        same for VAE and AE) """
-        # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
-        # ensures stable training.
-        if self.hparams["data_driven_sigma"]:
-            self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
-            self.log_scale = softclip(self.log_scale, -6)
-        # Gaussian log lik
-        if self.hparams["mean_recon_loss"]:
-            rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
-        else:
-            rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
-        return rec
-
     # def reconstruction_loss(self, X_hat, X):
     #     """ Computes the likelihood of the data given the latent variable,
     #     in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
     #     same for VAE and AE) """
     #     # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
     #     # ensures stable training.
-    #     return torch.mean((X_hat - X)**2)
+    #     if self.hparams["data_driven_sigma"]:
+    #         self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
+    #         self.log_scale = softclip(self.log_scale, -6)
+    #     # Gaussian log lik
+    #     if self.hparams["mean_recon_loss"]:
+    #         rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
+    #     else:
+    #         rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
+    #     return rec
+
+    def reconstruction_loss(self, X_hat, X):
+        """ Computes the likelihood of the data given the latent variable,
+        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
+        same for VAE and AE) """
+        # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
+        # ensures stable training.
+        return torch.nn.L1Loss()(X_hat, X)
 
     def ae_loss(self, X, X_hat):
         """
@@ -116,11 +116,10 @@ class SigmaAE(CPA):
                 if self.hparams["decoding_style"] == 'sum' or (self.hparams["decoding_style"] == 'concat' and self.hparams["concatenate_one_hot"]):
                     y_drug = torch.zeros(original_X.shape[0], self.n_seen_drugs).to(self.device)
                     y_moa = torch.zeros(original_X.shape[0], self.n_moa).to(self.device)
-                    reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
                 else:
-                    y_drug = torch.zeros(z.shape[0], self.hparams["drug_embedding_dimension"], z_basal.shape[2], z_basal.shape[3]).to(self.device)
-                    y_moa = torch.zeros(z_basal.shape[0], self.hparams["moa_embedding_dimension"], z_basal.shape[2], z_basal.shape[3]).to(self.device)
-                    reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
+                    y_drug = torch.zeros(z_basal.shape[0], self.hparams["drug_embedding_dimension"]).to(self.device)
+                    y_moa = torch.zeros(z_basal.shape[0], self.hparams["moa_embedding_dimension"]).to(self.device)
+                reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
 
             else:
                 if self.hparams["decoding_style"] == 'sum':
@@ -135,4 +134,11 @@ class SigmaAE(CPA):
                 reconstructed_X = self.decoder(z, y_drug, y_moa) 
 
         return original_X, reconstructed_X
-        
+
+    def GAN_loss(X, X_hat):
+        """Compute the GAN loss (fool a discriminator on the pixel space)
+
+        Args:
+            X (torch.nn.Tensor): _description_
+            X_hat (torch.nn.Tensor()): _description_
+        """

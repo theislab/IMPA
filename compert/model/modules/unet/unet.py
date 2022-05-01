@@ -63,8 +63,6 @@ class UNetDecoder(nn.Module):
         for _ in range(self.n_conv):
             self.modules.append(Up(in_fm+self.extra_fm, in_fm // 2))
             in_fm //= 2
-            if not self.concatenate_one_hot:
-                self.extra_fm = 0
             
         self.modules.append(OutConv(in_fm+self.extra_fm, self.out_channels))
         self.modules.append(torch.nn.Sigmoid())
@@ -77,23 +75,18 @@ class UNetDecoder(nn.Module):
     
     def forward_concat(self, z, y_drug, y_moa):
         # Reshape to height x width
-        if self.concatenate_one_hot:
-            for layer in self.deconv[:-1]:
-                
-                # Upsample drug labs
-                y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-                y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+        for layer in self.deconv[:-1]:
+            
+            # Upsample drug labs
+            y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-                # Upsample moa labs
-                y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-                y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
+            # Upsample moa labs
+            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
+            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-                z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
-            X = self.deconv[-1](z)
-
-        else:
-            z = torch.cat([z, y_drug, y_moa], dim=1)
-            X = self.deconv(z)
+            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+        X = self.deconv[-1](z)
         return X 
 
 
