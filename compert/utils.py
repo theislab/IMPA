@@ -149,3 +149,14 @@ def gaussian_nll(mu, log_sigma, x):
     Implement Gaussian nll loss
     """
     return 0.5 * (torch.pow((x - mu) , 2)/ log_sigma.exp() + log_sigma) + 0.5 * np.log(2 * np.pi)
+
+
+def configure_loss_dict(loss_dict):
+    losses = {}
+    for key in loss_dict:
+        if type(loss_dict[key]) == dict:
+            for subkey in loss_dict[key]:
+                losses[subkey] = loss_dict[key][subkey]
+        else:
+            losses[key] = loss_dict[key]
+    return losses

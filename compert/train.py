@@ -4,8 +4,7 @@ import sys
 sys.path.insert(0, '.')
 
 # Available autoencoder model attached to CPA 
-from model.sigma_VAE import SigmaVAE
-from model.sigma_AE import SigmaAE
+from model.CPA import CPA
 from data.cellpainting import CellPaintingDataset
 from data.fluorescent import BBBC021Dataset
 from utils import *
@@ -210,15 +209,9 @@ class Trainer:
         """
         Create dataset compatible with the pytorch training loop 
         """
-        # Create dataset objects for the three data folds
-        if self.dataset_name == 'cellpainting':
-            dataset = CellPaintingDataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
-                                                    return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train)
-            self.dim = 5  # The number of channels
-        else:
-            dataset = BBBC021Dataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
-                                                    return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train) 
-            self.dim = 3
+        dataset = BBBC021Dataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
+                                                return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train) 
+        self.dim = 3
 
         # Extract matrix of embeddings only if the embedding option is chosen 
         if self.use_embeddings:
@@ -226,18 +219,13 @@ class Trainer:
         else:
             self.drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
 
-        # Collect the number of total drugs and the one of seen (the two correspond in the fluorescent microscopy dataset)
-        self.num_drugs = dataset.num_drugs
         # The ood set in the BBC021 dataset does not leave out entire compounds but only compound dosage combinations 
-        if self.dataset_name == 'BBBC021':
-            self.n_seen_drugs = self.num_drugs
-            self.num_moa = dataset.num_moa
-        else:
-            self.n_seen_drugs = dataset.n_seen_drugs  
-            self.num_moa = 0  # No MOA annotated 
-        
+        self.n_seen_drugs = dataset.num_drugs
+        self.num_moa = dataset.num_moa
+
         # Collect training, test and validation sets
         training_set, validation_set, test_set, ood_set = dataset.fold_datasets.values()  
+
         # Free cell painting dataset memory
         del dataset
         return training_set, validation_set, test_set, ood_set
@@ -261,11 +249,16 @@ class Trainer:
 
         print(f'Beginning training with epochs {self.num_epochs}')
 
+        # Resume from epoch of the loaded checkpoint (1 if start from first epoch)
         for epoch in range(self.resume_epoch, self.resume_epoch+self.num_epochs+1):
 
-            # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial net  
+            # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial nets 
             if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
                 self.model.module.initialize_adversarial()
+                if self.hparams['recon_gan']:
+                    self.model.module.initialize_recons_GAN()
+                elif self.hparams['classification_gan']:
+                    self.model.module.initialize_classific_GAN()
             
             print(f'Running epoch {epoch}')
             self.model.train() 
@@ -318,10 +311,6 @@ class Trainer:
                                                     self.dest_dir)
 
                 print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
-
-            # # If we overcome the patience, we break the loop
-            # if early_stopping:
-            #     break 
             
             # Scheduler step at the end of the epoch 
             if epoch <= self.hparams["warmup_steps"]:
@@ -331,6 +320,10 @@ class Trainer:
             # We do not warmup the adversaries
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
+                if self.hparams['recon_gan']:
+                    self.model.module.recon_discriminator_scheduler.step()
+                if self.hparams['classification_gan']:
+                    self.model.module.classifier_predictor_scheduler.step()
             
             # Update the number of adversarial steps performed per each autoencoder step 
             if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
@@ -405,13 +398,11 @@ class Trainer:
         Load the model from the dedicated library
         """
         # Dictionary of models 
-        models = {'VAE': SigmaVAE, 'AE': SigmaAE}
-        model = models[self.model_name]
-        return model(in_width = self.in_width,
+        variational =  False if self.model_name == 'AE' else True
+        return CPA(in_width = self.in_width,
                     in_height = self.in_height,
                     in_channels = self.in_channels,
                     device = self.device,
-                    num_drugs = self.num_drugs,
                     n_seen_drugs = self.n_seen_drugs,
                     seed = self.seed,
                     patience = self.patience,
@@ -422,7 +413,8 @@ class Trainer:
                     predict_moa = self.predict_moa,
                     n_moa = self.num_moa, 
                     total_iterations = self.num_epochs,
-                    class_weights = self.class_imbalance_weights)
+                    class_weights = self.class_imbalance_weights,
+                    batch_size = self.batch_size)
 
 
 # We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,

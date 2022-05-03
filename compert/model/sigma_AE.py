@@ -1,63 +1,53 @@
 import torch
 import torch.utils.data
-
+from .autoencoders import initialize_encoder_decoder
 from .CPA import *
 
 
-class SigmaAE(CPA):
-    def __init__(self,
-                in_width: int,
-                in_height: int,
-                in_channels: int,
-                device: str,
-                num_drugs: int,
-                n_seen_drugs: int,
-                seed: int = 0,
-                patience: int = 5,
-                hparams="",
-                append_layer_width=None,
-                drug_embeddings = None,
-                dataset_name='cellpainting',
-                predict_moa=False,
-                n_moa=0, 
-                total_iterations=None,
-                class_weights: dict = None) -> None:
+class AE(torch.nn.Module):
+    def __init__(self, in_channels, in_width, in_height, variational, hparams, extra_fm, n_seen_drugs, n_moa) -> None:
      
-        super(SigmaAE, self).__init__(in_width,
-                                        in_height,
-                                        in_channels,
-                                        device,
-                                        num_drugs,
-                                        n_seen_drugs,   
-                                        seed,
-                                        patience,
-                                        hparams,
-                                        append_layer_width,
-                                        drug_embeddings, 
-                                        variational=False,
-                                        dataset_name=dataset_name,
-                                        predict_moa=predict_moa,
-                                        n_moa=n_moa,
-                                        total_iterations=total_iterations,
-                                        class_weights=class_weights)
+        super(AE, self).__init__()
+        self.in_channels = in_channels
+        self.in_width = in_width
+        self.in_height = in_height
+        self.hparams = hparams
+        self.variational = variational
+        self.extra_fm = extra_fm
+        self.encoder, self.decoder  = initialize_encoder_decoder(self.in_channels, 
+                                                                self.in_width, 
+                                                                self.in_height, 
+                                                                self.variational, 
+                                                                self.hparams, 
+                                                                self.extra_fm)
+        self.n_seen_drugs = n_seen_drugs
+        self.n_moa = n_moa
+        
+    def kl_loss(self, mu, log_sigma):
+        """Compute KL divergence with a standard normal distribution
+
+        Args:
+            mu (torch.tensor): mean tensor
+            log_sigma (torch.tensor): log sigma tensor
+        """
+        dims = list(range(len(mu.shape)))
+        if self.hparams["mean_recon_loss"]:
+            kl = torch.mean(-0.5 * torch.mean(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = dims[1:]), dim = 0)
+        else:
+            kl = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = dims[1:]), dim = 0)
+        return kl
+
+    def reparameterize(self, mu, log_sigma):
+        """
+        Perform the reparametrization trick to allow for gradient descent. 
+        mu: the mean of the latent space as predicted by the encoder module
+        log_sigma: log variance of the latent space as predicted by the encoder 
+        """
+        std = torch.exp(0.5 * log_sigma)
+        eps = torch.randn_like(std)
+        return eps * std + mu
 
         
-    # def reconstruction_loss(self, X_hat, X):
-    #     """ Computes the likelihood of the data given the latent variable,
-    #     in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
-    #     same for VAE and AE) """
-    #     # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
-    #     # ensures stable training.
-    #     if self.hparams["data_driven_sigma"]:
-    #         self.log_scale = ((X - X_hat) ** 2).mean([0,1,2,3], keepdim=True).sqrt().log()  # Keep the 3 dimensions 
-    #         self.log_scale = softclip(self.log_scale, -6)
-    #     # Gaussian log lik
-    #     if self.hparams["mean_recon_loss"]:
-    #         rec = gaussian_nll(X_hat, self.log_scale, X).mean()  # Single value (not averaged across batch element)
-    #     else:
-    #         rec = gaussian_nll(X_hat, self.log_scale, X).sum((1,2,3)).mean()  # Single value (not averaged across batch element)
-    #     return rec
-
     def reconstruction_loss(self, X_hat, X):
         """ Computes the likelihood of the data given the latent variable,
         in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
@@ -66,66 +56,142 @@ class SigmaAE(CPA):
         # ensures stable training.
         return torch.nn.L1Loss()(X_hat, X)
 
-    def ae_loss(self, X, X_hat):
+
+    def ae_loss(self, X, X_hat, mu=None, log_sigma=None):
         """
         Aggregate and return the reconstruction loss
         """
-        loss = self.reconstruction_loss(X_hat, X)        
-        return dict(total_loss=loss)
+        rec = self.reconstruction_loss(X_hat, X)   
+        if self.variational:
+            kl = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = 1), dim = 0)
+            loss = rec + self.hparams['beta']*kl
+            return dict(total_loss=loss, recon_loss=rec, kl_loss=kl)
+        else:
+            loss = rec
+            return dict(total_loss=loss)
 
-    
+
     def get_latent_representation(self, X):
         """
         Given an input X, it returns a latent encoding for it 
         """
         z = self.encoder(X)
         return dict(z=z)
-    
 
+
+    # Forward pass    
+    def forward_ae(self, X, y_drug=None, y_moa=None, mode='train'):
+        """Simple encoding-decoding process with no adversarial loss
+
+        Args:
+
+            X (torch.Tensor): The image data X
+        Returns:
+            dict: The reconstructed input, the latent representation and the losses  
+        """
+        # FORWARD STEP ENCODER
+        if not self.variational:
+            z_basal = self.encoder(X)
+        else:
+            mu, log_sigma = self.encoder(X)
+            z_basal = self.reparameterize(mu, log_sigma)  
+        
+        # DECODE THE BASAL STATE ONLY IN EVALUATION MODE
+        if mode=='eval' or y_drug == None:
+            if self.hparams['decoding_style'] == 'sum':
+                cond_drug = None
+                cond_moa = None
+
+            if (self.hparams['decoding_style'] == 'concat'and self.hparams['concatenate_one_hot']):
+                cond_drug = torch.zeros(z_basal.shape[0], self.n_seen_drugs).to(self.device)
+                cond_moa = torch.zeros(z_basal.shape[0], self.n_moa).to(self.device)
+            
+            else:
+                cond_drug = torch.zeros(z_basal.shape[0], self.hparams["drug_embedding_dimension"]).to(self.device)
+                cond_moa = torch.zeros(z_basal.shape[0], self.hparams["moa_embedding_dimension"]).to(self.device)
+            
+            # DECODE BASAL
+            out_basal = self.decoder(z_basal, cond_drug, cond_moa)
+        else:
+            out_basal = None
+
+        # IF y_drug IS DIFFERENT FROM NONE, WE CONDITION THE LATENT
+        if y_drug != None:
+            if self.hparams["decoding_style"] == 'sum':
+                # Sum the latents of the drug and the image
+                z = z_basal + y_drug + y_moa           
+                y_drug, y_moa = None, None
+            else:
+                z = z_basal  # We will concatenate to it in the decoder part 
+            
+            # DECODE CONDITIONED SPACE
+            out = self.decoder(z, y_drug, y_moa) 
+        else:
+            z = None
+            out = out_basal
+        
+        # Compute autoencoder loss
+        if self.variational:
+            ae_loss = self.ae_loss(X, out, mu, log_sigma)
+        else:
+            ae_loss = self.ae_loss(X, out)
+        
+        return dict(out=out, out_basal=out_basal, z=z, z_basal=z_basal, ae_loss=ae_loss)
+
+    
     def generate(self, loader):
         """
         Given an input image x, returns the reconstructed image
         x: input image
         """
-        # Collect the data from the batch at random 
-        original = next(iter(loader))
+        # COLLECT DATA FROM NEXT BATCH
+        original = next(iter(loader))  
         original_X = original['X'][0].to(self.device).unsqueeze(0) 
-        # Initialize the ground truth with the one-hot vectors
+        # GROUND TRUTH WITH ONE-HOT VECTORS
         y_drug = original['mol_one_hot'].to(self.device).float()
         y_moa = original['moa_one_hot'].to(self.device).float()
+        # DRUG AND MOA ID
+        drug_id = y_drug.argmax(1).to(self.device).float()
+        moa_id = y_moa.argmax(1).to(self.device).float()
 
         with torch.no_grad():
             if self.adversarial:
                 # Collect the encoders for the drug embeddings to condition the latent space 
-                drug_id  = original['smile_id'][0].to(self.device).unsqueeze(0)
                 drug_emb = self.drug_embeddings(drug_id) 
                 z_drug = self.drug_embedding_encoder(drug_emb) 
                 # Collect the mode of action embeddings 
                 if self.predict_moa:
-                    moa_id  = original['moa_id'][0].to(self.device).unsqueeze(0)
                     moa_emb = self.moa_embeddings(moa_id) 
                     z_moa = self.moa_embedding_encoder(moa_emb)
                 else:
                     z_moa = 0 
             
             # Encode image 
-            z_basal = self.encoder(original_X)  
+            if not self.variational:
+                z_basal = self.encoder(original_X)  
+            else:
+                mu_orig, log_sigma_orig = self.encoder(original_X) # Encode image
+                z_basal = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
 
             # Handle the case training is not adversarial (append zero masks to the )
             if not self.adversarial:
-                if self.hparams["decoding_style"] == 'sum' or (self.hparams["decoding_style"] == 'concat' and self.hparams["concatenate_one_hot"]):
+                if self.hparams["decoding_style"] == 'sum':
+                    y_drug = None
+                    y_moa = None
+                elif self.hparams["decoding_style"] == 'concat' and self.hparams["concatenate_one_hot"]:
                     y_drug = torch.zeros(original_X.shape[0], self.n_seen_drugs).to(self.device)
                     y_moa = torch.zeros(original_X.shape[0], self.n_moa).to(self.device)
                 else:
                     y_drug = torch.zeros(z_basal.shape[0], self.hparams["drug_embedding_dimension"]).to(self.device)
                     y_moa = torch.zeros(z_basal.shape[0], self.hparams["moa_embedding_dimension"]).to(self.device)
+                
+                # From basal reconstruct the image if not adversarial     
                 reconstructed_X = self.decoder(z_basal, y_drug, y_moa) 
 
             else:
+                # If not concat, perform the sum of embeddings 
                 if self.hparams["decoding_style"] == 'sum':
-                    # If not concat, perform the sum of embeddings 
                     z = z_basal + z_drug + z_moa
-                
                 else:
                     if not self.hparams["concatenate_one_hot"]:
                         y_drug = z_drug
@@ -134,4 +200,3 @@ class SigmaAE(CPA):
                 reconstructed_X = self.decoder(z, y_drug, y_moa) 
 
         return original_X, reconstructed_X
-

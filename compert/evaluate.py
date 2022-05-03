@@ -1,3 +1,5 @@
+from tkinter import E
+from zlib import Z_HUFFMAN_ONLY
 from tqdm import tqdm
 import sklearn
 from sklearn.metrics import silhouette_score, f1_score
@@ -8,13 +10,13 @@ from torch import nn
 import warnings
 from torch.nn import functional as F
 # from .model.modules.discriminator.discriminator_net import *
-from model.modules.discriminator.discriminator_net import *
-
+from model.modules.adversarial.adversarial_nets import *
 
 def training_evaluation(model,  
                         dataset_loader, 
                         adversarial, 
-                        metrics, 
+                        metrics,
+                        losses, 
                         dmso_id,
                         device, 
                         end=False, 
@@ -23,6 +25,7 @@ def training_evaluation(model,
                         predict_moa=False, 
                         ds_name=None, 
                         drug2moa=None):
+
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
     Args:
@@ -42,121 +45,120 @@ def training_evaluation(model,
     if (ds_name=='cellpainting' and model.hparams['concat_one_hot'] and ood):
         warnings.warn("OOD + one-hot unsupported on Cell Painting")
         return {}, {} 
+    
+    # Reset the metrics and the losses 
+    metrics.reset()  
+    losses.reset()
 
-    # Final dictionary containing all the losses
-    losses = {}
-
-    # Initialize the null metrics
-    val_loss = 0  # Total validation loss
-    if variational:
-        val_recon_loss = 0  # Total reconstruction loss
-        val_kl_loss = 0  # Total Kullback-Leibler loss
     if adversarial:
         rmse_basal_full = 0  # The difference between a decoded image with and without addition of the drug
         conterfactual_rmse = 0 # The average difference between the image and the counterfacted version of it 
-    
-    # Zero out the metrics for the next step
-    metrics.reset()  
 
-    # Settings for ground truth prediction
-    y_true_ds_drugs = []
+    # STORE PREDICTIONS AND GROUND TRUTH LABELS 
+    y_true_ds_drugs = []  
     y_hat_ds_drugs = []
     if predict_moa:
         y_true_ds_moa = []
         y_hat_ds_moa = []
-    
-    # If we are at the last iteration of a CPA-like model we also store z_basal predictions for disentanglement metrics
-    z_basal_ds = []  # Will contain the basal latent representation (no drug effect)
-    z_ds = []  # Will contain the total drug representation (with added drug effect)
 
+    # STORE THE LATENTS FOR LATER ANALYSIS
+    z_basal_ds = []  
+    z_ds = []  
+
+    # LOOP OVER SINGLE OBSERVATIONS 
     for observation in tqdm(dataset_loader):
-        # Load observation X
-        X = observation['X'].to(device)
 
-        # Cell Painting's ood are unseen drugs, so they are not assigned a one hot dimension 
-        y_adv_drugs = observation['mol_one_hot'].to(device) if (ds_name!='cellpainting' or not ood) else observation['smile_id'] 
-        y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())
+        # COLLECT DATA FROM BATCH 
+        X = observation['X'].to(device)  # X matrix
+        y_adv_drugs = observation['mol_one_hot'].to(device)  # Adversary drug prediction  
+        y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())  # Record the labels 
 
-        # The if statement is not required for the MOA because it is not present in the Cell Painting dataset 
         if predict_moa:
             y_adv_moa = observation['moa_one_hot'].to(device)
             y_true_ds_moa.append(torch.argmax(y_adv_moa, dim=1).item())
         else: 
             y_adv_moa =  None 
 
-        # Predictions 
+
+        # PREDICTIONS  
         if not adversarial:
             with torch.no_grad():
-                res = model.forward_ae(X)
+                res = model.forward_ae(X, y_drug=None, y_moa=None, mode='eval')
                 out, z_basal, ae_loss = res.values()
-        else:
-            # Get evaluation results
-            drug_id = observation["smile_id"].to(device)
-            if predict_moa:
-                moa_id = observation["moa_id"].to(device)
-            else: 
-                moa_id = None 
-            with torch.no_grad():
-                res = model.forward_compert(X=X, y_adv_drug=y_adv_drugs, y_adv_moa=y_adv_moa, drug_ids=drug_id, moa_ids=moa_id, mode='eval', device=device)
-                out, out_basal, z_basal, z, y_hat_drug, y_hat_moa, ae_loss, _, _ = res.values()
 
-            rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()
-            # Collect the predicted labels and argmax them  
-            if (ds_name!='cellpainting' or not ood):
-                y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
+            # Record the obtained loss functions 
+            losses.update_losses(ae_loss)
+            z_basal_ds.append(z_basal)
+
+        else:
+            # ENCODE THE LABELS IF NECESSARY 
+            # Label encoder 
+            if model.encoded_covariates:
+                drug_id = y_adv_drugs.argmax(1).to(device)
                 if predict_moa:
-                    y_hat_ds_moa.append(torch.argmax(y_hat_moa, dim=1).item())
+                    moa_id = y_adv_moa.argmax(1).to(device)
+                else: 
+                    moa_id = None
+                # Get the embedded drug and mode of action 
+                z_drug, z_moa = model.encode_cov_labels(drug_id, moa_id)
+            
+            else:
+                z_drug, z_moa = y_adv_drugs, y_adv_moa
+            
+            # Autoencoder step 
+            out, out_basal, z, z_basal, ae_loss = model.forward_ae(X, y_drug=drug_id, y_moa=moa_id, mode='eval')
+            rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()  # RMSE between out and out_basal 
+            
+            # Append the z for score later on 
+            z_ds.append(z)
+            z_basal_ds.append(z_basal)
+
+            # Latent adversary step and prediction append 
+            y_hat_drug = model.adversary_drugs(z_basal)
+            y_hat_moa = model.adversary_moa(z_basal)
+            y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
+            if predict_moa:
+                y_hat_ds_moa.append(torch.argmax(y_hat_moa, dim=1).item())
 
             # Update the counterfactual score 
             conterfactual_rmse += counterfactual_score(X, z_basal, model, y_adv_drugs, y_adv_moa, drug_id, moa_id, drug2moa)
-            
-        # Only at the end of training we store the latent vectors for analysis 
-        # If the training is not adversarial, we only have Z basal
-        if adversarial:
-            z_ds.append(z)
-        z_basal_ds.append(z_basal)
-            
-        # Update the losses and the metrics 
-        val_loss += ae_loss['total_loss'].item()
-        if variational:
-            val_recon_loss += ae_loss['reconstruction_loss'].item()
-            val_kl_loss += ae_loss['KLD'].item()
-        
+            # Update the autoencoder losses
+            losses.update_losses(ae_loss)
+
         # Update RMSE on valid set
         metrics.update_rmse(X, out)
 
-    if (ds_name!='cellpainting' or not ood) and adversarial:
-        if X.shape[0]>1:
-            # Update metric for drug prediction
-            y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-            y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
-            if predict_moa:
-                y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
-                y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
-        
-        # Check classification report on the labels
-        metrics.compute_classification_report(y_true_ds_drugs, y_hat_ds_drugs, '_drug')
-        
-        # Update the metric for the moa prediction, if applicable
-        if predict_moa: 
-            metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
-                    
-    # Derive the average losses 
-    losses["loss"] = val_loss/len(dataset_loader)
-    if variational:
-        losses["avg_validation_recon_loss"] = val_recon_loss/len(dataset_loader)
-        metrics.update_bpd(losses["avg_validation_recon_loss"])
-        losses["avg_validation_kld_loss"] = val_kl_loss/len(dataset_loader)
-    else:
-        metrics.update_bpd(losses["loss"])
+    # Compute classification report adversary
+    if X.shape[0]>1:
+        # Update metric for drug prediction
+        y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
+        y_hat_ds_drugs = torch.cat(y_hat_drug, dim=0).to('cpu').numpy()
+        if predict_moa:
+            y_true_ds_moa = torch.cat(y_true_ds_moa, dim=0).to('cpu').numpy()
+            y_hat_ds_moa = torch.cat(y_hat_ds_moa, dim=0).to('cpu').numpy()
+    
+    # Check classification report on the labels
+    metrics.compute_classification_report(y_true_ds_drugs, y_hat_ds_drugs, '_drug')
+    # Update the metric for the moa prediction, if applicable
+    if predict_moa: 
+        metrics.compute_classification_report(y_true_ds_moa, y_hat_ds_moa, '_moa')
+    
+    # Average losses 
+    losses.average_losses()
+    losses.print_losses()
 
-    # Update the rmse and rmse_basal_full metric 
-    metrics.metrics['rmse'] /= len(dataset_loader)
+    # Update the bit per dimension metric
+    recon_loss = losses.loss_dict['recon_loss'] if variational else losses.loss_dict['total_loss']
+    metrics.update_bpd(recon_loss*X.shape[1]*X.shape[2]*X.shape[3]) 
+
+    metrics.average_losses()
+    # Add the adversarial scores to the metrics 
     if adversarial:
         metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
         metrics.metrics['conterfactual_rmse'] = conterfactual_rmse/len(dataset_loader)
 
-    # Exclude the DMSO from the predictions to make the prediction balanced 
+
+    # COMPUTE THE DISENTANGLEMENT SCORES for drugs that are not DMSO
     y_true_ds_drugs = np.array(y_true_ds_drugs)
     idx_not_dmso = np.where(y_true_ds_drugs!=dmso_id)
 
@@ -181,14 +183,10 @@ def training_evaluation(model,
 
     del z_basal_ds
     del z_ds
-
-    print(f'Average validation loss: {losses["loss"]}')
-    if variational:
-        print(f'Average validation reconstruction loss: {losses["avg_validation_recon_loss"]}')
-        print(f'Average kld reconstruction loss: {losses["avg_validation_kld_loss"]}')
-
+        
+    # Print metrics 
     metrics.print_metrics()
-    return losses, metrics.metrics
+    return losses.loss_dict, metrics.metrics
 
 
 def compute_disentanglement_score(Z, y, return_misclass_report=False):
