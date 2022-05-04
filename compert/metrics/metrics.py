@@ -85,7 +85,7 @@ class TrainingLosses:
         """
         self.loss_dict = {}
         for key in losses:
-            self.loss_dict[key] = losses[key]
+            self.loss_dict[key] = 0
         
     def update_losses(self, losses):
         """
@@ -111,4 +111,3 @@ class TrainingLosses:
         """
         for key in self.loss_dict:
             self.loss_dict[key] = self.loss_dict[key]/self.batch_size
-

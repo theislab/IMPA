@@ -144,7 +144,6 @@ class DisentanglementClassifier(nn.Module):
 
     def forward(self, x):
         out = self.conv(x)
-        print(out.shape)
         out = out.view(out.shape[0], -1)
         return self.linear(out)
 

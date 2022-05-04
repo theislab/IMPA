@@ -257,7 +257,7 @@ class Trainer:
                 self.model.module.initialize_adversarial()
                 if self.hparams['recon_gan']:
                     self.model.module.initialize_recons_GAN()
-                elif self.hparams['classification_gan']:
+                if self.hparams['classification_gan']:
                     self.model.module.initialize_classific_GAN()
             
             print(f'Running epoch {epoch}')

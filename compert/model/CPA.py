@@ -256,7 +256,7 @@ class CPA(TemplateModel):
 
     def initialize_recons_GAN(self):
         # Discriminator on the output pixel state (True vs False)
-        self.recon_predictor = GANDiscriminator(self.in_width, self.in_channels, init_fm=64, device=self.device)
+        self.recon_predictor = GANDiscriminator(self.in_width, self.in_channels, init_fm=64, device=self.device).to(self.device)
                
         # Loss for the GAN on the pixel space
         self.recon_predictor_loss = torch.nn.BCELoss()
@@ -281,8 +281,8 @@ class CPA(TemplateModel):
 
     def initialize_classific_GAN(self):
         # Discriminator on the output pixel state (True vs False)
-        self.classifier_predictor = GANClassifier(self.in_width, self.in_channels, init_fm=64, num_outputs=self.n_seen_drugs,
-                                                    num_outputs_moa=self.n_moa, predict_moa=self.predict_moa)
+        self.classifier_predictor = GANClassifier(self.in_width, self.in_channels, init_fm=64, num_outputs_drug=self.n_seen_drugs,
+                                                    num_outputs_moa=self.n_moa, predict_moa=self.predict_moa).to(self.device)
 
         self.classifier_predictor_loss = torch.nn.CrossEntropyLoss(reduction = 'mean')
 
@@ -431,7 +431,7 @@ class CPA(TemplateModel):
 
                 # Update autoencoder 
                 if option == 'AE':
-                    out, loss, ae_loss, adv_loss_drug, adv_loss_moa, loss_recon_gan, loss_classification_gan_drug, loss_classification_gan_moa= self.autoencoder_step(X, 
+                    out, loss, ae_loss, adv_loss_drug, adv_loss_moa, loss_recon_gan, loss_classification_gan= self.autoencoder_step(X, 
                                                                                             y_adv_drug, 
                                                                                             drug_id, 
                                                                                             y_adv_moa, 
@@ -442,8 +442,7 @@ class CPA(TemplateModel):
                                 'adv_loss_drug': adv_loss_drug,
                                 'adv_loss_moa': adv_loss_moa,
                                 'loss_recon_gan': loss_recon_gan,
-                                'loss_classification_gan_drug': loss_classification_gan_drug,
-                                'loss_classification_gan_moa': loss_classification_gan_moa
+                                'loss_classification_gan': loss_classification_gan
                                 }
                     
                     loss_dict = configure_loss_dict(loss_dict)
@@ -497,14 +496,11 @@ class CPA(TemplateModel):
         if self.encoded_covariates:
             # Embed the drug and moa
             z_drug, z_moa = self.encode_cov_labels(drug_id, moa_id)
-            out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='train')
+            out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='train').values()
 
         else:
-            out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, y_moa=y_adv_moa, mode='train')
+            out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, y_moa=y_adv_moa, mode='train').values()
 
-        # Free memory 
-        del z_drug
-        del z_moa
         
         # GET THE ADVERSARIAL LATENT DISCRIMINATOR LOSS 
         y_adv_hat_drug = self.adversary_drugs(z_basal)
@@ -542,7 +538,7 @@ class CPA(TemplateModel):
             # Perform decoding with randomly flipped attributes
             x_flipped = self.autoencoder.decoder(z_flip, z_drug_flip, z_moa_flip)
 
-            loss_classification_gan = self.classifier_predictor.generator_pass(x_flipped, self.classifier_predictor_loss, y_adv_drug_flip, y_adv_moa_flip)  
+            loss_classification_gan = self.classifier_predictor.generator_pass(x_flipped, self.classifier_predictor_loss, drug_id_flip, moa_id_flip)  
         else:
             loss_classification_gan_drug, loss_classification_gan_moa = 0, 0
         
@@ -556,7 +552,7 @@ class CPA(TemplateModel):
         self.optimizer_autoencoder.step()
         
         return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_latent_drug, adv_loss_moa=adv_loss_latent_moa,
-                    loss_recon_gan=loss_recon_gan, loss_classification_gan_drug=loss_classification_gan_drug, loss_classification_gan_moa=loss_classification_gan_moa)
+                    loss_recon_gan=loss_recon_gan, loss_classification_gan_drug=loss_classification_gan)
 
 
     def latent_discriminator_step(self, X, y_adv_drug, y_adv_moa):
@@ -642,6 +638,8 @@ class CPA(TemplateModel):
 
     def update_cycle(self, name, number_of_steps):
         # The cycle controls what kind of training step is performed among discriminators and autoencoder 
+        print(self.max_cycle)
+        print(number_of_steps)
         vals = [self.max_cycle+i for i in range(1, number_of_steps+1)]
         for val in vals:
             self.cycle[val] = name
@@ -650,7 +648,7 @@ class CPA(TemplateModel):
 
     def swap_attributes(self, y_drug, y_moa = None):
         # Randomly flip the treatements in the dataset 
-        perm = torch.randperm(torch.arange(y_drug.size(0)))
+        perm = torch.randperm(y_drug.size(0))
         # Apply permutation  
         y_drug_perm = y_drug[perm]
         if self.predict_moa:
