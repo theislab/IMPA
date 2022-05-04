@@ -14,7 +14,7 @@ class UNetEncoder(nn.Module):
         self.in_height = in_height 
         self.variational = variational
 
-        # The initial feature maps equate the number of channels of the 
+        # The initial feature maps equate the number of channels of the image
         in_fm = self.init_fm
 
         # First convolution from the input channels to the first feature map 
@@ -31,12 +31,10 @@ class UNetEncoder(nn.Module):
 
     def forward(self, X):
         z = self.module(X)  # Encode the image 
-        
         # Derive the encodings for the mean and the log variance
         if self.variational:
             mu, log_sigma = z.chunk(2, dim=1)
             return mu, log_sigma
-
         return z
 
 
@@ -60,21 +58,22 @@ class UNetDecoder(nn.Module):
         in_fm = self.in_channels
         self.modules = []
         
+        # Upscale increasing number of feature maps based on concatenation 
         for _ in range(self.n_conv):
             self.modules.append(Up(in_fm+self.extra_fm, in_fm // 2))
             in_fm //= 2
-            
+        
+        # Out conv is not transposing
         self.modules.append(OutConv(in_fm+self.extra_fm, self.out_channels))
         self.modules.append(torch.nn.Sigmoid())
         self.deconv = torch.nn.Sequential(*self.modules)        
 
     def forward_sum(self, z):
-        # Reshape to height x width
         X = self.deconv(z)
         return X 
     
     def forward_concat(self, z, y_drug, y_moa):
-        # Reshape to height x width
+        # Concat label after every upscaling layer 
         for layer in self.deconv[:-1]:
             
             # Upsample drug labs
@@ -86,15 +85,16 @@ class UNetDecoder(nn.Module):
             y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
             z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+        # Sigmoid pass
         X = self.deconv[-1](z)
         return X 
-
 
     def forward(self, z, y_drug, y_moa):
         if self.decoding_style == 'sum':
             return self.forward_sum(z)
         else:
             return self.forward_concat(z, y_drug, y_moa) 
+
 
 
 if __name__ == '__main__':

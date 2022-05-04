@@ -2,7 +2,6 @@ import json
 from tqdm import tqdm
 import numpy as np
 import torch
-from utils import *
 
 from .modules.building_blocks import *
 
@@ -11,9 +10,10 @@ from .template_model import *
 import sys
 sys.path.insert(0, '..')
 
-from .sigma_AE import AE
+from .AE import AE
 from .modules.adversarial.adversarial_nets import *
 from metrics.metrics import *
+from utils import *
 
 
 """
@@ -65,7 +65,7 @@ class CPA(TemplateModel):
         else:
             self.set_hparams_(0, hparams)
 
-        # Setup metrics object
+        # Setup metrics and losses objects
         self.metrics = TrainingMetrics(self.in_height, self.in_width, self.in_channels, batch_size, device = self.device)
         self.losses = TrainingLosses(self.batch_size)
         
@@ -102,7 +102,7 @@ class CPA(TemplateModel):
         # Get the parameters of a model if a condition is verified
         self.get_params = lambda model, cond: list(model.parameters()) if cond else []  
 
-        # Class weights 
+        # Class weights for balancing 
         self.class_weights = class_weights 
 
         # Initialize the autoencoder first with adversarial equal to False
@@ -151,7 +151,7 @@ class CPA(TemplateModel):
                 init_fm, self.hparams["adversary_width_moa"], depth, self.n_moa
             ).to(self.device)
         
-        # Create drug and moa embeddings 
+        # Create drug embedding 
         if self.drug_embeddings is None:
             self.drug_embeddings = torch.nn.Embedding(
                 self.n_seen_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
@@ -369,19 +369,6 @@ class CPA(TemplateModel):
 
         return self.hparams
             
-        
-    def compute_gradient_penalty(self, output, input):
-        """Compute the penalty of the gradient of an output with respect to an input tensor
-        Args:
-            output (_torch.nn.Tensor_): Result of a differentiable function 
-            input (_torch.nn.Tensor_): The input
-        Returns:
-            torch.Tensor: The gradient penalty associated to the gradient of output with respect to input 
-        """
-        grads = torch.autograd.grad(output, input, create_graph=True)
-        grads = grads[0].pow(2).mean()
-        return grads
-    
     
     def early_stopping(self, score):
         """
@@ -399,7 +386,8 @@ class CPA(TemplateModel):
     
 
     def update_model(self, train_loader, epoch):
-        """Call the right model update function 
+        """
+        Call the right model update function 
         """
         
         # Reset the previously defined metrics
@@ -484,7 +472,7 @@ class CPA(TemplateModel):
 
         # Update the bit per dimension metric
         recon_loss = loss_dict['recon_loss'] if self.variational else loss_dict['total_loss']
-        self.metrics.update_bpd(recon_loss*self.batch_size) 
+        self.metrics.update_bpd(recon_loss*self.in_width*self.in_height*self.in_channels) 
 
         # Print losses
         self.losses.print_losses()
@@ -494,15 +482,27 @@ class CPA(TemplateModel):
                 
                 
     def autoencoder_step(self, X, y_adv_drug, drug_id, y_adv_moa, moa_id):
+        """Step to train the autoencoder model. It maximizes the reconstruction and minimizes the GAN losses 
+
+        Args:
+            X (torch.nn.Tensor): The batch of observations 
+            y_adv_drug (torch.nn.Tensor): The labels for the drugs
+            drug_id (torch.nn.Tensor): The ids for the drugs (to retreieve embeddings)
+            y_adv_moa (torch.nn.Tensor): The labels for the moas 
+            moa_id (torch.nn.Tensor): The ids for the moas 
+        """
+        # Put the autoencoder back in training mode in case it was in eval after the execution of a GAN step 
         self.autoencoder.train()
         # GET THE RECONSTRUCTION LOSS
-        if self.hparams['decoding_style'] == 'sum' or (self.hparams['decoding_style'] == 'concat' and not self.hparams['concat_one_hot']):
+        if self.encoded_covariates:
             # Embed the drug and moa
             z_drug, z_moa = self.encode_cov_labels(drug_id, moa_id)
             out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='train')
 
         else:
             out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, y_moa=y_adv_moa, mode='train')
+
+        # Free memory 
         del z_drug
         del z_moa
         
@@ -524,14 +524,14 @@ class CPA(TemplateModel):
         # GET THE CLASSIFICATION GAN LOSS 
         if self.hparams["classification_gan"]:
             # Permute labels 
-            y_adv_hat_drug_flip, y_adv_hat_moa_flip = self.swap_attributes(y_drug=y_adv_hat_drug, y_moa=y_adv_moa)
-            drug_id_flip, moa_id_flip = y_adv_hat_drug_flip.argmax(1), y_adv_hat_moa_flip.argmax(1) if y_adv_hat_moa_flip!= None else None
+            y_adv_drug_flip, y_adv_moa_flip = self.swap_attributes(y_drug=y_adv_drug, y_moa=y_adv_moa)
+            drug_id_flip, moa_id_flip = y_adv_drug_flip.argmax(1), y_adv_moa_flip.argmax(1) if y_adv_moa_flip!= None else None
             
             # Encode labels
-            if self.hparams['decoding_style'] == 'sum' or (self.hparams['decoding_style'] == 'concat' and not self.hparams['concat_one_hot']):
+            if self.encoded_covariates:
                 z_drug_flip, z_moa_flip = self.encode_cov_labels(drug_id_flip, moa_id_flip)
             else:
-                z_drug_flip, z_moa_flip = y_adv_hat_drug_flip, y_adv_hat_moa_flip
+                z_drug_flip, z_moa_flip = y_adv_drug_flip, y_adv_moa_flip
 
             # Condition the latents
             if self.hparams['decoding_style'] == 'sum':
@@ -542,7 +542,7 @@ class CPA(TemplateModel):
             # Perform decoding with randomly flipped attributes
             x_flipped = self.autoencoder.decoder(z_flip, z_drug_flip, z_moa_flip)
 
-            loss_classification_gan = self.classifier_predictor.generator_pass(x_flipped, self.classifier_predictor_loss, y_adv_hat_drug_flip, y_adv_hat_moa_flip)  
+            loss_classification_gan = self.classifier_predictor.generator_pass(x_flipped, self.classifier_predictor_loss, y_adv_drug_flip, y_adv_moa_flip)  
         else:
             loss_classification_gan_drug, loss_classification_gan_moa = 0, 0
         
@@ -560,6 +560,7 @@ class CPA(TemplateModel):
 
 
     def latent_discriminator_step(self, X, y_adv_drug, y_adv_moa):
+        self.autoencoder.eval()
         # Just need to encode the images and predict on the latent
         if not self.variational:
             z_basal = self.autoencoder.encoder(X)
@@ -650,6 +651,7 @@ class CPA(TemplateModel):
     def swap_attributes(self, y_drug, y_moa = None):
         # Randomly flip the treatements in the dataset 
         perm = torch.randperm(torch.arange(y_drug.size(0)))
+        # Apply permutation  
         y_drug_perm = y_drug[perm]
         if self.predict_moa:
             y_moa_perm =  y_moa[perm]

@@ -28,7 +28,7 @@ class ResnetEncoderCycleGAN(nn.Module):
         self.modules = []
 
         # The kind of normalization provided is batch normalization 
-        self.norm_layer = nn.BatchNorm2d
+        self.norm_layer = nn.BatchNorm2d()
 
         # Initial layer with a large convolutional kernel
         self.model = [nn.ReflectionPad2d(3),  # padding +3 to half the spatial dimension
@@ -36,12 +36,14 @@ class ResnetEncoderCycleGAN(nn.Module):
                  self.norm_layer(self.init_fm),
                  nn.ReLU(True)]
 
+        # Convolutional layer 
         for i in range(self.n_conv):  # add downsampling layers
             mult = 2 ** i
             self.model += [nn.Conv2d(self.init_fm * mult, self.init_fm * mult * 2, kernel_size=3, stride=2, padding=1, bias=False),
                       self.norm_layer(self.init_fm * mult * 2),
                       nn.ReLU(True)]
 
+        # Residual network  
         mult = 2 ** self.n_conv
         for i in range(self.n_residual_blocks):  # add ResNet blocks
             self.model += [ResnetBlock(self.init_fm * mult, norm_layer=self.norm_layer, use_dropout=False, use_bias=False)]
@@ -87,6 +89,7 @@ class ResnetDecoderCycleGAN(nn.Module):
                       self.norm_layer(int(self.init_fm * mult / 2)),
                       nn.ReLU(True)]
         model += [nn.ReflectionPad2d(3)]
+        # Last comvolution with a large kernel 
         model += [nn.Conv2d(self.init_fm+self.extra_fm, self.out_channels, kernel_size=7, padding=0)]
         model += [nn.Sigmoid()]
 

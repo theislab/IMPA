@@ -289,7 +289,13 @@ class Trainer:
                 # Plot reconstruction of a random image 
                 if self.save_results:
                     with torch.no_grad():
-                        original, reconstructed = self.model.module.generate(self.loader_val)
+                        original, reconstructed = self.model.module.generate(self.loader_val,
+                                                                                self.model.module.drug_embeddings,
+                                                                                self.model.module.drug_embedding_encoder,
+                                                                                self.model.modile.predict_moa,
+                                                                                self.model.module.moa_moa_embeddings,
+                                                                                self.model.module.moa_embedding_encoder)
+
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
                                                     tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 5)
                     del original
@@ -312,12 +318,13 @@ class Trainer:
 
                 print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
             
-            # Scheduler step at the end of the epoch 
+            # Scheduler step at the end of the epoch for the autoencoder 
             if epoch <= self.hparams["warmup_steps"]:
                 self.model.module.optimizer_autoencoder.param_groups[0]["lr"] = self.hparams["autoencoder_lr"] * min(1., epoch/self.model.module.warmup_steps)
             else:
                 self.model.module.scheduler_autoencoder.step()
-            # We do not warmup the adversaries
+
+            # We do not warmup the adversaries and perform the lr scheduling for them separately 
             if self.model.module.adversarial:
                 self.model.module.scheduler_adversaries.step()
                 if self.hparams['recon_gan']:
@@ -368,7 +375,8 @@ class Trainer:
             writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=losses[key], 
                                     global_step=epoch)
         for key in metrics:
-            writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=metrics[key], global_step=epoch)
+            writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=metrics[key],
+                                    global_step=epoch)
     
 
     def format_seml_results(self, history):
@@ -409,6 +417,7 @@ class Trainer:
                     hparams = self.hparams,
                     append_layer_width = self.append_layer_width,
                     drug_embeddings = self.drug_embeddings,
+                    variational = variational,
                     dataset_name = self.dataset_name,
                     predict_moa = self.predict_moa,
                     n_moa = self.num_moa, 

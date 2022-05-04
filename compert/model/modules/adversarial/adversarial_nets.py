@@ -8,7 +8,8 @@ from torch.optim import lr_scheduler
 import torch.nn.functional as F
 
 
-"""The latent discriminator network
+"""
+The latent discriminator network
 """
 
 class LeakyReLUConv2d(nn.Module):
@@ -16,16 +17,21 @@ class LeakyReLUConv2d(nn.Module):
         super(LeakyReLUConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,padding=padding, bias=True)]
+        # Normalization layer, can be instance or batch
         if norm == 'Instance':
             model += [nn.InstanceNorm2d(out_channels, affine=False)]
         if norm == 'Batch':
-            model += [nn.BatchNorm2d(out_channels, affine=False)]
+            model += [nn.BatchNorm2d(out_channels)]
+        # Leaky ReLU loss with default parameters
         model += [nn.LeakyReLU(inplace=True)]
         self.model = nn.Sequential(*model)
 
     def forward(self, x):
         return self.model(x)
 
+"""
+The latent discriminator: tries to predict drugs and moas on the latent space 
+"""
 
 class DiscriminatorNet(nn.Module):
   def __init__(self, init_fm, out_fm, depth, num_outputs):
@@ -38,6 +44,7 @@ class DiscriminatorNet(nn.Module):
     # First number of feature maps 
     in_fm = self.init_fm 
 
+    # Go as deep as necessary to transform the spatial dimension to 1 
     model = []
     for i in range(depth):
         model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=2, padding=1)]
@@ -54,19 +61,20 @@ class DiscriminatorNet(nn.Module):
     return out
 
 
-"""The covariate encoding network 
+"""
+Label encoder networks start from label embeddings and produce a high dimensional encoding that is used to condition the latent 
 """
 
 class LabelEncoder(nn.Module):
     def __init__(self, output_dim, input_fm, output_fm):
         super(LabelEncoder, self).__init__()
 
-        self.output_dim = output_dim
+        self.output_dim = output_dim  # Spatial dimension of the transposed embeddings
         self.input_fm = input_fm
-        self.output_fm = output_fm
+        self.output_fm = output_fm  # Number of feature maps in the middle channels 
         
-        # Depth 
-        depth = int(np.log2(self.output_dim//3))  # Requited for upsampling
+        # Depth required for upsampling 
+        depth = int(np.log2(self.output_dim//3))  
         
         # Initial feature map setup
         in_fm = self.input_fm
@@ -76,13 +84,14 @@ class LabelEncoder(nn.Module):
         self.modules = [torch.nn.ConvTranspose2d(in_fm, out_fm, kernel_size = 3, stride = 2, padding=0),
                         torch.nn.ReLU()] # 1x1 --> 3x3 spatial dimension 
 
-        # Conve2d transpose till the latent dimension 
+        # Conv2d transpose till the latent dimension 
         for i in range(depth):
             self.modules.append(torch.nn.ConvTranspose2d(out_fm, out_fm, kernel_size = 4, stride = 2, padding=1))
             self.modules.append(torch.nn.ReLU())
         self.transp = torch.nn.Sequential(*self.modules)
 
     def forward(self, z):
+        # Since working with linear embeddings, we must reshape the to a unitary spatial dimension 
         z = z.view(z.shape[0], z.shape[1], 1, 1)
         x = self.transp(z)
         return x
@@ -92,18 +101,20 @@ class LabelEncoderLinear(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(LabelEncoderLinear, self).__init__()
         self.input_fm = input_dim
+        self.output_dim = output_dim 
 
         self.mlp = nn.Sequential(
-            nn.Linear(input_dim, output_dim),
+            nn.Linear(self.input_fm, self.output_dim),
             nn.ReLU(inplace=True),
-            nn.Linear(output_dim, output_dim))
+            nn.Linear(self.output_dim, self.output_dim))
 
     def forward(self, z):
         out = self.mlp(z)
         return out
 
 
-"""Disentanglement classifier for classification 
+"""
+Disentanglement classifier for classification 
 """
 
 class DisentanglementClassifier(nn.Module):
@@ -117,13 +128,14 @@ class DisentanglementClassifier(nn.Module):
         # First number of feature maps 
         in_fm = self.init_fm 
 
+        # Two layers of leaky relu convolutions
         model = []
         for i in range(2):
-            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=1, padding=1, norm='Instance')]
+            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=1, padding=1, norm='Instance')]
             if i == 0:
                 in_fm = out_fm
         
-        flattened_dim = self.init_dim *  out_fm
+        flattened_dim = (self.init_dim**2*out_fm)
         # Compile model 
         self.conv = nn.Sequential(*model)
         
@@ -132,17 +144,19 @@ class DisentanglementClassifier(nn.Module):
 
     def forward(self, x):
         out = self.conv(x)
+        print(out.shape)
         out = out.view(out.shape[0], -1)
-        return out
+        return self.linear(out)
 
 
-"""GAN discriminator for prestine vs true
+"""
+GAN discriminator for prestine vs true
 """
 
 class GANDiscriminator(nn.Module):
     def __init__(self, init_dim, init_ch, init_fm, device='cuda'):
         super(GANDiscriminator, self).__init__()
-        self.device = device
+        self.device = device  
         self.init_dim = init_dim  # Spatial dimension
         self.init_ch = init_ch  # Input feature maps (3) 
         self.init_fm = init_fm  # The number of feature maps in the first layer 
@@ -151,6 +165,7 @@ class GANDiscriminator(nn.Module):
         in_fm = self.init_ch
         out_fm = self.init_fm
 
+        # Four layers of strided LeakyReLU
         model = []
         for i in range(4):
             model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Instance')]
@@ -158,7 +173,7 @@ class GANDiscriminator(nn.Module):
             out_fm = in_fm *2
 
         # Last convolution with stride 1
-        model += [nn.Conv2d(in_fm, out_fm, kernel_size=4, stride=1, padding=1, norm='Instance')]
+        model += [nn.Conv2d(in_fm, out_fm, kernel_size=4, stride=1, padding=1)]
 
         # Compile model 
         self.conv = nn.Sequential(*model)
@@ -167,7 +182,7 @@ class GANDiscriminator(nn.Module):
         self.activation = nn.Sigmoid()
 
     def forward(self, x):
-        out = self.conv(x)
+        out = self.conv(x)  # BxCx6x6
         out = out.view(out.shape[0], -1)
         return self.activation(out).mean(1).view(out.size(0))
 
@@ -176,7 +191,7 @@ class GANDiscriminator(nn.Module):
         data_real = X  # From batch
         data_fake = X_hat.detach()  # From the autoencoder
         label_real = torch.ones(data_real.shape[0]).to(self.device) 
-        label_fake = torch.zeros(data_fake.shape[0].to(self.device))
+        label_fake = torch.zeros(data_fake.shape[0]).to(self.device)
 
         pred_real = self.forward(data_real).squeeze()
         pred_fake = self.forward(data_fake).squeeze()
@@ -193,7 +208,8 @@ class GANDiscriminator(nn.Module):
         return gan_loss
 
  
-"""GAN discriminator for prestine vs true
+"""
+GAN classifier for correctness of the cell
 """
 
 
@@ -201,7 +217,7 @@ class GANClassifier(nn.Module):
     def __init__(self, init_dim, in_channels, init_fm, num_outputs_drug, num_outputs_moa=0, predict_moa=None):
 
         super(GANClassifier, self).__init__()
-        self.init_dim = init_dim
+        self.init_dim = init_dim  # Starting spatial dimension 
         self.in_channels = in_channels  # Spatial dimension
         self.init_fm = init_fm  # Input feature maps
         self.num_outputs_drug = num_outputs_drug  # Number of classes for the classification 
@@ -219,7 +235,7 @@ class GANClassifier(nn.Module):
             out_fm *= 2
         
         # Dimension of the latent 
-        flattened_dim = (self.init_dim//16)**2  * in_fm
+        flattened_dim = (self.init_dim//16)**2  * in_fm  # Division by 16 because we use 4 2x2 strided convolutions 
         
         # Compile model 
         self.conv = nn.Sequential(*model)
@@ -240,7 +256,6 @@ class GANClassifier(nn.Module):
             out_moa = None
         return out_drug, out_moa
     
-
     def discriminator_pass(self, X, loss, labels_drug, labels_moa=None):
         self.train()
         out_drug, out_moa = self.forward(X)
@@ -249,7 +264,6 @@ class GANClassifier(nn.Module):
         loss_moa = loss(out_moa, labels_moa) if self.predict_moa else 0
         return (loss_drug+loss_moa)/2
 
-    
     def generator_pass(self, X_counterf, loss, swapped_idx_drugs, swapped_idx_moas):
         self.eval()
         # Swapped indices are meant to fool the classifier 
@@ -261,18 +275,18 @@ class GANClassifier(nn.Module):
 
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     # x = torch.rand(3, 512, 6, 6)
     # dis = DiscriminatorNet(512, 256, 3, 4)
     # print(dis(x).shape)
 
-    x = torch.rand(64, 3, 96, 96)
-    x_hat = torch.rand(64, 3, 96, 96)
-    loss = torch.nn.BCELoss()
+    # x = torch.rand(64, 3, 96, 96)
+    # x_hat = torch.rand(64, 3, 96, 96)
+    # loss = torch.nn.BCELoss()
 
-    enc = GANDiscriminator(init_dim=96, init_ch=3, init_fm=64, device='cuda')
-    print(enc.discriminator_pass(x, x_hat, loss))
-    print(enc.generator_pass(x_hat, loss))    
+    # enc = GANDiscriminator(init_dim=96, init_ch=3, init_fm=64, device='cuda')
+    # print(enc.discriminator_pass(x, x_hat, loss))
+    # print(enc.generator_pass(x_hat, loss))    
 
     # enc = GANClassifier(init_dim=96, in_channels=3, init_fm=64, num_outputs=15)
     # print(enc(x).shape)

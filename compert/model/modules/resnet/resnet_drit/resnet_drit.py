@@ -30,31 +30,30 @@ class ResnetDritEncoder(torch.nn.Module):
         self.modules = []
         in_fm = self.init_fm
 
-        # Add the first module convolution with leaky relu and a kernel size of 7
+        # Add the first module convolution with leaky relu and a kernel size of 7 (capture high-level spatial features)
         self.modules += [LeakyReLUConv2d(self.in_channels, in_fm, kernel_size=7, stride=2, padding=3)]
 
         # Add an additional number of convolutions with reduced kernel size 
         for i in range(1, self.n_conv):
-            mult = 2 if not (self.variational and i == self.n_conv-1) else 4  
-            self.modules += [ReLUINSConv2d(in_fm, in_fm * mult, kernel_size=3, stride=2, padding=1)]
-            in_fm = in_fm * mult
+            mult = 2 if not (self.variational and i == self.n_conv-1) else 4  # The product is by 4 if variational (double fm for var and mean)
+            self.modules += [ReLUINSConv2d(in_fm, in_fm * mult, kernel_size=3, stride=2, padding=1)]  # Convolution 
+            in_fm = in_fm * mult 
         
         # Build residual network
         for i in range(0, self.n_residual_blocks):
             self.modules += [INSResBlock(in_fm, in_fm)]
             if i == self.n_residual_blocks-1:
-                self.modules += [GaussianNoiseLayer()]
+                self.modules += [GaussianNoiseLayer()]  # Add Gauss after the last residual net 
         
-        self.conv = nn.Sequential(*self.modules )
+        self.conv = nn.Sequential(*self.modules)
 
     def forward(self, X):
-        z = self.conv(X)  # Encode the image 
-        
+        # Encode the image 
+        z = self.conv(X)  
         # Derive the encodings for the mean and the log variance
         if self.variational:
             mu, log_sigma = z.chunk(2, dim=1)
             return mu, log_sigma
-
         return z
 
 
@@ -75,30 +74,32 @@ class ResnetDritDecoder(nn.Module):
         self.out_channels = out_channels
         self.n_conv = n_conv 
         self.init_fm = init_fm*(2**(self.n_conv-1))  # The first number of feature vectors 
-        self.n_residual_blocks = n_residual_blocks
+        self.n_residual_blocks = n_residual_blocks  
         self.out_width, self.out_height = out_width, out_height 
         self.decoding_style = decoding_style
         self.concatenate_one_hot = concatenate_one_hot
-        self.extra_fm = extra_fm
+        self.extra_fm = extra_fm  # How many extra feature maps die to concatenation 
         
         # Initial number of feature maps
-        in_fm = self.init_fm
+        in_fm = self.init_fm  
         self.modules = []
 
         # Residual blocks
         residual_connections = []
         for i in range(0, self.n_residual_blocks):
+            # Will perform a single concatenation before the residual block, so all the blocks are a single all together 
             residual_connections += [INSResBlock(in_fm+self.extra_fm, in_fm+self.extra_fm)]
         # Residual connections are treated as a whole layer within the module 
         self.residual_connections = torch.nn.Sequential(*residual_connections)
         self.modules += [self.residual_connections]
 
+        # Output feature channels of the residual block 
         in_fm = in_fm+self.extra_fm
-
         for i in range(0, self.n_conv):
             self.modules += [ReLUINSConvTranspose2d(in_fm+self.extra_fm, in_fm//2, kernel_size=3, stride=2, padding=1, output_padding=1)]
             in_fm = in_fm//2
         
+        # Output channel 
         self.modules += [nn.ConvTranspose2d(in_fm+self.extra_fm, self.out_channels, kernel_size=1, stride=1, padding=0)]+[nn.Sigmoid()]
         self.deconv = nn.Sequential(*self.modules)
 
@@ -119,11 +120,11 @@ class ResnetDritDecoder(nn.Module):
 
             z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
         X = self.deconv[-1](z)
-
         return X 
 
 
     def forward(self, z, y_drug, y_moa):
+        # If the decoding style is sum, the labels are ignored
         if self.decoding_style == 'sum':
             return self.forward_sum(z)
         else:
@@ -131,27 +132,27 @@ class ResnetDritDecoder(nn.Module):
 
 
 
-if __name__ == '__main__':
-    enc = ResnetDritEncoder(in_channels = 3,
-                init_fm = 64,
-                n_conv = 3,
-                n_residual_blocks = 4, 
-                in_width = 96,
-                in_height = 96,
-                variational = False)
+# if __name__ == '__main__':
+#     enc = ResnetDritEncoder(in_channels = 3,
+#                 init_fm = 64,
+#                 n_conv = 3,
+#                 n_residual_blocks = 4, 
+#                 in_width = 96,
+#                 in_height = 96,
+#                 variational = False)
 
-    # dec = ResnetDritDecoder(out_channels = 3,
-    #             init_fm = 64,
-    #             n_conv = 5,
-    #             n_residual_blocks = 4, 
-    #             out_width = 96,
-    #             out_height = 96,
-    #             variational = False,
-    #             batch_norm_layers_ae = False,
-    #             dropout_ae = False,
-    #             dropout_rate_ae = 0) 
+#     # dec = ResnetDritDecoder(out_channels = 3,
+#     #             init_fm = 64,
+#     #             n_conv = 5,
+#     #             n_residual_blocks = 4, 
+#     #             out_width = 96,
+#     #             out_height = 96,
+#     #             variational = False,
+#     #             batch_norm_layers_ae = False,
+#     #             dropout_ae = False,
+#     #             dropout_rate_ae = 0) 
     
-    x = torch.Tensor(64, 3, 96, 96)
-    res = enc(x)
-    # x = dec(res)
-    print(res.shape)
+#     x = torch.Tensor(64, 3, 96, 96)
+#     res = enc(x)
+#     # x = dec(res)
+#     print(res.shape)

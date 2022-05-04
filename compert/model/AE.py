@@ -30,7 +30,7 @@ class AE(torch.nn.Module):
             mu (torch.tensor): mean tensor
             log_sigma (torch.tensor): log sigma tensor
         """
-        dims = list(range(len(mu.shape)))
+        dims = list(range(len(mu.shape)))  # Either for linear latent or for feature map latent 
         if self.hparams["mean_recon_loss"]:
             kl = torch.mean(-0.5 * torch.mean(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = dims[1:]), dim = 0)
         else:
@@ -49,11 +49,9 @@ class AE(torch.nn.Module):
 
         
     def reconstruction_loss(self, X_hat, X):
-        """ Computes the likelihood of the data given the latent variable,
-        in this case using a Gaussian distribution with mean predicted by the neural network and variance = 1 (
-        same for VAE and AE) """
-        # Learning the variance can become unstable in some cases. Softly limiting log_sigma to a minimum of -6
-        # ensures stable training.
+        """ 
+        Reconstruction loss is the L1 loss (better at preserving sharp details)
+        """
         return torch.nn.L1Loss()(X_hat, X)
 
 
@@ -63,7 +61,7 @@ class AE(torch.nn.Module):
         """
         rec = self.reconstruction_loss(X_hat, X)   
         if self.variational:
-            kl = torch.mean(-0.5 * torch.sum(1 + log_sigma - mu.pow(2) - log_sigma.exp(), dim = 1), dim = 0)
+            kl = self.kl_loss(mu, log_sigma)
             loss = rec + self.hparams['beta']*kl
             return dict(total_loss=loss, recon_loss=rec, kl_loss=kl)
         else:
@@ -81,13 +79,14 @@ class AE(torch.nn.Module):
 
     # Forward pass    
     def forward_ae(self, X, y_drug=None, y_moa=None, mode='train'):
-        """Simple encoding-decoding process with no adversarial loss
+        """Simple autoencoder forward pass used both in train and validation mode. 
 
         Args:
+            X (torch.Tensor): The input data of interest
+            y_drug (torch.Tensor, optional): The label for the drug. Can be encoded or one-hot depending on conditioning type. Defaults to None.
+            y_moa (torch.Tensor, optional): The label for the moa. Can be encoded or one-hot depending on conditioning type. Defaults to None.
+            mode (str, optional): in what mode we run it (train/eval). Defaults to 'train'.
 
-            X (torch.Tensor): The image data X
-        Returns:
-            dict: The reconstructed input, the latent representation and the losses  
         """
         # FORWARD STEP ENCODER
         if not self.variational:
@@ -139,7 +138,7 @@ class AE(torch.nn.Module):
         return dict(out=out, out_basal=out_basal, z=z, z_basal=z_basal, ae_loss=ae_loss)
 
     
-    def generate(self, loader):
+    def generate(self, loader, drug_embeddings, drug_embedding_encoder, predict_moa, moa_embeddings, moa_embedding_encoder):
         """
         Given an input image x, returns the reconstructed image
         x: input image
@@ -157,12 +156,12 @@ class AE(torch.nn.Module):
         with torch.no_grad():
             if self.adversarial:
                 # Collect the encoders for the drug embeddings to condition the latent space 
-                drug_emb = self.drug_embeddings(drug_id) 
-                z_drug = self.drug_embedding_encoder(drug_emb) 
+                drug_emb = drug_embeddings(drug_id) 
+                z_drug = drug_embedding_encoder(drug_emb) 
                 # Collect the mode of action embeddings 
-                if self.predict_moa:
-                    moa_emb = self.moa_embeddings(moa_id) 
-                    z_moa = self.moa_embedding_encoder(moa_emb)
+                if predict_moa:
+                    moa_emb = moa_embeddings(moa_id) 
+                    z_moa = moa_embedding_encoder(moa_emb)
                 else:
                     z_moa = 0 
             
@@ -192,6 +191,7 @@ class AE(torch.nn.Module):
                 # If not concat, perform the sum of embeddings 
                 if self.hparams["decoding_style"] == 'sum':
                     z = z_basal + z_drug + z_moa
+                # If concat, perform the embedding concatenation 
                 else:
                     if not self.hparams["concatenate_one_hot"]:
                         y_drug = z_drug

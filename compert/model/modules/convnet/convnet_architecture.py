@@ -1,9 +1,4 @@
-from collections import OrderedDict
-from turtle import forward
-
-import numpy as np
 import torch
-import torch.nn.functional as F
 
 #-------------------------------------------------------------------------------------
 
@@ -143,13 +138,14 @@ class Decoder(torch.nn.Module):
         in_fm = self.init_fm
         out_fm = self.init_fm//2
 
-        # Append the residual blocks
+        # Append the residual blocks and make them a layer by themselves
         residual_connections = []
         for _ in range(self.n_residual_blocks):
             residual_connections.append(ResidualLayer(in_fm+self.extra_fm, in_fm+self.extra_fm))
         self.residual_connections = torch.nn.Sequential(*residual_connections)
         self.modules.append(self.residual_connections)
         
+
         for i in range(0, self.n_conv):
             # Convolutional layer
             self.modules += [torch.nn.Sequential(torch.nn.ConvTranspose2d(in_fm+self.extra_fm, out_fm, kernel_size=4, stride=2, padding=1),

@@ -11,7 +11,7 @@ class DoubleConv(nn.Module):
     def __init__(self, init_fm, out_fm, mid_channels=None):
         super().__init__()
         if not mid_channels:
-            mid_channels = init_fm
+            mid_channels = out_fm
         self.double_conv = nn.Sequential(
             nn.Conv2d(init_fm, mid_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(mid_channels),
@@ -40,7 +40,9 @@ class Down(nn.Module):
 
 
 class Up(nn.Module):
-    """Upscaling then double conv"""
+    """
+    Upscaling then double conv
+    """
 
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -54,29 +56,12 @@ class Up(nn.Module):
 
 
 class OutConv(nn.Module):
+    """
+    Final convolution before the output layer 
+    """
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
 
     def forward(self, x):
         return self.conv(x)
-
-
-class ProjectionHeadAE(nn.Module):
-    def __init__(self, input_dim=2048, output_dim=128):
-        super(ProjectionHeadAE, self).__init__()
-        self.projection_head = nn.Linear(input_dim, output_dim)
-
-    def forward(self, x):
-        return self.projection_head(x)
-
-
-
-class ProjectionHeadVAE(nn.Module):
-    def __init__(self, input_dim=2048, output_dim=128):
-        super(ProjectionHeadVAE, self).__init__()
-        self.mu = nn.Linear(input_dim, output_dim, bias=False)
-        self.logvar = nn.Linear(input_dim, output_dim, bias=False)
-
-    def forward(self, x):
-        return [self.mu(x), self.logvar(x)]

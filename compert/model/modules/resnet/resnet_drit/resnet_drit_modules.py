@@ -9,12 +9,14 @@ import torch.nn.functional as F
 
 # Basic blocks encoder
 class LeakyReLUConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='None'):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Instance'):
         super(LeakyReLUConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
         if norm == 'Instance':
             model += [nn.InstanceNorm2d(out_channels, affine=False)]
+        elif norm == 'Batch':
+            model += [nn.BatchNorm2d(out_channels)]
         model += [nn.LeakyReLU(inplace=True)]
         self.model = nn.Sequential(*model)
 
@@ -23,11 +25,14 @@ class LeakyReLUConv2d(nn.Module):
 
 
 class ReLUINSConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Instance'):
         super(ReLUINSConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
-        model += [nn.InstanceNorm2d(out_channels, affine=False)]
+        if norm == 'Instance':
+            model += [nn.InstanceNorm2d(out_channels, affine=False)]
+        elif norm == 'Batch':
+            model += [nn.BatchNorm2d(out_channels)]
         model += [nn.ReLU(inplace=True)]
         self.model = nn.Sequential(*model)
         
@@ -54,6 +59,7 @@ class INSResBlock(nn.Module):
     def forward(self, x):
         residual = x
         out = self.model(x)
+        # Residual connection 
         out += residual
         return out
 
@@ -96,6 +102,7 @@ class ReLUINSConvTranspose2d(nn.Module):
         model = []
         model += [nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, 
                                     padding=padding, output_padding=output_padding, bias=True)]
+        # In the deconvolutions you apply layer normalization 
         model += [LayerNorm(out_channels)]
         model += [nn.ReLU(inplace=True)]
         self.model = nn.Sequential(*model)
