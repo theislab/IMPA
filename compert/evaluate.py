@@ -1,5 +1,3 @@
-from tkinter import E
-from zlib import Z_HUFFMAN_ONLY
 from tqdm import tqdm
 import sklearn
 from sklearn.metrics import silhouette_score, f1_score
@@ -11,6 +9,8 @@ import warnings
 from torch.nn import functional as F
 # from .model.modules.discriminator.discriminator_net import *
 from model.modules.adversarial.adversarial_nets import *
+import os 
+import pickle as pkl
 
 def training_evaluation(model,  
                         dataset_loader, 
@@ -24,7 +24,8 @@ def training_evaluation(model,
                         ood=False, 
                         predict_moa=False, 
                         ds_name=None, 
-                        drug2moa=None):
+                        drug2moa=None, 
+                        save_path = None):
 
     """Evaluation loop on the validation set to compute evaluation metrics of the model 
 
@@ -183,6 +184,10 @@ def training_evaluation(model,
             disentanglement_score_z_moa= compute_disentanglement_score(z_ds[idx_not_dmso], y_true_ds_moa[idx_not_dmso]) 
             metrics.metrics["disentanglement_score_z_moa"] = disentanglement_score_z_moa
             metrics.metrics["difference_disentanglement_moa"] = disentanglement_score_z_moa - disentanglement_score_basal_moa
+
+    if save_path!=None: 
+        with open(os.path.join(save_path, 'embeddings.pkl'), 'wb') as f:
+            pkl.dump([z_basal_ds, z_ds, y_true_ds_moa, y_true_ds_drugs], f)
 
     del z_basal_ds
     del z_ds
