@@ -260,63 +260,64 @@ class Trainer:
                 if self.hparams['classification_gan']:
                     self.model.module.initialize_classific_GAN()
             
-            print(f'Running epoch {epoch}')
-            self.model.train() 
+            # print(f'Running epoch {epoch}')
+            # self.model.train() 
             
-            # Losses and metrics dictionaries from the epoch 
-            train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
+            # # Losses and metrics dictionaries from the epoch 
+            # train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
             
-            # Save results to tensorboard and to model's history  
-            if self.save_results:
-                self.write_results(train_losses, train_metrics, self.writer, epoch, 'train')
-            self.model.module.save_history(epoch, train_losses, train_metrics, 'train')
+            # # Save results to tensorboard and to model's history  
+            # if self.save_results:
+            #     self.write_results(train_losses, train_metrics, self.writer, epoch, 'train')
+            # self.model.module.save_history(epoch, train_losses, train_metrics, 'train')
 
-            # Evaluate
-            if epoch % self.eval_every == 0 and self.eval:
-                # Switch the model to evaluate mode 
-                self.model.eval()
+            # # Evaluate
+            # if epoch % self.eval_every == 0 and self.eval:
+            #     # Switch the model to evaluate mode 
+            #     self.model.eval()
 
-                # Get the validation results 
-                val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
-                                                        self.model.module.metrics, self.dmso_id, self.device, end, 
-                                                        variational=self.model.module.variational, predict_moa=self.predict_moa,
-                                                        ds_name=self.dataset_name, drug2moa=self.drug2moa)
+            #     # Get the validation results 
+            #     val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
+            #                                             self.model.module.metrics, self.model.module.losses, self.dmso_id, self.device, end, 
+            #                                             variational=self.model.module.variational, predict_moa=self.predict_moa,
+            #                                             ds_name=self.dataset_name, drug2moa=self.drug2moa)
 
-                if self.save_results:
-                    self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
-                self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
+            #     if self.save_results:
+            #         self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
+            #     self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
 
-                # Plot reconstruction of a random image 
-                if self.save_results:
-                    with torch.no_grad():
-                        original, reconstructed = self.model.module.generate(self.loader_val,
-                                                                                self.model.module.drug_embeddings,
-                                                                                self.model.module.drug_embedding_encoder,
-                                                                                self.model.modile.predict_moa,
-                                                                                self.model.module.moa_moa_embeddings,
-                                                                                self.model.module.moa_embedding_encoder)
+            #     # Plot reconstruction of a random image 
+            #     if self.save_results:
+            #         with torch.no_grad():
+            #             original, reconstructed = self.model.module.autoencoder.generate(self.loader_val,
+            #                                                                     self.model.module.drug_embeddings,
+            #                                                                     self.model.module.drug_embedding_encoder,
+            #                                                                     self.model.module.predict_moa,
+            #                                                                     self.model.module.moa_embeddings,
+            #                                                                     self.model.module.moa_embedding_encoder,
+            #                                                                     self.model.module.adversarial)
 
-                    self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 5)
-                    del original
-                    del reconstructed
+            #         self.plotter.plot_reconstruction(tensor_to_image(original), 
+            #                                         tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 5)
+            #         del original
+            #         del reconstructed
 
-                # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                score = val_metrics['bpd']
+            #     # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
+            #     score = val_metrics['bpd']
                 
-                # Evaluate early-stopping 
-                cond, early_stopping = self.model.module.early_stopping(score) 
+            #     # Evaluate early-stopping 
+            #     cond, early_stopping = self.model.module.early_stopping(score) 
 
-                # Save the model if it is the best performing one 
-                print(f'New best score is {self.model.module.best_score}')
-                # Save the model with lowest validation loss 
-                self.model.module.save_checkpoints(epoch, 
-                                                    val_metrics, 
-                                                    train_losses, 
-                                                    val_losses, 
-                                                    self.dest_dir)
+            #     # Save the model if it is the best performing one 
+            #     print(f'New best score is {self.model.module.best_score}')
+            #     # Save the model with lowest validation loss 
+            #     self.model.module.save_checkpoints(epoch, 
+            #                                         val_metrics, 
+            #                                         train_losses, 
+            #                                         val_losses, 
+            #                                         self.dest_dir)
 
-                print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
+            #     print(f"Save new checkpoint at {os.path.join(self.dest_dir, 'checkpoint')}")
             
             # Scheduler step at the end of the epoch for the autoencoder 
             if epoch <= self.hparams["warmup_steps"]:
@@ -343,7 +344,7 @@ class Trainer:
         # Perform last evaluation on TEST SET   
         end = True
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
-                                                self.model.module.metrics, self.dmso_id, self.device, end, 
+                                                self.model.module.metrics, self.model.module.losses, self.dmso_id, self.device, end, 
                                                 variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa,
                                                 ds_name=self.dataset_name, drug2moa=self.drug2moa)
         if self.save_results:
@@ -352,7 +353,7 @@ class Trainer:
 
         # Perform last evaluation on OOD SET
         ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
-                                                metrics=self.model.module.metrics, dmso_id=self.dmso_id, device=self.device, end=end, 
+                                                metrics=self.model.module.metrics, losses=self.model.module.losses, dmso_id=self.dmso_id, device=self.device, end=end, 
                                                 variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa,
                                                 ds_name=self.dataset_name, drug2moa=self.drug2moa)
         if self.save_results:

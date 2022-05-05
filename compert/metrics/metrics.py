@@ -70,7 +70,7 @@ class TrainingMetrics:
         """
         Compute the batch average for each metric         
         """
-        for key in self.loss_dict:
+        for key in self.metrics:
             self.metrics[key] = self.metrics[key]/self.batch_size
 
 
@@ -94,7 +94,7 @@ class TrainingLosses:
         # Initialize losses if they don't exist yet 
         if self.loss_dict == None:
             self.initialize_losses(losses)
-        # Record the losses 
+        # Record the losses
         for loss in losses:
             self.loss_dict[loss] += losses[loss]
 

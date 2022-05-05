@@ -5,7 +5,7 @@ from .CPA import *
 
 
 class AE(torch.nn.Module):
-    def __init__(self, in_channels, in_width, in_height, variational, hparams, extra_fm, n_seen_drugs, n_moa) -> None:
+    def __init__(self, in_channels, in_width, in_height, variational, hparams, extra_fm, n_seen_drugs, n_moa, device) -> None:
      
         super(AE, self).__init__()
         self.in_channels = in_channels
@@ -22,6 +22,7 @@ class AE(torch.nn.Module):
                                                                 self.extra_fm)
         self.n_seen_drugs = n_seen_drugs
         self.n_moa = n_moa
+        self.device = device
         
     def kl_loss(self, mu, log_sigma):
         """Compute KL divergence with a standard normal distribution
@@ -138,7 +139,7 @@ class AE(torch.nn.Module):
         return dict(out=out, out_basal=out_basal, z=z, z_basal=z_basal, ae_loss=ae_loss)
 
     
-    def generate(self, loader, drug_embeddings, drug_embedding_encoder, predict_moa, moa_embeddings, moa_embedding_encoder):
+    def generate(self, loader, drug_embeddings, drug_embedding_encoder, predict_moa, moa_embeddings, moa_embedding_encoder, adversarial):
         """
         Given an input image x, returns the reconstructed image
         x: input image
@@ -150,11 +151,11 @@ class AE(torch.nn.Module):
         y_drug = original['mol_one_hot'].to(self.device).float()
         y_moa = original['moa_one_hot'].to(self.device).float()
         # DRUG AND MOA ID
-        drug_id = y_drug.argmax(1).to(self.device).float()
-        moa_id = y_moa.argmax(1).to(self.device).float()
+        drug_id = y_drug.argmax(1).to(self.device)
+        moa_id = y_moa.argmax(1).to(self.device)
 
         with torch.no_grad():
-            if self.adversarial:
+            if adversarial:
                 # Collect the encoders for the drug embeddings to condition the latent space 
                 drug_emb = drug_embeddings(drug_id) 
                 z_drug = drug_embedding_encoder(drug_emb) 
@@ -173,7 +174,7 @@ class AE(torch.nn.Module):
                 z_basal = self.reparameterize(mu_orig, log_sigma_orig)  # Reparametrization trick 
 
             # Handle the case training is not adversarial (append zero masks to the )
-            if not self.adversarial:
+            if not adversarial:
                 if self.hparams["decoding_style"] == 'sum':
                     y_drug = None
                     y_moa = None

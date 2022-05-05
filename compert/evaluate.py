@@ -92,12 +92,13 @@ def training_evaluation(model,
             # ENCODE THE LABELS IF NECESSARY 
 
             # Label encoder if required
+            drug_id = y_adv_drugs.argmax(1).to(device)
+            if predict_moa:
+                moa_id = y_adv_moa.argmax(1).to(device)
+            else: 
+                moa_id = None
+            
             if model.encoded_covariates:
-                drug_id = y_adv_drugs.argmax(1).to(device)
-                if predict_moa:
-                    moa_id = y_adv_moa.argmax(1).to(device)
-                else: 
-                    moa_id = None
                 # Get the embedded drug and mode of action 
                 z_drug, z_moa = model.encode_cov_labels(drug_id, moa_id)
             
@@ -105,7 +106,8 @@ def training_evaluation(model,
                 z_drug, z_moa = y_adv_drugs, y_adv_moa
             
             # Autoencoder step 
-            out, out_basal, z, z_basal, ae_loss = model.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='eval')
+            with torch.no_grad():
+                out, out_basal, z, z_basal, ae_loss = model.autoencoder.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='eval').values()
             rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()  # RMSE between out and out_basal 
             
             # Append the z for score later on 
@@ -152,7 +154,7 @@ def training_evaluation(model,
     recon_loss = losses.loss_dict['recon_loss'] if variational else losses.loss_dict['total_loss']
     metrics.update_bpd(recon_loss*X.shape[1]*X.shape[2]*X.shape[3]) 
 
-    metrics.average_losses()
+    metrics.metrics['rmse'] = metrics.metrics['rmse']/len(dataset_loader)
     # Add the adversarial scores to the metrics 
     if adversarial:
         metrics.metrics['rmse_basal_full'] = rmse_basal_full/len(dataset_loader)
@@ -220,6 +222,7 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
 
     # Split into training and test set 
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.10, stratify=y)  # Make the dataset balanced 
+
     y_train_tensor = torch.tensor(
         [label_to_idx[label] for label in y_train], dtype=torch.long, device="cuda")
     y_test_tensor = torch.tensor(
@@ -267,9 +270,9 @@ def counterfactual_score(X, z_basal, model, y_adv_drug, y_adv_moa, drug_id, moa_
         
             if model.hparams["decoding_style"] == 'sum': 
                 z_counter = z_basal + z_drug + z_moa  # Broadcast automatocally
-                res = model.decoder(z_counter, None, None)
+                res = model.autoencoder.decoder(z_counter, None, None)
             else:
-                res = model.decoder(z_basal.repeat(drug_emb.shape[0],1,1,1), z_drug, z_moa)  # Must repeat z on the batch dimension
+                res = model.autoencoder.decoder(z_basal.repeat(drug_emb.shape[0],1,1,1), z_drug, z_moa)  # Must repeat z on the batch dimension
 
         elif model.hparams["decoding_style"] == 'concat':
             # One hot encoded drugs and moas

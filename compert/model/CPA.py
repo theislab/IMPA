@@ -87,7 +87,7 @@ class CPA(TemplateModel):
                 self.extra_fm = self.hparams["drug_embedding_dimension"] + self.hparams["moa_embedding_dimension"]
 
         # Instantiate the convolutional encoder and decoder modules
-        self.autoencoder = AE(self.in_channels, self.in_width, self.in_height, self.variational, self.hparams, self.extra_fm, self.n_seen_drugs, self.n_moa)
+        self.autoencoder = AE(self.in_channels, self.in_width, self.in_height, self.variational, self.hparams, self.extra_fm, self.n_seen_drugs, self.n_moa, self.device)
 
         # Initialize warmup params
         self.warmup_steps = self.hparams["warmup_steps"]
@@ -435,7 +435,7 @@ class CPA(TemplateModel):
                                                                                             y_adv_drug, 
                                                                                             drug_id, 
                                                                                             y_adv_moa, 
-                                                                                            moa_id)
+                                                                                            moa_id).values()
 
                     # Update losses 
                     loss_dict = {'ae_loss': ae_loss,
@@ -551,7 +551,7 @@ class CPA(TemplateModel):
         loss.backward()
         self.optimizer_autoencoder.step()
         
-        return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_latent_drug, adv_loss_moa=adv_loss_latent_moa,
+        return dict(out=out, loss=loss.item(), ae_loss=ae_loss, adv_loss_drug=adv_loss_latent_drug, adv_loss_moa=adv_loss_latent_moa,
                     loss_recon_gan=loss_recon_gan, loss_classification_gan_drug=loss_classification_gan)
 
 
@@ -591,11 +591,11 @@ class CPA(TemplateModel):
             # Embed the drug and moa
             z_drug, z_moa = self.encode_cov_labels(drug_id, moa_id)
 
-            out, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='train')
+            out, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=z_drug, y_moa=z_moa, mode='train').values()
         else:
-            out, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, y_moa=y_adv_moa, mode='train')
+            out, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, y_moa=y_adv_moa, mode='train').values()
 
-        loss = self.hparams["beta_gan_recon"]*self.recon_predictor.discriminator_pass(X, out, self.recon_predictor_loss)
+        loss = self.recon_predictor.discriminator_pass(X, out, self.recon_predictor_loss)
 
         self.recon_discriminator_optimizer.zero_grad()
         loss.backward()
@@ -604,8 +604,6 @@ class CPA(TemplateModel):
 
     def classific_GAN_step(self, X, y_adv_drug, y_adv_moa):
         loss =  self.classifier_predictor.discriminator_pass(X, self.classifier_predictor_loss, y_adv_drug.argmax(1), y_adv_moa.argmax(1))
-        
-        loss = self.hparams["beta_gan_classific"]*loss
 
         self.classifier_predictor_optimizer.zero_grad()
         loss.backward()
@@ -638,8 +636,6 @@ class CPA(TemplateModel):
 
     def update_cycle(self, name, number_of_steps):
         # The cycle controls what kind of training step is performed among discriminators and autoencoder 
-        print(self.max_cycle)
-        print(number_of_steps)
         vals = [self.max_cycle+i for i in range(1, number_of_steps+1)]
         for val in vals:
             self.cycle[val] = name
