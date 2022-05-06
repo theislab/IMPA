@@ -131,7 +131,7 @@ class DisentanglementClassifier(nn.Module):
         # Two layers of leaky relu convolutions
         model = []
         for i in range(2):
-            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=1, padding=1, norm='Instance')]
+            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=1, padding=1, norm='Batch')]
             if i == 0:
                 in_fm = out_fm
         
@@ -167,7 +167,7 @@ class GANDiscriminator(nn.Module):
         # Four layers of strided LeakyReLU
         model = []
         for i in range(4):
-            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Instance')]
+            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Batch')]
             in_fm = out_fm
             out_fm = in_fm *2
 
@@ -229,7 +229,7 @@ class GANClassifier(nn.Module):
 
         model = []
         for i in range(4):
-            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Instance')]
+            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Batch')]
             in_fm = out_fm
             out_fm *= 2
         
