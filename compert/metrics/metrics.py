@@ -37,6 +37,7 @@ class TrainingMetrics:
         Update bpd with the result from the batch 
         """
         self.metrics['bpd'] = (-loss)/(self.height*self.width*self.channels)/np.log(2.)
+        self.metrics['bpd'] = self.metrics['bpd'].item()
     
     def compute_classification_report(self, y, y_hat, label=''):
         """
@@ -66,17 +67,16 @@ class TrainingMetrics:
         for metric in self.metrics:
             print(f'{metric} = {self.metrics[metric]}')
 
-    def average_metrics(self):
+    def average_metrics(self, factor):
         """
         Compute the batch average for each metric         
         """
         for key in self.metrics:
-            self.metrics[key] = self.metrics[key]/self.batch_size
+            self.metrics[key] = self.metrics[key]/factor
 
 
 class TrainingLosses:
-    def __init__(self, batch_size):
-        self.batch_size = batch_size 
+    def __init__(self):
         self.loss_dict = None
 
     def initialize_losses(self, losses):
@@ -96,18 +96,21 @@ class TrainingLosses:
             self.initialize_losses(losses)
         # Record the losses
         for loss in losses:
-            self.loss_dict[loss] += losses[loss]
+            try:
+                self.loss_dict[loss] += losses[loss].item()
+            except:
+                self.loss_dict[loss] += losses[loss]
 
     def reset(self):
         self.loss_dict = None 
 
     def print_losses(self):
         for loss in self.loss_dict:
-            print(f'Average {loss} = {self.loss_dict[loss]/self.batch_size}')
+            print(f'Average {loss} = {self.loss_dict[loss]}')
     
-    def average_losses(self):
+    def average_losses(self, factor):
         """
         Convert the losses to batch averages            
         """
         for key in self.loss_dict:
-            self.loss_dict[key] = self.loss_dict[key]/self.batch_size
+            self.loss_dict[key] = self.loss_dict[key]/factor

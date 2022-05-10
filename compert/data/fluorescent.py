@@ -19,8 +19,9 @@ class CustomTransform:
     """
     Scale and resize an input image 
     """
-    def __init__(self, augment = False):
+    def __init__(self, augment=False, normalize=False):
         self.augment = augment 
+        self.normalize = True 
         
     def __call__(self, X):
         """
@@ -28,14 +29,16 @@ class CustomTransform:
         """
         # Add random noise and rescale pixels between 0 and 1 
         random_noise = torch.rand_like(X)  # To transform the image to continuous data point
-        X = (X+random_noise)/255.0
+        X = (X+random_noise)/255.0  # Scale 
         # Perform augmentation step
         if self.augment:
-            transform = T.Compose([
-                T.RandomHorizontalFlip(p=0.3),
-                T.RandomVerticalFlip(p=0.3)]
-            )
-            return transform(X)
+            t = []
+            # if self.normalize==True:
+            #     t.append(T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
+            t.append(T.RandomHorizontalFlip(p=0.3))
+            t.append(T.RandomVerticalFlip(p=0.3))
+            trans = T.Compose(t)
+            return trans(X)
         else:
             return X
 
@@ -44,29 +47,26 @@ class BBBC021Dataset:
     """
     Dataset class for image data 
     """
-    def __init__(self, image_path, data_index_path, embeddings_path, device='cuda', return_labels=False, augment_train=False, use_pretrained=True):    
+    def __init__(self, image_path, data_index_path, device='cuda', return_labels=False, augment_train=False, normalize=False):    
         assert os.path.exists(image_path), 'The data path does not exist'
         assert os.path.exists(data_index_path), 'The data index path does not exist'
 
         # Set up the variables 
         self.image_path = image_path  # Path to the image folder
         self.data_index_path = data_index_path  # Path to data index (.csv file) 
-        self.embeddings_path = embeddings_path  # Path to the embedding matrix
         self.augment_train = augment_train
+        self.normalize = normalize  # Controls whether the input lies between 0 and 1 or -1 and 1
 
         # Fix the training specifics 
         self.device = device 
         self.return_labels = return_labels  # Whether onehot drug labels, the assay labels and the case/control labels should be returned 
-        self.use_pretrained = use_pretrained  # Whether the pre-trained embeddings should be used for the drugs
 
         # Read the datasets
         self.fold_datasets = self.read_folds()
-        self.drug2smile = {drug: smile for drug, smile in zip(self.fold_datasets['train']["mol_names"], self.fold_datasets['train']["mol_smiles"])}
         
         # Count the number of compounds 
         self.drug_names = np.sort(np.unique(self.fold_datasets['train']["mol_names"]))  # Sorted drug names
         self.moa_names = np.sort(np.unique(self.fold_datasets['train']["MOA"]))  # Sorted MOA names 
-        self.smile_names = np.array([self.drug2smile[drug] for drug in self.drug_names])  # Sorted smile names based on drug sorting 
 
         # Count the number of drugs and MOAs 
         self.num_drugs = len(self.drug_names) 
@@ -80,58 +80,29 @@ class BBBC021Dataset:
         encoder_drug = OneHotEncoder(sparse=False, categories=[self.drug_names])
         encoder_drug.fit(np.array(self.drug_names).reshape((-1,1)))
 
-        encoder_moa = OneHotEncoder(sparse=False, categories=[self.moa_names])
-        encoder_moa.fit(np.array(self.moa_names).reshape((-1,1)))
-
-        if self.use_pretrained:
-            # Get the drug embedding matrix indexed by indices 
-            drug_embeddings = pd.read_csv(self.embeddings_path, index_col=0).loc[self.smile_names]  # Read embedding paths sorted based on smile names 
-            # Tranform the embddings to torch embeddings
-            drug_embeddings  = torch.tensor(drug_embeddings.values, 
-                                                dtype=torch.float32, device=self.device)
-            # Must feed from_pretrained() with num_embeddings x dimension
-            self.drug_embeddings = torch.nn.Embedding.from_pretrained(drug_embeddings, freeze=True).to(self.device)
-
-        
         # Initialize the datasets 
         self.fold_datasets = {'train': BBBC021Fold('train', self.fold_datasets['train'], 
                                                         self.image_path, 
                                                         encoder_drug, 
-                                                        encoder_moa,
                                                         self.drugs2idx, 
                                                         self.moa2idx, 
                                                         self.return_labels, 
-                                                        self.use_pretrained,
                                                         self.augment_train),
 
                             'val': BBBC021Fold('val', self.fold_datasets['valid'], 
                                                     self.image_path, 
                                                     encoder_drug, 
-                                                    encoder_moa,
                                                     self.drugs2idx, 
                                                     self.moa2idx, 
                                                     self.return_labels, 
-                                                    self.use_pretrained,
                                                     self.augment_train),
 
                             'test': BBBC021Fold('test', self.fold_datasets['test'], 
                                                     self.image_path, 
                                                     encoder_drug, 
-                                                    encoder_moa,
                                                     self.drugs2idx, 
                                                     self.moa2idx, 
                                                     self.return_labels, 
-                                                    self.use_pretrained,
-                                                    self.augment_train),
-
-                            'ood': BBBC021Fold('ood', self.fold_datasets['ood'], 
-                                                    self.image_path, 
-                                                    encoder_drug, 
-                                                    encoder_moa,
-                                                    self.drugs2idx, 
-                                                    self.moa2idx, 
-                                                    self.return_labels, 
-                                                    self.use_pretrained,
                                                     self.augment_train)}
 
 
@@ -146,7 +117,7 @@ class BBBC021Dataset:
         # Get the file names and molecules of training, test and validation sets
         dataset_splits = dict()
         
-        for fold_name in ['train', 'valid', 'test', 'ood']:
+        for fold_name in ['train', 'valid', 'test']:
             # Divide the dataset in splits 
             dataset_splits[fold_name] = {}
 
@@ -164,14 +135,13 @@ class BBBC021Dataset:
 
 
 class BBBC021Fold(Dataset):
-    def __init__(self, fold, data, image_path, drug_encoder, moa_encoder, drugs2idx, moa2idx, return_labels = True, use_pretrained=True, augment_train=True):
+    def __init__(self, fold, data, image_path, drug_encoder, drugs2idx, moa2idx, return_labels = True, augment_train=True):
         super(BBBC021Fold, self).__init__() 
         
         self.fold = fold  # train, test or validation set
         # For each piece of the data create its own object
         self.file_names = data['file_names']
         self.mol_names = data['mol_names']
-        self.mol_smiles = data['mol_smiles']
         self.dose = data['dose']
         self.moa = data['MOA']
 
@@ -185,7 +155,6 @@ class BBBC021Fold(Dataset):
         
         # One-hot encoders 
         self.drug_encoder = drug_encoder
-        self.moa_encoder = moa_encoder
 
         # Subset mol2label to the important part only 
         self.drugs2idx = drugs2idx
@@ -200,21 +169,17 @@ class BBBC021Fold(Dataset):
         if self.fold ==  'train':
             # Compute class imbalance weights
             compute_class_imbalance_weights_drug = self.compute_class_imbalance_weights(self.mol_names)
-            compute_class_imbalance_weights_moa = self.compute_class_imbalance_weights(self.moa)
-            self.class_imbalances = {'drugs': compute_class_imbalance_weights_drug, 
-                                'moas': compute_class_imbalance_weights_moa}
+
+            self.class_imbalances = compute_class_imbalance_weights_drug
             # Map drugs to moas
             drug_ids, moa_ids = [self.drugs2idx[mol] for mol in self.mol_names] , [self.moa2idx[moa] for moa in self.moa]
             self.couples_drug_moa = {drug:moa for drug, moa in zip(drug_ids, moa_ids)}
         
         # Control whether the labels should be provided in the batch together with the images  
         self.return_labels = return_labels 
-        self.use_pretrained = use_pretrained
 
         # One-hot encode molecules and moas
-        self.one_hot_drugs = self.drug_encoder.transform(np.array(self.mol_names.reshape((-1,1))))
-        self.one_hot_moa = self.moa_encoder.transform(np.array(self.moa.reshape((-1,1))))
-        
+        self.one_hot_drugs = self.drug_encoder.transform(np.array(self.mol_names.reshape((-1,1))))        
         
     def __len__(self):
         """
@@ -246,7 +211,6 @@ class BBBC021Fold(Dataset):
         if self.return_labels:
             return dict(X=img, 
                         mol_one_hot=self.one_hot_drugs[idx],
-                        moa_one_hot=self.one_hot_moa[idx],
                         smile_id=self.drugs2idx[self.mol_names[idx]],
                         moa_id=self.moa2idx[self.moa[idx]],
                         dose = self.dose[idx],
@@ -275,7 +239,6 @@ class BBBC021Fold(Dataset):
         # Select from the the filenames at random
         imgs = []
         subset_mol_one_hot = []
-        subset_moa_one_hot = []
         subset_smile_id = []
         subset_moa_id = []
         subset_dose = []
@@ -292,7 +255,6 @@ class BBBC021Fold(Dataset):
         imgs = torch.cat(imgs, dim=0)
         return dict(X = imgs,
                     mol_one_hot = subset_mol_one_hot,
-                    moa_one_hot = subset_moa_one_hot, 
                     smile_id = subset_smile_id,
                     moa_id = subset_moa_id,
                     dose = self.dose[idx]) 

@@ -156,7 +156,9 @@ def configure_loss_dict(loss_dict):
     for key in loss_dict:
         if type(loss_dict[key]) == dict:
             for subkey in loss_dict[key]:
-                losses[subkey] = loss_dict[key][subkey].item()
+                if loss_dict[key][subkey] != 0:
+                    losses[subkey] = loss_dict[key][subkey].item()
         else:
-            losses[key] = loss_dict[key].item()
+            if loss_dict[key] != 0:
+                losses[key] = loss_dict[key].item()
     return losses

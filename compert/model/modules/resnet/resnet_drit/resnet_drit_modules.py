@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 # Basic blocks encoder
 class LeakyReLUConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Instance'):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Batch'):
         super(LeakyReLUConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
@@ -25,7 +25,7 @@ class LeakyReLUConv2d(nn.Module):
 
 
 class ReLUINSConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Instance'):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Batch'):
         super(ReLUINSConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
@@ -48,10 +48,10 @@ class INSResBlock(nn.Module):
         super(INSResBlock, self).__init__()
         model = []
         model += self.conv3x3(in_channels, out_channels, stride)
-        model += [nn.InstanceNorm2d(out_channels)]
+        model += [nn.BatchNorm2d(out_channels)]
         model += [nn.ReLU(inplace=True)]
         model += self.conv3x3(out_channels, out_channels)
-        model += [nn.InstanceNorm2d(out_channels)]
+        model += [nn.BatchNorm2d(out_channels)]
         if dropout > 0:
             model += [nn.Dropout(p=dropout)]
         self.model = nn.Sequential(*model)

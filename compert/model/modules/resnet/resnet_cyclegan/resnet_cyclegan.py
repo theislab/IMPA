@@ -95,31 +95,34 @@ class ResnetDecoderCycleGAN(nn.Module):
 
         self.deconv = nn.Sequential(*model)
 
-    def forward_sum(self, z):
+    def forward_sum(self, z, y_drug):
         # Reshape to height x width
+        z = z + y_drug
         X = self.deconv(z)
-        return X 
+        return X, z
     
-    def forward_concat(self, z, y_drug, y_moa):
-        # Reshape to height x width
-        for layer in self.deconv[:-1]:
+    def forward_concat(self, z, y_drug):
+        z_init = None
+        for i, layer in enumerate(self.deconv[:-1]):
+
             # Upsample drug labs
             y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
-            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
+            y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
-            # Upsample moa labs
-            y_moa_unsqueezed = y_moa.view(y_moa.size(0), y_moa.size(1), 1, 1)
-            y_moa_broadcast = y_moa_unsqueezed.repeat(1, 1, z.size(2), z.size(3))
-
-            z = layer(torch.cat([z, y_drug_broadcast, y_moa_broadcast], dim=1))
+            z_concat = torch.cat([z, y_drug_broadcast], dim=1)
+            z = layer(z_concat)
+            
+            if i == 0:
+                z_init = z_concat
+            
         X = self.deconv[-1](z)
-        return X 
+        return X, z_init
 
-    def forward(self, z, y_drug, y_moa):
+    def forward(self, z, y_drug):
         if self.decoding_style == 'sum':
-            return self.forward_sum(z)
+            return self.forward_sum(z, y_drug)
         else:
-            return self.forward_concat(z, y_drug, y_moa) 
+            return self.forward_concat(z, y_drug) 
 
 
 if __name__ == '__main__':

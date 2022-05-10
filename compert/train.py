@@ -1,3 +1,5 @@
+from locale import normalize
+import matplotlib.pyplot as plt
 import os
 import torch
 import sys
@@ -5,7 +7,6 @@ sys.path.insert(0, '.')
 
 # Available autoencoder model attached to CPA 
 from model.CPA import CPA
-from data.cellpainting import CellPaintingDataset
 from data.fluorescent import BBBC021Dataset
 from utils import *
 from plot_utils import Plotter 
@@ -82,8 +83,7 @@ class Trainer:
 
     @ex.capture(prefix="training_params")
     def init_training_params(self, img_plot, save_results, num_epochs, batch_size, eval, eval_every, 
-                            n_workers_loader, generate, model_name, temperature, augment_train, patience, seed,
-                            append_layer_width=False, predict_moa = False):
+                            n_workers_loader, generate, model_name, temperature, augment_train, normalize, patience, seed):
         """Initialization of parameters for training
         Args:
             img_plot (bool): Used when trained on notebooks - print generations/reconstructions after epoch
@@ -100,7 +100,6 @@ class Trainer:
             patience (int): How many steps of non-improvement of valid loss before stopping 
             seed (int): The random seed for reproducibility 
             append_layer_width (bool, optional): Controls The addition of trailing layers to the adversarial and drug embedding MLPs. Defaults to False.
-            predict_moa (book, optional): Used only if the the dataset employed is MOA-annotated 
         """
         self.img_plot = img_plot    
         self.save_results = save_results  
@@ -115,12 +114,11 @@ class Trainer:
         self.model_name = model_name   
         self.temperature = temperature   
         self.augment_train = augment_train   
+        self.normalize = normalize 
 
         self.patience = patience
         self.seed = seed 
         
-        self.append_layer_width = append_layer_width
-        self.predict_moa = predict_moa
         # Set device
         self.device = self.set_device() 
         print(f'Working on device: {self.device}')
@@ -145,7 +143,7 @@ class Trainer:
         """
         # # Prepare the data
         print('Lodading the data...') 
-        self.training_set, self.validation_set, self.test_set, self.ood_set = self.create_torch_datasets()
+        self.training_set, self.validation_set, self.test_set = self.create_torch_datasets()
         
         # Create data loaders 
         self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.batch_size, shuffle=True, 
@@ -155,12 +153,10 @@ class Trainer:
                                                     num_workers=self.n_workers_loader, drop_last=False)
         self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=1, shuffle=True, 
                                                     num_workers=self.n_workers_loader, drop_last=False)
-        self.loader_ood = torch.utils.data.DataLoader(self.ood_set, batch_size=1, shuffle=True, 
-                                                    num_workers=self.n_workers_loader, drop_last=False)
 
         # The id of the dmso to exclude from the prediction 
-        self.dmso_id = self.training_set.drugs2idx['DMSO']
         self.class_imbalance_weights = self.training_set.class_imbalances
+
         # Mapping drug to moa
         self.drug2moa = self.training_set.couples_drug_moa 
         print('Successfully loaded the data')
@@ -173,7 +169,6 @@ class Trainer:
         self.hparams = hparams  # Dictionary with model hyperparameters 
         # Initialize model 
         self.model =  self.load_model().to(self.device)
-        print(self.model)
         self.model = torch.nn.DataParallel(self.model)  # In case multiple GPUs are present
     
 
@@ -183,13 +178,11 @@ class Trainer:
         # Create result folder
         if self.save_results:
             if self.resume:
-                print('Create output directories for the experiment')
                 self.resume_epoch = self.model.module.load_checkpoints(self.resume_checkpoint)
+            print('Create output directories for the experiment')
             self.dest_dir = make_dirs(self.result_path, self.experiment_name)
-            # Setup logger in any case
-            self.writer = SummaryWriter(os.path.join(self.result_path, 'logs'))
 
-    
+
     @ex.capture
     def init_all(self, seed: int):
         """
@@ -209,26 +202,20 @@ class Trainer:
         """
         Create dataset compatible with the pytorch training loop 
         """
-        dataset = BBBC021Dataset(self.image_path, self.data_index_path, self.embeddings_path, device=self.device, 
-                                                return_labels=True, use_pretrained=self.use_embeddings, augment_train=self.augment_train) 
-        self.dim = 3
+        dataset = BBBC021Dataset(self.image_path, self.data_index_path, device=self.device, 
+                                                return_labels=True, augment_train=self.augment_train, normalize=self.normalize) 
+        self.dim = 3  # Channel dimension
 
-        # Extract matrix of embeddings only if the embedding option is chosen 
-        if self.use_embeddings:
-            self.drug_embeddings = dataset.drug_embeddings
-        else:
-            self.drug_embeddings = None  # No pre-trained embeddings are used and drug embeddings are learnt
-
-        # The ood set in the BBC021 dataset does not leave out entire compounds but only compound dosage combinations 
+        # Number of drugs and nujmber of modes of action 
         self.n_seen_drugs = dataset.num_drugs
         self.num_moa = dataset.num_moa
 
         # Collect training, test and validation sets
-        training_set, validation_set, test_set, ood_set = dataset.fold_datasets.values()  
+        training_set, validation_set, test_set = dataset.fold_datasets.values()  
 
         # Free cell painting dataset memory
         del dataset
-        return training_set, validation_set, test_set, ood_set
+        return training_set, validation_set, test_set
 
 
     @ex.capture(prefix="training")
@@ -244,7 +231,6 @@ class Trainer:
             self.plotter = Plotter(self.dest_dir)
         
         # The variable `end` determines whether we are at the end of the training loop and therefore if disentanglement and clustering stats
-        # are to be evaluated on the test and ood splits
         end = False
 
         print(f'Beginning training with epochs {self.num_epochs}')
@@ -255,8 +241,10 @@ class Trainer:
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial nets 
             if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
                 self.model.module.initialize_adversarial()
+                # Patch GAN for reconstruction accuracy 
                 if self.hparams['recon_gan']:
                     self.model.module.initialize_recons_GAN()
+                # Classification GAN for the swapping 
                 if self.hparams['classification_gan']:
                     self.model.module.initialize_classific_GAN()
             
@@ -264,11 +252,9 @@ class Trainer:
             self.model.train() 
             
             # Losses and metrics dictionaries from the epoch 
-            train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run 
+            train_losses, train_metrics = self.model.module.update_model(self.loader_train, epoch)  # Update run
             
-            # Save results to tensorboard and to model's history  
-            if self.save_results:
-                self.write_results(train_losses, train_metrics, self.writer, epoch, 'train')
+            # Save results to model's history  
             self.model.module.save_history(epoch, train_losses, train_metrics, 'train')
 
             # Evaluate
@@ -278,32 +264,33 @@ class Trainer:
 
                 # Get the validation results 
                 val_losses, val_metrics = training_evaluation(self.model.module, self.loader_val, self.model.module.adversarial,
-                                                        self.model.module.metrics, self.model.module.losses, self.dmso_id, self.device, end, 
-                                                        variational=self.model.module.variational, predict_moa=self.predict_moa,
-                                                        ds_name=self.dataset_name, drug2moa=self.drug2moa)
+                                                        self.model.module.metrics, self.model.module.losses, self.device, end, 
+                                                        variational=self.model.module.variational, ds_name=self.dataset_name, drug2moa=self.drug2moa)
 
-                if self.save_results:
-                    self.write_results(val_losses, val_metrics, self.writer, epoch, 'val')
                 self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
 
                 # Plot reconstruction of a random image 
                 if self.save_results:
                     with torch.no_grad():
-                        original, reconstructed = self.model.module.autoencoder.generate(self.loader_val,
-                                                                                self.model.module.drug_embeddings,
-                                                                                self.model.module.drug_embedding_encoder,
-                                                                                self.model.module.predict_moa,
-                                                                                self.model.module.moa_embeddings,
-                                                                                self.model.module.moa_embedding_encoder,
-                                                                                self.model.module.adversarial)
+                        if self.model.module.adversarial and not self.hparams['concatenate_one_hot']:
+                            original, reconstructed = self.model.module.autoencoder.generate(self.loader_val,
+                                                                                    self.model.module.drug_embeddings,
+                                                                                    self.model.module.drug_embedding_encoder,
+                                                                                    self.model.module.adversarial)  
+                        else:
+                            original, reconstructed = self.model.module.autoencoder.generate(self.loader_val,
+                                                                                    None,
+                                                                                    None,
+                                                                                    self.model.module.adversarial)
 
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 5)
+                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 4)
+                    # plt.show()
                     del original
                     del reconstructed
 
                 # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
-                score = val_metrics['bpd']
+                score = val_metrics['rmse']
                 
                 # Evaluate early-stopping 
                 cond, early_stopping = self.model.module.early_stopping(score) 
@@ -334,51 +321,27 @@ class Trainer:
                     self.model.module.classifier_predictor_scheduler.step()
             
             # Update the number of adversarial steps performed per each autoencoder step 
-            if self.model.module.adversarial and self.model.module.hparams['anneal_adv_steps']:
+            if self.model.module.hparams['anneal_beta']:
                 # Update the number of adversarial steps so they do not go under a minumum 
-                self.model.module.current_adversary_steps = max(self.model.module.hparams["final_adv_steps"], self.model.module.current_adversary_steps-self.model.module.step)
-                self.model.module.iterations = 0 
-        
+                self.model.module.autoencoder.beta = min(self.model.module.hparams["max_beta"], self.model.module.autoencoder.beta+self.model.module.step)        
+
 
         self.model.eval()
         # Perform last evaluation on TEST SET   
         end = True
+
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
-                                                self.model.module.metrics, self.model.module.losses, self.dmso_id, self.device, end, 
-                                                variational=self.model.module.variational, ood=False, predict_moa=self.predict_moa,
-                                                ds_name=self.dataset_name, drug2moa=self.drug2moa, save_path=self.dest_dir)
-        if self.save_results:
-            self.write_results(test_losses, test_metrics, self.writer, epoch, ' test')
+                                                self.model.module.metrics, self.model.module.losses, self.device, end, 
+                                                variational=self.model.module.variational, ds_name=self.dataset_name, drug2moa=self.drug2moa, save_path=self.dest_dir)
+
         self.model.module.save_history('final_test', test_losses, test_metrics, 'test')
 
-        # Perform last evaluation on OOD SET
-        ood_losses, ood_metrics = training_evaluation(self.model.module, self.loader_ood, adversarial=self.model.module.adversarial,
-                                                metrics=self.model.module.metrics, losses=self.model.module.losses, dmso_id=self.dmso_id, device=self.device, end=end, 
-                                                variational=self.model.module.variational, ood=True, predict_moa=self.predict_moa,
-                                                ds_name=self.dataset_name, drug2moa=self.drug2moa)
-        if self.save_results:
-            self.write_results(ood_losses, ood_metrics, self.writer, epoch,' ood')
-        self.model.module.save_history('final_ood', ood_losses, ood_metrics, 'ood')
 
         # Get results in a correct format
         results = self.format_seml_results(self.model.module.history)
         return results
 
 
-    def write_results(self, losses, metrics, writer, epoch, fold='train'):
-        """Write results to tensorboard
-        Args:
-            losses (dict): Dictiornay with the loss metrics  
-            metrics (dict): Dictionary with the evaluation metrics
-            writer (torch.utils.tensorboard.SummaryWriter): Summary statistics writer 
-        """
-        for key in losses:
-            writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=losses[key], 
-                                    global_step=epoch)
-        for key in metrics:
-            writer.add_scalar(tag=f'{self.experiment_name}/{fold}/{key}', scalar_value=metrics[key],
-                                    global_step=epoch)
-    
 
     def format_seml_results(self, history):
         """Format results for seml 
@@ -416,11 +379,8 @@ class Trainer:
                     seed = self.seed,
                     patience = self.patience,
                     hparams = self.hparams,
-                    append_layer_width = self.append_layer_width,
-                    drug_embeddings = self.drug_embeddings,
                     variational = variational,
                     dataset_name = self.dataset_name,
-                    predict_moa = self.predict_moa,
                     n_moa = self.num_moa, 
                     total_iterations = self.num_epochs,
                     class_weights = self.class_imbalance_weights,

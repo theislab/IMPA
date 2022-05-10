@@ -16,7 +16,7 @@ class LeakyReLUConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='None'):
         super(LeakyReLUConv2d, self).__init__()
         model = []
-        model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,padding=padding, bias=True)]
+        model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
         # Normalization layer, can be instance or batch
         if norm == 'Instance':
             model += [nn.InstanceNorm2d(out_channels, affine=False)]
@@ -30,7 +30,7 @@ class LeakyReLUConv2d(nn.Module):
         return self.model(x)
 
 """
-The latent discriminator: tries to predict drugs and moas on the latent space 
+The latent discriminator: tries to predict drugs on the latent space 
 """
 
 class DiscriminatorNet(nn.Module):
@@ -82,12 +82,14 @@ class LabelEncoder(nn.Module):
 
         # Initialize the modules 
         self.modules = [torch.nn.ConvTranspose2d(in_fm, out_fm, kernel_size = 3, stride = 2, padding=0),
-                        torch.nn.ReLU()] # 1x1 --> 3x3 spatial dimension 
+                        torch.nn.LeakyReLU(inplace=True)] # 1x1 --> 3x3 spatial dimension 
 
         # Conv2d transpose till the latent dimension 
         for i in range(depth):
             self.modules.append(torch.nn.ConvTranspose2d(out_fm, out_fm, kernel_size = 4, stride = 2, padding=1))
-            self.modules.append(torch.nn.ReLU())
+            if i < depth-1:
+                self.modules.append(torch.nn.LeakyReLU(inplace=True))
+
         self.transp = torch.nn.Sequential(*self.modules)
 
     def forward(self, z):
@@ -131,11 +133,11 @@ class DisentanglementClassifier(nn.Module):
         # Two layers of leaky relu convolutions
         model = []
         for i in range(2):
-            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=1, padding=1, norm='Batch')]
+            model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=2, padding=1, norm='Batch')]
             if i == 0:
                 in_fm = out_fm
         
-        flattened_dim = (self.init_dim**2*out_fm)
+        flattened_dim = (np.around(self.init_dim/4)**2*out_fm).astype(int)
         # Compile model 
         self.conv = nn.Sequential(*model)
         
@@ -169,10 +171,10 @@ class GANDiscriminator(nn.Module):
         for i in range(4):
             model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=4, stride=2, padding=1, norm='Batch')]
             in_fm = out_fm
-            out_fm = in_fm *2
+            out_fm = in_fm*2
 
         # Last convolution with stride 1
-        model += [nn.Conv2d(in_fm, out_fm, kernel_size=4, stride=1, padding=1)]
+        model += [nn.Conv2d(in_fm, 1, kernel_size=4, stride=1, padding=1)]
 
         # Compile model 
         self.conv = nn.Sequential(*model)
@@ -192,8 +194,8 @@ class GANDiscriminator(nn.Module):
         label_real = torch.ones(data_real.shape[0]).to(self.device) 
         label_fake = torch.zeros(data_fake.shape[0]).to(self.device)
 
-        pred_real = self.forward(data_real).squeeze()
-        pred_fake = self.forward(data_fake).squeeze()
+        pred_real = self.forward(data_real)
+        pred_fake = self.forward(data_fake)
         gan_loss_real = loss(pred_real, label_real)
         gan_loss_fake = loss(pred_fake, label_fake)
         return (gan_loss_real + gan_loss_fake)/2
@@ -213,15 +215,13 @@ GAN classifier for correctness of the cell
 
 
 class GANClassifier(nn.Module):
-    def __init__(self, init_dim, in_channels, init_fm, num_outputs_drug, num_outputs_moa=0, predict_moa=None):
+    def __init__(self, init_dim, in_channels, init_fm, num_outputs_drug):
 
         super(GANClassifier, self).__init__()
         self.init_dim = init_dim  # Starting spatial dimension 
         self.in_channels = in_channels  # Spatial dimension
         self.init_fm = init_fm  # Input feature maps
         self.num_outputs_drug = num_outputs_drug  # Number of classes for the classification 
-        self.num_outputs_moa = num_outputs_moa
-        self.predict_moa = predict_moa 
 
         # First number of feature maps 
         in_fm = self.in_channels
@@ -239,38 +239,31 @@ class GANClassifier(nn.Module):
         # Compile model 
         self.conv = nn.Sequential(*model)
         
-        # Linear classification layer. The network has two heads, one for the drug and one for the moa 
+        # Linear classification layer
         self.linear_drug = torch.nn.Linear(flattened_dim, self.num_outputs_drug)
-        if self.predict_moa:
-            self.linear_moa = torch.nn.Linear(flattened_dim, self.num_outputs_moa)
+
 
     def forward(self, x):
         out = self.conv(x)
         # Output drug
         out_drug = self.linear_drug(out.view(out.shape[0], -1))
-        # Output moa
-        if self.predict_moa:
-            out_moa = self.linear_moa(out.view(out.shape[0], -1))
-        else:
-            out_moa = None
-        return out_drug, out_moa
+        return out_drug
     
-    def discriminator_pass(self, X, loss, labels_drug, labels_moa=None):
+    def discriminator_pass(self, X, loss, labels_drug):
         self.train()
-        out_drug, out_moa = self.forward(X)
+        out_drug = self.forward(X)
         # Given input image X, train the classifier on the true label 
         loss_drug = loss(out_drug, labels_drug)
-        loss_moa = loss(out_moa, labels_moa) if self.predict_moa else 0
-        return (loss_drug+loss_moa)/2
+        return loss_drug
 
-    def generator_pass(self, X_counterf, loss, swapped_idx_drugs, swapped_idx_moas):
+    def generator_pass(self, X_counterf, loss, swapped_idx_drugs):
         self.eval()
         # Swapped indices are meant to fool the classifier 
-        pred_drug, pred_moa = self.forward(X_counterf)  # Prediction by the model on the generated images (single value per batch observation)
+        pred_drug = self.forward(X_counterf)  # Prediction by the model on the generated images (single value per batch observation)
 
         gan_loss_drug = loss(pred_drug, swapped_idx_drugs)  # GAN loss function (cross entropy)
-        gan_loss_moa = loss(pred_moa, swapped_idx_moas) if self.predict_moa else 0
-        return (gan_loss_drug + gan_loss_moa)/2
+        return gan_loss_drug
+
 
 
 
