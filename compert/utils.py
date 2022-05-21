@@ -4,6 +4,7 @@ import pandas as pd
 import cv2
 from datetime import datetime 
 import torch
+import torch.nn.functional as F
 
     
 def img_resize(image, width:int, height:int, interpolation:str):
@@ -162,3 +163,60 @@ def configure_loss_dict(loss_dict):
             if loss_dict[key] != 0:
                 losses[key] = loss_dict[key].item()
     return losses
+
+"""
+Funtion to swap the labels randomly
+"""
+def swap_attributes(y_drug, drug_id, device):
+    # Initialize the swapped indices 
+    swapped_idx = torch.zeros_like(y_drug)
+    # Maximum drug index
+    max_drug = y_drug.shape[1] 
+    # Ranges of possible drugs 
+    offsets = torch.randint(1, max_drug, (drug_id.shape[0], 1)).to(device)
+    # Permute
+    permutation = drug_id + offsets.squeeze()
+    # Remainder 
+    permutation = torch.remainder(permutation, max_drug)
+    # Add ones 
+    swapped_idx[np.arange(y_drug.shape[0]), permutation] = 1
+    return swapped_idx
+
+"""
+Loss function designed for label smoothing 
+"""
+# From https://www.kaggle.com/c/siim-isic-melanoma-classification/discussion/166833#930136
+
+class LabelSmoothingLoss(torch.nn.Module):
+    def __init__(self, smoothing: float = 0.1, reduction="mean", weight=None):
+        super(LabelSmoothingLoss, self).__init__()
+        self.epsilon = smoothing
+        self.reduction = reduction
+        self.weight = weight
+
+    def reduce_loss(self, loss):
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        else:
+            return loss
+
+    def linear_combination(self, x, y):
+        return self.epsilon * x + (1 - self.epsilon) * y
+
+    def forward(self, preds, target):
+        # Move weights to device
+        if self.weight is not None:
+            self.weight = self.weight.to(preds.device)
+
+        if self.training:
+            n = preds.size(-1)
+            log_preds = F.log_softmax(preds, dim=-1)
+            loss = self.reduce_loss(-log_preds.sum(dim=-1))
+            nll = F.nll_loss(
+                log_preds, target, reduction=self.reduction, weight=self.weight
+            )
+            return self.linear_combination(loss / n, nll)
+        else:
+            return torch.nn.functional.cross_entropy(preds, target, weight=self.weight)

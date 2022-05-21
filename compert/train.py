@@ -47,22 +47,18 @@ class Trainer:
             self.init_all()
     
     @ex.capture(prefix="paths")
-    def init_folders(self, experiment_name, image_path, data_index_path, embeddings_path, use_embeddings, result_path, dataset_name):
+    def init_folders(self, experiment_name, image_path, data_index_path, result_path, dataset_name):
         """Initialize the logging folders 
         Args:
             experiment_name (str): Name of the experiment 
             image_path (str): Path to the image dataset
             data_index_path (str): Path to the image metadata
-            embeddings_path (str): The path to the molecular embedding csv
-            use_embeddings (str): Whether to use pre-trained embeddings or not
             result_path (str): path to the outcome
             dataset_name (str): the name of the dataset. Can be cellpainting or BBBC021
         """
         self.experiment_name = experiment_name  
         self.image_path = image_path 
         self.data_index_path = data_index_path  
-        self.embeddings_path = embeddings_path  
-        self.use_embeddings = use_embeddings  
         self.result_path = result_path
         self.dataset_name = dataset_name
 
@@ -99,7 +95,6 @@ class Trainer:
             augment_train (bool): Whether augmentation should be carried out on the training set
             patience (int): How many steps of non-improvement of valid loss before stopping 
             seed (int): The random seed for reproducibility 
-            append_layer_width (bool, optional): Controls The addition of trailing layers to the adversarial and drug embedding MLPs. Defaults to False.
         """
         self.img_plot = img_plot    
         self.save_results = save_results  
@@ -159,6 +154,8 @@ class Trainer:
 
         # Mapping drug to moa
         self.drug2moa = self.training_set.couples_drug_moa 
+        self.drugs2idx = self.training_set.drugs2idx
+        self.idx2drugs = {value:key for key, value in self.drugs2idx.items()}
         print('Successfully loaded the data')
 
     
@@ -181,6 +178,8 @@ class Trainer:
                 self.resume_epoch = self.model.module.load_checkpoints(self.resume_checkpoint)
             print('Create output directories for the experiment')
             self.dest_dir = make_dirs(self.result_path, self.experiment_name)
+        else:
+            self.dest_dir = ''
 
 
     @ex.capture
@@ -193,7 +192,6 @@ class Trainer:
         self.init_resume()
         self.init_training_params()
         self.init_img_params()
-        self.init_dataset()
         self.init_model()
         self.init_log()
         
@@ -206,7 +204,7 @@ class Trainer:
                                                 return_labels=True, augment_train=self.augment_train, normalize=self.normalize) 
         self.dim = 3  # Channel dimension
 
-        # Number of drugs and nujmber of modes of action 
+        # Number of drugs and number of modes of action 
         self.n_seen_drugs = dataset.num_drugs
         self.num_moa = dataset.num_moa
 
@@ -230,7 +228,7 @@ class Trainer:
             # Setup plotting object
             self.plotter = Plotter(self.dest_dir)
         
-        # The variable `end` determines whether we are at the end of the training loop and therefore if disentanglement and clustering stats
+        # The variable `end` determines whether we are at the end of the training loop 
         end = False
 
         print(f'Beginning training with epochs {self.num_epochs}')
@@ -239,14 +237,13 @@ class Trainer:
         for epoch in range(self.resume_epoch, self.resume_epoch+self.num_epochs+1):
 
             # If we are at the end of the autoencoder pretraining steps, we initialize the adversarial nets 
-            if epoch >= self.model.module.hparams["ae_pretrain_steps"] + 1 and not self.model.module.adversarial:
-                self.model.module.initialize_adversarial()
+            if epoch > self.model.module.hparams["ae_pretrain_steps"] and not self.model.module.adversarial:
+                # Initialize the latent discriminator 
+                if self.hparams['train_latent_gan']:
+                    self.model.module.initialize_latent_GAN()
                 # Patch GAN for reconstruction accuracy 
-                if self.hparams['recon_gan']:
-                    self.model.module.initialize_recons_GAN()
-                # Classification GAN for the swapping 
-                if self.hparams['classification_gan']:
-                    self.model.module.initialize_classific_GAN()
+                if self.hparams['train_discriminator_classifier']:
+                    self.model.module.initialize_recons_classifier_GAN()
             
             print(f'Running epoch {epoch}')
             self.model.train() 
@@ -270,30 +267,43 @@ class Trainer:
                 self.model.module.save_history(epoch, val_losses, val_metrics, 'val')
 
                 # Plot reconstruction of a random image 
-                if self.save_results:
+                if self.save_results and self.generate:
                     with torch.no_grad():
-                        if self.model.module.adversarial and not self.hparams['concatenate_one_hot']:
-                            original, reconstructed = self.model.module.autoencoder.generate(self.loader_val,
+                        if self.hparams['decoding_style'] == 'sum' or (self.hparams['decoding_style'] == 'concat' and not self.hparams['concatenate_one_hot']):
+                            original, reconstructed, reconstructed_flip, label_orig, label_swap = self.model.module.autoencoder.generate(self.loader_val,
                                                                                     self.model.module.drug_embeddings,
                                                                                     self.model.module.drug_embedding_encoder,
                                                                                     self.model.module.adversarial)  
                         else:
-                            original, reconstructed = self.model.module.autoencoder.generate(self.loader_val,
+                            original, reconstructed, reconstructed_flip, label_orig, label_swap = self.model.module.autoencoder.generate(self.loader_val,
                                                                                     None,
                                                                                     None,
                                                                                     self.model.module.adversarial)
+                    
+                    self.plotter.plot_reconstruction(tensor_to_image(original), 
+                                                    tensor_to_image(reconstructed), 
+                                                    epoch, 
+                                                    self.save_results, 
+                                                    self.img_plot, 
+                                                    dim=self.dim, 
+                                                    size = 4,
+                                                    drug1 = self.idx2drugs[label_orig.item()],
+                                                    drug2 = self.idx2drugs[label_orig.item()])
 
                     self.plotter.plot_reconstruction(tensor_to_image(original), 
-                                                    tensor_to_image(reconstructed), epoch, self.save_results, self.img_plot, dim=self.dim, size = 4)
+                                                    tensor_to_image(reconstructed_flip), 
+                                                    str(epoch)+'_swap', 
+                                                    self.save_results, 
+                                                    self.img_plot, 
+                                                    dim=self.dim, 
+                                                    size = 4,
+                                                    drug1 = self.idx2drugs[label_orig.item()],
+                                                    drug2 = self.idx2drugs[label_swap.item()])
                     # plt.show()
                     del original
                     del reconstructed
 
-                # Decide on early stopping based on the bit/dim of the image during autoencoder mode and the difference between decoded images after
                 score = val_metrics['rmse']
-                
-                # Evaluate early-stopping 
-                cond, early_stopping = self.model.module.early_stopping(score) 
 
                 # Save the model if it is the best performing one 
                 print(f'New best score is {self.model.module.best_score}')
@@ -314,21 +324,19 @@ class Trainer:
 
             # We do not warmup the adversaries and perform the lr scheduling for them separately 
             if self.model.module.adversarial:
-                self.model.module.scheduler_adversaries.step()
-                if self.hparams['recon_gan']:
-                    self.model.module.recon_discriminator_scheduler.step()
-                if self.hparams['classification_gan']:
-                    self.model.module.classifier_predictor_scheduler.step()
-            
+                if self.hparams['train_latent_gan']:
+                    self.model.module.scheduler_adversaries.step()
+                if self.hparams['train_discriminator_classifier']:
+                    self.model.module.discriminator_scheduler.step()
+
             # Update the number of adversarial steps performed per each autoencoder step 
             if self.model.module.hparams['anneal_beta']:
                 # Update the number of adversarial steps so they do not go under a minumum 
                 self.model.module.autoencoder.beta = min(self.model.module.hparams["max_beta"], self.model.module.autoencoder.beta+self.model.module.step)        
 
-
-        self.model.eval()
         # Perform last evaluation on TEST SET   
-        end = True
+        self.model.eval()
+        end = True  # Flag used to indicate the end of training, where latent results are saved
 
         test_losses, test_metrics = training_evaluation(self.model.module, self.loader_test, self.model.module.adversarial,
                                                 self.model.module.metrics, self.model.module.losses, self.device, end, 
@@ -336,12 +344,10 @@ class Trainer:
 
         self.model.module.save_history('final_test', test_losses, test_metrics, 'test')
 
-
         # Get results in a correct format
         results = self.format_seml_results(self.model.module.history)
         return results
-
-
+        
 
     def format_seml_results(self, history):
         """Format results for seml 
@@ -384,7 +390,8 @@ class Trainer:
                     n_moa = self.num_moa, 
                     total_iterations = self.num_epochs,
                     class_weights = self.class_imbalance_weights,
-                    batch_size = self.batch_size)
+                    batch_size = self.batch_size,
+                    normalize = self.normalize)
 
 
 # We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,

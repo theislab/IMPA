@@ -5,7 +5,7 @@ from .modules.resnet.resnet_cyclegan.resnet_cyclegan import ResnetEncoderCycleGA
 
 
 
-def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hparams, extra_fm):
+def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hparams, extra_fm, normalize):
     """Initialize encoder and decoder architectures 
 
     Args:
@@ -34,7 +34,8 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 out_height = in_height,
                 decoding_style = decoding_style, 
                 concatenate_one_hot=concatenate_one_hot,
-                extra_fm = extra_fm) 
+                extra_fm = extra_fm,
+                normalize = normalize) 
 
 
     elif hparams["autoencoder_type"] == 'convnet':
@@ -61,7 +62,8 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
             variational =  variational,
             decoding_style = decoding_style, 
             concatenate_one_hot=concatenate_one_hot,
-            extra_fm = extra_fm
+            extra_fm = extra_fm,
+            normalize = normalize
         ) 
     
     elif hparams["autoencoder_type"] == 'resnet_cyclegan':
@@ -81,7 +83,7 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 variational = variational,
                 decoding_style = decoding_style, 
                 concatenate_one_hot=concatenate_one_hot,
-                extra_fm = extra_fm) 
+                extra_fm = extra_fm, normalize = normalize) 
 
     elif hparams["autoencoder_type"] == 'unet':
         encoder = UNetEncoder(in_channels = in_channels,
@@ -99,7 +101,8 @@ def initialize_encoder_decoder(in_channels, in_width, in_height, variational, hp
                 variational = variational, 
                 decoding_style = decoding_style,
                 concatenate_one_hot=concatenate_one_hot,
-                extra_fm = extra_fm)        
+                extra_fm = extra_fm,
+                normalize = normalize)        
 
     else:
         raise NotImplementedError

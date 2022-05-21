@@ -62,12 +62,13 @@ class ResnetDritDecoder(nn.Module):
                 out_channels: int = 5,
                 init_fm: int = 64,
                 n_conv: int = 3,
-                n_residual_blocks: int = 6, 
+                n_residual_blocks: int = 4, 
                 out_width: int = 64,
                 out_height: int = 64,
                 decoding_style = 'sum', 
                 concatenate_one_hot = True,
-                extra_fm = 0):
+                extra_fm = 6,
+                normalize=False):
 
         super(ResnetDritDecoder, self).__init__()
 
@@ -79,6 +80,7 @@ class ResnetDritDecoder(nn.Module):
         self.decoding_style = decoding_style
         self.concatenate_one_hot = concatenate_one_hot
         self.extra_fm = extra_fm  # How many extra feature maps die to concatenation 
+        self.normalize = normalize
         
         # Initial number of feature maps
         in_fm = self.init_fm  
@@ -90,8 +92,8 @@ class ResnetDritDecoder(nn.Module):
             # Will perform a single concatenation before the residual block, so all the blocks are a single all together 
             residual_connections += [INSResBlock(in_fm+self.extra_fm, in_fm+self.extra_fm)]
         # Residual connections are treated as a whole layer within the module 
-        self.residual_connections = torch.nn.Sequential(*residual_connections)
-        self.modules += [self.residual_connections]
+        residual_connections = torch.nn.Sequential(*residual_connections)
+        self.modules += [residual_connections]
 
         # Output feature channels of the residual block 
         in_fm = in_fm+self.extra_fm
@@ -100,8 +102,15 @@ class ResnetDritDecoder(nn.Module):
             in_fm = in_fm//2
         
         # Output channel 
-        self.modules += [nn.ConvTranspose2d(in_fm+self.extra_fm, self.out_channels, kernel_size=1, stride=1, padding=0)]+[nn.Sigmoid()]
+        self.modules += [nn.ConvTranspose2d(in_fm+self.extra_fm, self.out_channels, kernel_size=1, stride=1, padding=0)] + \
+                            [nn.Sigmoid() if not self.normalize else nn.Tanh()]
         self.deconv = nn.Sequential(*self.modules)
+    
+    def forward(self, z, y_drug):
+        if self.decoding_style == 'sum':
+            return self.forward_sum(z, y_drug)
+        else:
+            return self.forward_concat(z, y_drug) 
 
     def forward_sum(self, z, y_drug):
         z = z + y_drug
@@ -112,27 +121,19 @@ class ResnetDritDecoder(nn.Module):
         z_init = None
         for i, layer in enumerate(self.deconv[:-1]):
 
-            # Upsample drug labs
+            # Upsample drug labs (originally a linear vector)
             y_drug_unsqueezed = y_drug.view(y_drug.size(0), y_drug.size(1), 1, 1)
             y_drug_broadcast = y_drug_unsqueezed.repeat(1, 1, z.size(2), z.size(3)).float()
 
             z_concat = torch.cat([z, y_drug_broadcast], dim=1)
             z = layer(z_concat)
             
+            # Output first latent concatenation 
             if i == 0:
                 z_init = z_concat
             
         X = self.deconv[-1](z)
         return X, z_init
-
-
-    def forward(self, z, y_drug):
-        # If the decoding style is sum, the labels are ignored
-        if self.decoding_style == 'sum':
-            return self.forward_sum(z, y_drug)
-        else:
-            return self.forward_concat(z, y_drug) 
-
 
 
 # if __name__ == '__main__':

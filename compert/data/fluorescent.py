@@ -21,7 +21,7 @@ class CustomTransform:
     """
     def __init__(self, augment=False, normalize=False):
         self.augment = augment 
-        self.normalize = True 
+        self.normalize = normalize 
         
     def __call__(self, X):
         """
@@ -30,32 +30,43 @@ class CustomTransform:
         # Add random noise and rescale pixels between 0 and 1 
         random_noise = torch.rand_like(X)  # To transform the image to continuous data point
         X = (X+random_noise)/255.0  # Scale 
+        
+        t = []
+        # If the input must be normalized between -1 and +1
+        if self.normalize==True:
+            t.append(T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
+        
         # Perform augmentation step
         if self.augment:
-            t = []
-            # if self.normalize==True:
-            #     t.append(T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
             t.append(T.RandomHorizontalFlip(p=0.3))
             t.append(T.RandomVerticalFlip(p=0.3))
-            trans = T.Compose(t)
-            return trans(X)
-        else:
-            return X
+
+        trans = T.Compose(t)
+        return trans(X)
 
 
 class BBBC021Dataset:
     """
     Dataset class for image data 
     """
-    def __init__(self, image_path, data_index_path, device='cuda', return_labels=False, augment_train=False, normalize=False):    
+    def __init__(self, 
+                image_path, 
+                data_index_path, 
+                device='cuda', 
+                return_labels=False, 
+                augment_train=False, 
+                normalize=False,
+                drug_subset=['taxol', 'cytochalasin B']):
+
         assert os.path.exists(image_path), 'The data path does not exist'
         assert os.path.exists(data_index_path), 'The data index path does not exist'
 
         # Set up the variables 
         self.image_path = image_path  # Path to the image folder
         self.data_index_path = data_index_path  # Path to data index (.csv file) 
-        self.augment_train = augment_train
+        self.augment_train = augment_train  
         self.normalize = normalize  # Controls whether the input lies between 0 and 1 or -1 and 1
+        self.drug_subset = drug_subset
 
         # Fix the training specifics 
         self.device = device 
@@ -87,7 +98,8 @@ class BBBC021Dataset:
                                                         self.drugs2idx, 
                                                         self.moa2idx, 
                                                         self.return_labels, 
-                                                        self.augment_train),
+                                                        self.augment_train, 
+                                                        normalize),
 
                             'val': BBBC021Fold('val', self.fold_datasets['valid'], 
                                                     self.image_path, 
@@ -95,7 +107,8 @@ class BBBC021Dataset:
                                                     self.drugs2idx, 
                                                     self.moa2idx, 
                                                     self.return_labels, 
-                                                    self.augment_train),
+                                                    self.augment_train, 
+                                                    normalize),
 
                             'test': BBBC021Fold('test', self.fold_datasets['test'], 
                                                     self.image_path, 
@@ -103,7 +116,8 @@ class BBBC021Dataset:
                                                     self.drugs2idx, 
                                                     self.moa2idx, 
                                                     self.return_labels, 
-                                                    self.augment_train)}
+                                                    self.augment_train, 
+                                                    normalize)}
 
 
 
@@ -122,7 +136,7 @@ class BBBC021Dataset:
             dataset_splits[fold_name] = {}
 
             # Subset of dataframe corresponding to the split 
-            subset = dataset.loc[dataset.SPLIT == fold_name]
+            subset = dataset.loc[np.logical_and(dataset.SPLIT == fold_name, dataset.CPD_NAME.isin(self.drug_subset))]
 
             # Add the  important entries to the dataset
             dataset_splits[fold_name]['file_names'] = np.array(subset.SAMPLE_KEY)
@@ -135,7 +149,7 @@ class BBBC021Dataset:
 
 
 class BBBC021Fold(Dataset):
-    def __init__(self, fold, data, image_path, drug_encoder, drugs2idx, moa2idx, return_labels = True, augment_train=True):
+    def __init__(self, fold, data, image_path, drug_encoder, drugs2idx, moa2idx, return_labels = True, augment_train=True, normalize=False):
         super(BBBC021Fold, self).__init__() 
         
         self.fold = fold  # train, test or validation set
@@ -155,22 +169,19 @@ class BBBC021Fold(Dataset):
         
         # One-hot encoders 
         self.drug_encoder = drug_encoder
-
-        # Subset mol2label to the important part only 
         self.drugs2idx = drugs2idx
         self.moa2idx = moa2idx
         
         # Transform only the training set and only if required
         if self.augment_train and self.fold == 'train':
-            self.transform = CustomTransform(augment=True)
+            self.transform = CustomTransform(augment=True, normalize=normalize)
         else:
-            self.transform = CustomTransform(augment=False)
+            self.transform = CustomTransform(augment=False, normalize=normalize)
         
         if self.fold ==  'train':
             # Compute class imbalance weights
-            compute_class_imbalance_weights_drug = self.compute_class_imbalance_weights(self.mol_names)
-
-            self.class_imbalances = compute_class_imbalance_weights_drug
+            self.class_imbalances = self.compute_class_imbalance_weights(self.mol_names)
+            
             # Map drugs to moas
             drug_ids, moa_ids = [self.drugs2idx[mol] for mol in self.mol_names] , [self.moa2idx[moa] for moa in self.moa]
             self.couples_drug_moa = {drug:moa for drug, moa in zip(drug_ids, moa_ids)}
@@ -246,7 +257,7 @@ class BBBC021Fold(Dataset):
         for i in idx_sample:
             X, mol_one_hot, smile_id, moa_id, dose, _, _ = self.__getitem__(i).values()
             
-            imgs.append(X.unsqueeze(0))  # Unsqueeze barch dimension
+            imgs.append(X.unsqueeze(0))  # Unsqueeze batch dimension
             subset_mol_one_hot.append(mol_one_hot)
             subset_smile_id.append(smile_id)
             subset_moa_id.append(moa_id)

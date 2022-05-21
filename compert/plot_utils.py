@@ -9,7 +9,7 @@ class Plotter:
     def __init__(self, dest_dir):
         self.dest_dir = dest_dir
 
-    def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False, dim = 5, size=6):
+    def plot_reconstruction(self, original, reconstruction, epoch, save=True, plot=False, dim = 5, size=6, drug1='', drug2=''):
         """Plot two images represented the original and reconstructed outputs of a neural network.
 
         Args:
@@ -22,7 +22,7 @@ class Plotter:
         fig = plt.figure(constrained_layout=True, figsize = (size,size))
         # create 3x1 subfigs
         subfigs = fig.subfigures(nrows=2, ncols=1)
-        titles = ['ORIGINAL', 'RECONSTRUCTED']
+        titles = [f'{drug1}_ORIGINAL', f'{drug2}_RECONSTRUCTED']
         images = [original, reconstruction]        
 
         for row, subfig in enumerate(subfigs):

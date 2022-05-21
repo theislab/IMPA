@@ -64,7 +64,8 @@ class ResnetDecoderCycleGAN(nn.Module):
                 out_height: int = 64,
                 variational: bool = True,
                 decoding_style = 'sum',
-                extra_fm=0):
+                extra_fm=0, 
+                normalize=False):
 
         super(ResnetDecoderCycleGAN, self).__init__()
 
@@ -76,6 +77,7 @@ class ResnetDecoderCycleGAN(nn.Module):
         self.norm_layer = nn.BatchNorm2d
         self.decoding_style = decoding_style
         model = []
+        self.normalize = normalize
 
         # Extra fm controls amount of added dimensions in case of latent concatenation 
         self.extra_fm = extra_fm
@@ -91,7 +93,7 @@ class ResnetDecoderCycleGAN(nn.Module):
         model += [nn.ReflectionPad2d(3)]
         # Last comvolution with a large kernel 
         model += [nn.Conv2d(self.init_fm+self.extra_fm, self.out_channels, kernel_size=7, padding=0)]
-        model += [nn.Sigmoid()]
+        model += [nn.Sigmoid() if not self.normalize else nn.Tanh()]
 
         self.deconv = nn.Sequential(*model)
 

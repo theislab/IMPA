@@ -30,7 +30,8 @@ def training_evaluation(model,
         model (nn.Model): The torch model being trained
         dataset_loader (torch.utils.data.DataLoader): Data loader of the split of interest
         adversarial (bool): Whether adversarial training is performed or not
-        metrics (Metrics): Metrics object for computing qulity scores  
+        metrics (TrainingMetrics): Metrics object for computing quality scores  
+        losses (TrainingLosses): Losses object 
         device (str): `cuda` or `cpu`
         end (bool, optional): If the evaluation is performed at the end of the training loop. Defaults to False.
         variational (bool, optional): Whether a VAE is used over an AE. Defaults to True.
@@ -63,41 +64,34 @@ def training_evaluation(model,
         y_true_ds_drugs.append(torch.argmax(y_adv_drugs, dim=1).item())  # Record the labels 
 
         # PREDICTIONS  
-        if not adversarial:
-            with torch.no_grad():
-                res = model.autoencoder.forward_ae(X, y_drug=None, mode='eval')
-                out, _, _, z_basal, ae_loss = res.values()
-
-            # Record the obtained loss functions 
-            z_basal_ds.append(z_basal)
-
+        # Label id for encoding
+        drug_id = y_adv_drugs.argmax(1).to(device)
+        
+        if model.encoded_covariates:
+            # Get the embedded drug
+            z_drug = model.encode_cov_labels(drug_id)
+        
         else:
-            # Label id for encoding
-            drug_id = y_adv_drugs.argmax(1).to(device)
-            
-            if model.encoded_covariates:
-                # Get the embedded drug and mode of action 
-                z_drug = model.encode_cov_labels(drug_id)
-            
-            else:
-                z_drug = y_adv_drugs
-                        
-            # Autoencoder step 
-            with torch.no_grad():
-                out, out_basal, z, z_basal, ae_loss = model.autoencoder.forward_ae(X, y_drug=z_drug, mode='eval').values()
-            # Save non-redundacy latent basal and latent 
-            rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()  # RMSE between out and out_basal 
-            
-            # Append the z for score later on 
-            z_ds.append(z)
-            z_basal_ds.append(z_basal)
+            # If one-hot encodings are to be concatenated, then z_drug is simply the one hot vector 
+            z_drug = y_adv_drugs
+                    
+        # Autoencoder step 
+        with torch.no_grad():
+            out, out_basal, z, z_basal, ae_loss = model.autoencoder.forward_ae(X, y_drug=z_drug, mode='eval').values()
+        # Save non-redundacy latent basal and latent 
+        rmse_basal_full += metrics.compute_batch_rmse(out, out_basal).item()  # RMSE between out and out_basal 
+        
+        # Append the z for score later on 
+        z_ds.append(z)
+        z_basal_ds.append(z_basal)
 
-            # Latent adversary step and prediction append 
-            y_hat_drug = model.adversary_drugs(z_basal)
-            y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
+        # Latent adversary step and prediction append 
+        model.latent_discriminator.eval()
+        y_hat_drug = model.latent_discriminator(z_basal)
+        y_hat_ds_drugs.append(torch.argmax(y_hat_drug, dim=1).item())
 
-            # Update the counterfactual score 
-            conterfactual_rmse += counterfactual_score(X, z_basal, model, y_adv_drugs, drug_id)
+        # Update the counterfactual score 
+        conterfactual_rmse += counterfactual_score(X, z_basal, model, y_adv_drugs, drug_id)
 
         # Update the autoencoder losses
         losses.update_losses(ae_loss)
@@ -117,11 +111,8 @@ def training_evaluation(model,
         metrics.compute_classification_report(y_true_ds_drugs, y_hat_ds_drugs, '_drug')
     
     # Average losses 
-    losses.average_losses(len(dataset_loader))    
+    losses.average_losses()    
     losses.print_losses()
-
-    # Update the bit per dimension metric
-    recon_loss = losses.loss_dict['recon_loss'] if variational else losses.loss_dict['total_loss']
 
     metrics.metrics['rmse'] = metrics.metrics['rmse']/len(dataset_loader)
     # Add the adversarial scores to the metrics 
@@ -143,10 +134,13 @@ def training_evaluation(model,
         metrics.metrics["disentanglement_score_z_drug"] = disentanglement_score_z_drug
         metrics.metrics["difference_disentanglement_drug"] = disentanglement_score_z_drug - disentanglement_score_basal_drug
 
+    if end:
+        with open(os.path.join(save_path, 'embeddings.pkl'), 'wb') as file:
+            pkl.dump([z_basal_ds, z_ds, y_true_ds_drugs], file)
 
     del z_basal_ds
     del z_ds
-        
+
     # Print metrics 
     metrics.print_metrics()
     return losses.loss_dict, metrics.metrics
@@ -183,10 +177,10 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
 
     # Create loader and dataset
     dataset = torch.utils.data.TensorDataset(X_train, y_train_tensor)
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=256, shuffle=True)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
 
-    # initialize nwtwork and training hyperparameters 
-    net = DisentanglementClassifier(X_train.shape[2], X_train.shape[1], 32, len(unique_classes)).to('cuda')
+    # initialize network and training hyperparameters 
+    net = DisentanglementClassifier(X_train.shape[2], X_train.shape[1], 256, len(unique_classes)).to('cuda')
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 
@@ -208,9 +202,11 @@ def compute_disentanglement_score(Z, y, return_misclass_report=False):
 
 
 def counterfactual_score(X, z_basal, model, y_adv_drug,  drug_id):
-    max_drug = y_adv_drug.shape[1]  # Single integer representing maximum drug id
-
-    drug_ids = [i for i in range(max_drug) if i!=drug_id]  # Drug ids for counterfactual (different from the data point)
+    # Single integer representing maximum drug id plus 1
+    max_drug = y_adv_drug.shape[1]  
+    
+    # Drug ids for counterfactual (different from the data point)
+    drug_ids = [i for i in range(max_drug) if i!=drug_id]  
 
     with torch.no_grad():
         if model.encoded_covariates:
@@ -218,7 +214,7 @@ def counterfactual_score(X, z_basal, model, y_adv_drug,  drug_id):
             drug_emb = model.drug_embeddings(torch.tensor(drug_ids).to('cuda'))  # Get the embeddings of all the drugs 
             z_drug = model.drug_embedding_encoder(drug_emb)  # One for each drug 
         
-            res, _ = model.autoencoder.decoder(z_basal.repeat(drug_emb.shape[0],1,1,1), z_drug)  # Must repeat z on the batch dimension
+            out_X, _ = model.autoencoder.decoder(z_basal.repeat(drug_emb.shape[0],1,1,1), z_drug)  # Must repeat z on the batch dimension
 
         else:
             # One hot encoded drugs and moas
@@ -226,11 +222,10 @@ def counterfactual_score(X, z_basal, model, y_adv_drug,  drug_id):
 
             y_adv_drug = torch.cat((y_adv_drug[:drug_id], y_adv_drug[drug_id+1:]))
 
-            res, _ = model.autoencoder.decoder(z_basal.repeat(y_adv_drug.shape[0],1,1,1), y_adv_drug.to('cuda'))
-        
+            out_X, _ = model.autoencoder.decoder(z_basal.repeat(y_adv_drug.shape[0],1,1,1), y_adv_drug.to('cuda'))
+                
         # Decode the counterfactual vector
-        rmse = torch.sqrt(torch.mean((X.repeat(res.shape[0], 1, 1, 1) - res)**2))
-    
+        rmse = torch.sqrt(torch.mean((X.repeat(out_X.shape[0], 1, 1, 1) - out_X)**2))
     return rmse.item()
 
 

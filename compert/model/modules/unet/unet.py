@@ -39,7 +39,17 @@ class UNetEncoder(nn.Module):
 
 
 class UNetDecoder(nn.Module):
-    def __init__(self, out_channels, init_fm, n_conv, out_width, out_height, variational, decoding_style='sum', concatenate_one_hot=True, extra_fm=0):
+    def __init__(self, out_channels, 
+                        init_fm, 
+                        n_conv, 
+                        out_width, 
+                        out_height, 
+                        variational, 
+                        decoding_style='sum', 
+                        concatenate_one_hot=True, 
+                        extra_fm=0,
+                        normalize=False):
+
         super(UNetDecoder, self).__init__()
         self.out_channels = out_channels
         self.init_fm = init_fm
@@ -50,6 +60,7 @@ class UNetDecoder(nn.Module):
         self.decoding_style = decoding_style
         self.concatenate_one_hot = concatenate_one_hot
         self.extra_fm = extra_fm 
+        self.normalize = normalize
 
         # The initial feature maps equate the number of channels of the         
         self.in_channels = self.init_fm*2**(self.n_conv-1)
@@ -65,7 +76,8 @@ class UNetDecoder(nn.Module):
         
         # Out conv is not transposing
         self.modules.append(OutConv(in_fm+self.extra_fm, self.out_channels))
-        self.modules.append(torch.nn.Sigmoid())
+        activ = torch.nn.Sigmoid() if not self.normalize else torch.nn.Tanh()
+        self.modules.append(activ)
         self.deconv = torch.nn.Sequential(*self.modules)        
 
     def forward_sum(self, z, y_drug):

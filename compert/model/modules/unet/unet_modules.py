@@ -8,18 +8,26 @@ import torch.nn.functional as F
 class DoubleConv(nn.Module):
     """Convolutional layer that is followed by ReLU and batch normalization  
     """
-    def __init__(self, init_fm, out_fm, mid_channels=None):
+    def __init__(self, init_fm, out_fm, mid_channels=None, last = False):
         super().__init__()
         if not mid_channels:
             mid_channels = out_fm
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(init_fm, mid_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(mid_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_fm, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_fm),
-            nn.ReLU(inplace=True)
-        )
+        if not last:
+            self.double_conv = nn.Sequential(
+                nn.Conv2d(init_fm, mid_channels, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(mid_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(mid_channels, out_fm, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(out_fm),
+                nn.ReLU(inplace=True) 
+            )
+        else:
+            self.double_conv = nn.Sequential(
+                nn.Conv2d(init_fm, mid_channels, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(mid_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(mid_channels, out_fm, kernel_size=3, padding=1, bias=False)
+            )
 
     def forward(self, x):
         return self.double_conv(x)

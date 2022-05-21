@@ -9,12 +9,12 @@ import torch.nn.functional as F
 
 # Basic blocks encoder
 class LeakyReLUConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Batch'):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Instance'):
         super(LeakyReLUConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
         if norm == 'Instance':
-            model += [nn.InstanceNorm2d(out_channels, affine=False)]
+            model += [nn.InstanceNorm2d(out_channels, affine=True)]
         elif norm == 'Batch':
             model += [nn.BatchNorm2d(out_channels)]
         model += [nn.LeakyReLU(inplace=True)]
@@ -25,12 +25,12 @@ class LeakyReLUConv2d(nn.Module):
 
 
 class ReLUINSConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Batch'):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0, norm='Instance'):
         super(ReLUINSConv2d, self).__init__()
         model = []
         model += [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=True)]
         if norm == 'Instance':
-            model += [nn.InstanceNorm2d(out_channels, affine=False)]
+            model += [nn.InstanceNorm2d(out_channels, affine=True)]
         elif norm == 'Batch':
             model += [nn.BatchNorm2d(out_channels)]
         model += [nn.ReLU(inplace=True)]
@@ -48,10 +48,10 @@ class INSResBlock(nn.Module):
         super(INSResBlock, self).__init__()
         model = []
         model += self.conv3x3(in_channels, out_channels, stride)
-        model += [nn.BatchNorm2d(out_channels)]
+        model += [nn.InstanceNorm2d(out_channels, affine=True)]
         model += [nn.ReLU(inplace=True)]
         model += self.conv3x3(out_channels, out_channels)
-        model += [nn.BatchNorm2d(out_channels)]
+        model += [nn.InstanceNorm2d(out_channels, affine=True)]
         if dropout > 0:
             model += [nn.Dropout(p=dropout)]
         self.model = nn.Sequential(*model)

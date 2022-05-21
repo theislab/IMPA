@@ -12,6 +12,7 @@ class TrainingMetrics:
         self.channels = channels
 
         self.metrics = dict(rmse=0) 
+        self.iterations = dict(rmse=0)
         self.device = device
         self.batch_size = batch_size 
 
@@ -22,6 +23,7 @@ class TrainingMetrics:
         avg = self.compute_batch_rmse(X, X_hat)
         # Add the sum of rmses per batch
         self.metrics['rmse'] += avg.item()
+        self.iterations['rmse'] += 1
     
     def compute_batch_rmse(self, X, X_hat):
         """
@@ -58,7 +60,8 @@ class TrainingMetrics:
         """
         Reset metrics to 0        
         """
-        self.metrics = dict(rmse=0)    
+        self.metrics = dict(rmse=0)  
+        self.iterations = dict(rmse=0)  
 
     def print_metrics(self):
         """
@@ -67,25 +70,28 @@ class TrainingMetrics:
         for metric in self.metrics:
             print(f'{metric} = {self.metrics[metric]}')
 
-    def average_metrics(self, factor):
+    def average_metrics(self):
         """
         Compute the batch average for each metric         
         """
         for key in self.metrics:
-            self.metrics[key] = self.metrics[key]/factor
+            self.metrics[key] = self.metrics[key]/self.iterations[key]
 
 
 class TrainingLosses:
     def __init__(self):
         self.loss_dict = None
+        self.iteration_dict = None
 
     def initialize_losses(self, losses):
         """
         Initialize the loss vector attribute 
         """
         self.loss_dict = {}
+        self.iteration_dict = {}
         for key in losses:
             self.loss_dict[key] = 0
+            self.iteration_dict[key] = 0
         
     def update_losses(self, losses):
         """
@@ -96,21 +102,32 @@ class TrainingLosses:
             self.initialize_losses(losses)
         # Record the losses
         for loss in losses:
-            try:
-                self.loss_dict[loss] += losses[loss].item()
-            except:
-                self.loss_dict[loss] += losses[loss]
+            # If loss is not in the dict, update it and its iteration dict 
+            if loss not in self.loss_dict:
+                try: 
+                    self.loss_dict[loss] = losses[loss].item()
+                except:
+                    self.loss_dict[loss] = losses[loss]
+                self.iteration_dict[loss] = 1
+                
+            else:
+                try:
+                    self.loss_dict[loss] += losses[loss].item()
+                except:
+                    self.loss_dict[loss] += losses[loss]
+                self.iteration_dict[loss] += 1
 
     def reset(self):
         self.loss_dict = None 
+        self.iteration_dict = None 
 
     def print_losses(self):
         for loss in self.loss_dict:
             print(f'Average {loss} = {self.loss_dict[loss]}')
     
-    def average_losses(self, factor):
+    def average_losses(self):
         """
         Convert the losses to batch averages            
         """
         for key in self.loss_dict:
-            self.loss_dict[key] = self.loss_dict[key]/factor
+            self.loss_dict[key] = self.loss_dict[key]/self.iteration_dict[key]

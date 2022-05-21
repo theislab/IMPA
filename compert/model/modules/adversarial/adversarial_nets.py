@@ -49,7 +49,7 @@ class DiscriminatorNet(nn.Module):
     # Go as deep as necessary to transform the spatial dimension to 1 
     model = []
     for i in range(depth):
-        model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=2, padding=1, norm=self.norm)]
+        model += [LeakyReLUConv2d(in_fm, out_fm, kernel_size=3, stride=2, padding=1, norm=self.norm if i < depth-1 else 'None')]
         if i == 0:
             in_fm = out_fm
 
@@ -117,9 +117,43 @@ class LabelEncoderLinear(nn.Module):
         return out
 
 
+class LabelEncoderLinearMultiTask(nn.Module):
+    def __init__(self, input_dim, output_dim, num_drugs):
+        super(LabelEncoderLinearMultiTask, self).__init__()
+        self.input_fm = input_dim
+        self.output_dim = output_dim 
+        self.num_drugs = num_drugs
+
+        self.shared = nn.Sequential(
+            nn.Linear(self.input_fm, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 512))
+    
+        self.nets = nn.ModuleList()
+        for _ in range(self.num_drugs):
+            self.nets += [nn.Sequential(nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, self.output_dim))]
+
+    def forward(self, z, y):
+        h = self.shared(z)
+        out = []
+        for layer in self.nets:
+            out += [layer(h)]
+        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        idx = torch.LongTensor(range(y.size(0))).to(y.device)
+        s = out[idx, y]  # (batch, style_dim)
+        return s
+
+
 """
 Disentanglement classifier for classification 
 """
+
 
 class DisentanglementClassifier(nn.Module):
     def __init__(self, init_dim, init_fm, out_fm, num_outputs):
@@ -221,8 +255,6 @@ class GANDiscriminator(nn.Module):
 """
 GAN classifier for correctness of the cell
 """
-
-
 class GANClassifier(nn.Module):
     def __init__(self, init_dim, in_channels, init_fm, num_outputs_drug):
 
@@ -338,22 +370,51 @@ class DiscriminatorClassifier(nn.Module):
         labels_fake = torch.ones(X_hat.shape[0]).to(self.device)  
         loss_fake = loss_discr(out_patch_fake, labels_fake)
         
-        return loss_class, loss_fake
+        return loss_fake, loss_class 
 
+"""
+Style encoder (from image to embedding)
+"""
+class AdaIN(nn.Module):
+    def __init__(self, style_dim, num_features):
+        super().__init__()
+        self.norm = nn.InstanceNorm2d(num_features, affine=False)
+        self.fc = nn.Linear(style_dim, num_features*2)
 
+    def forward(self, x, s):
+        h = self.fc(s)
+        h = h.view(h.size(0), h.size(1), 1, 1)
+        gamma, beta = torch.chunk(h, chunks=2, dim=1)
+        return (1 + gamma) * self.norm(x) + beta
 
-# if __name__ == '__main__':
-    # x = torch.rand(3, 512, 6, 6)
-    # dis = DiscriminatorNet(512, 256, 3, 4)
-    # print(dis(x).shape)
+class StyleEncoder(nn.Module):
+    def __init__(self, in_channels=3, in_width=96, style_dim=64, num_drugs=2, max_conv_dim=512):
+        super().__init__()
+        dim_in = 64
+        blocks = []
+        blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
+        repeat_num = int(np.log2(in_width)) - 1
 
-    # x = torch.rand(64, 3, 96, 96)
-    # x_hat = torch.rand(64, 3, 96, 96)
-    # loss = torch.nn.BCELoss()
+        for _ in range(repeat_num):
+            dim_out = min(dim_in*2, max_conv_dim)
+            blocks += [LeakyReLUConv2d(dim_in, dim_out, 4, 2, 1, norm='Instance')]
+            dim_in = dim_out
 
-    # enc = GANDiscriminator(init_dim=96, init_ch=3, init_fm=64, device='cuda')
-    # print(enc.discriminator_pass(x, x_hat, loss))
-    # print(enc.generator_pass(x_hat, loss))    
+        blocks += [nn.Conv2d(dim_out, dim_out, 3, 1, 0)]
+        blocks += [nn.LeakyReLU(0.2)]
+        self.shared = nn.Sequential(*blocks)
 
-    # enc = GANClassifier(init_dim=96, in_channels=3, init_fm=64, num_outputs=15)
-    # print(enc(x).shape)
+        self.unshared = nn.ModuleList()
+        for _ in range(num_drugs):
+            self.unshared += [nn.Linear(dim_out, style_dim)]
+
+    def forward(self, x, y):
+        h = self.shared(x)
+        h = h.view(h.size(0), -1)
+        out = []
+        for layer in self.unshared:
+            out += [layer(h)]
+        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        idx = torch.LongTensor(range(y.size(0))).to(y.device)
+        s = out[idx, y]  # (batch, style_dim)
+        return s

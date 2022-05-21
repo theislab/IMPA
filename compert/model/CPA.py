@@ -35,7 +35,8 @@ class CPA(TemplateModel):
             n_moa: int = 0,
             total_iterations: int = None, 
             class_weights: dict = None,
-            batch_size: dict = 256):     
+            batch_size: dict = 256, 
+            normalize=False):     
 
         super(CPA, self).__init__() 
         self.adversarial = False  # If a normal adversarial network must be trained (starting at false)
@@ -70,6 +71,7 @@ class CPA(TemplateModel):
         # The information concerning dataset and the MOA based adversarial task 
         self.dataset_name = dataset_name 
         self.n_moa = n_moa
+        self.normalize = normalize
 
         # Prepare initialization of the encoder and the decoder 
         if self.hparams["decoding_style"] == 'sum':
@@ -78,10 +80,10 @@ class CPA(TemplateModel):
             if self.hparams["concatenate_one_hot"]:
                 self.extra_fm = self.n_seen_drugs  # If we concatenate the one-hot encodings of the conditions, the number of added dimension is the sum of such conditions 
             else:
-                self.extra_fm = self.hparams["drug_embedding_dimension"]
+                self.extra_fm = self.hparams["drug_embedding_dimension"]  # Else the number of additional feature maps is the size of the drug embeddings
 
         # Instantiate the convolutional encoder and decoder modules
-        self.autoencoder = AE(self.in_channels, self.in_width, self.in_height, self.variational, self.hparams, self.extra_fm, self.n_seen_drugs, self.device)
+        self.autoencoder = AE(self.in_channels, self.in_width, self.in_height, self.variational, self.hparams, self.extra_fm, self.n_seen_drugs, self.device, self.normalize)
 
         # Initialize warmup params
         self.warmup_steps = self.hparams["warmup_steps"]
@@ -98,12 +100,19 @@ class CPA(TemplateModel):
 
         # Class weights for balancing 
         self.class_weights = class_weights 
+        
+        # The cycle and associated steps control the alternation of GAN and AE
+        self.cycle, self.max_cycle = {}, -1
+        
+        # The latent feature maps and the latent spatial dimension
+        self.init_fm = 2**(self.hparams["n_conv"]-1)*self.hparams["init_fm"]  # Feature maps in the latent space 
+        self.downsample_dim = self.in_width//(2**self.hparams["n_conv"])  # Spatial dimension in the latent 
+
+        # Get the boolean about whether the encoders are required
+        self.encoded_covariates = (self.hparams["decoding_style"] == 'sum' or  (self.hparams['decoding_style'] == 'concat' and not self.hparams['concatenate_one_hot']))  
 
         # Initialize the autoencoder first with adversarial equal to False
         self.initialize_ae() 
-
-        # The cycle and associated steps control the alternation of GAN and AE
-        self.cycle, self.max_cycle = {0:'AE'}, 0
 
         # Initializae the iterations controlling beta annealing 
         if self.hparams['anneal_beta']:
@@ -111,67 +120,29 @@ class CPA(TemplateModel):
             self.step = (self.hparams["max_beta"]-self.hparams["beta"])/self.total_iterations
 
 
-
     def initialize_ae(self):
         """Initialize autoencoder model 
         """
         print('Initalize autoencoder')
-        _parameters = (self.get_params(self.autoencoder, True))
-
-        # Setup the optimizer and scheduler for the standard VAE 
-        self.optimizer_autoencoder = torch.optim.Adam(
-            _parameters,
-            lr=self.hparams["autoencoder_lr"],
-            weight_decay=self.hparams["autoencoder_wd"],
-        )
-        
-        # Learning rate schedulers for the model 
-        self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
-            self.optimizer_autoencoder,
-            step_size=self.hparams["step_size_lr"],
-            gamma=0.5,
-        )
-
-
-    def initialize_adversarial(self):
-        print('Initalize latent adversarial training')
-
-        # Adversary is a convolutional net on the latent
-        init_fm = 2**(self.hparams["n_conv"]-1)*self.hparams["init_fm"]  # Feature maps in the latent space 
-        downsample_dim = self.in_width//(2**self.hparams["n_conv"])  # Spatial dimension in the latent 
-        depth = int(np.around(np.log2(downsample_dim)))  # Number of 3x3 convolutions needed to reduce the spatial dimension to 1
-
-        # Initialize the discriminator for the drugs and the moa 
-        self.adversary_drugs = DiscriminatorNet(
-            init_fm, self.hparams["adversary_width_drug"], depth, self.n_seen_drugs
-        ).to(self.device)
-        
-        # Create drug embedding 
-        self.drug_embeddings = torch.nn.Embedding(
-            self.n_seen_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
-
-        # Drug embedding encoder 
-        if self.hparams["decoding_style"] == 'sum':
-            self.drug_embedding_encoder = LabelEncoder(downsample_dim, 
-                                            self.hparams["drug_embedding_dimension"], init_fm).to(self.device) 
-
-        elif self.hparams['decoding_style'] == 'concat' and not self.hparams['concatenate_one_hot']:
-            self.drug_embedding_encoder = LabelEncoderLinear(self.hparams["drug_embedding_dimension"], self.hparams["drug_embedding_dimension"]).to(self.device) 
-
-        # Crossentropy loss for the prediction of both MOA and the drug 
-        if self.hparams["weigh_loss"]:
-            self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(weight = torch.tensor(self.class_weights).float().to(self.device), 
-                                                                    reduction = 'mean')
-        else:
-            self.loss_adversary_drugs = torch.nn.CrossEntropyLoss(reduction = 'mean')
-
-        # Get the boolean about whether the encoders are required
-        self.encoded_covariates = (self.hparams["decoding_style"] == 'sum' or  (self.hparams['decoding_style'] == 'concat' and not self.hparams['concatenate_one_hot']))  
 
         # Collect parameters of the autoencoder branch
         _parameters = (self.get_params(self.autoencoder, True))
 
         if self.encoded_covariates:
+            # Create drug embedding 
+            self.drug_embeddings = torch.nn.Embedding(
+                self.n_seen_drugs, self.hparams["drug_embedding_dimension"]).to(self.device)
+
+            # Drug embedding encoder 
+            if self.hparams["decoding_style"] == 'sum':
+                self.drug_embedding_encoder = LabelEncoder(self.downsample_dim, 
+                                                self.hparams["drug_embedding_dimension"], self.init_fm).to(self.device) 
+
+            # Linear encoder '
+            elif self.hparams['decoding_style'] == 'concat' and not self.hparams['concatenate_one_hot']:
+                self.drug_embedding_encoder = LabelEncoderLinear(self.hparams["drug_embedding_dimension"], self.hparams["drug_embedding_dimension"]).to(self.device) 
+            
+
             _parameters.extend(self.get_params(self.drug_embeddings, True) + 
                                 self.get_params(self.drug_embedding_encoder, True)) 
 
@@ -182,20 +153,44 @@ class CPA(TemplateModel):
             weight_decay=self.hparams["autoencoder_wd"],
         )
         
-        # Optimizer for the drug adversary
-        _parameters = self.get_params(self.adversary_drugs, True)
-    
-        self.optimizer_adversaries = torch.optim.Adam(
-            _parameters,
-            lr=self.hparams["adversary_lr"],
-            weight_decay=self.hparams["adversary_wd"],
-        )
-
         # Learning rate schedulers for the model 
         self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
             self.optimizer_autoencoder,
             step_size=self.hparams["step_size_lr"],
             gamma=0.5,
+        )
+
+        # Update the cycle with the number of batches used to train the autoencoder
+        self.update_cycle('AE', self.hparams['reconstruction_steps'])
+
+
+    def initialize_latent_GAN(self):
+        print('Initalize latent adversarial training')
+        
+        # Number of 3x3 convolutions needed to reduce the spatial dimension to 1        
+        depth = int(np.around(np.log2(self.downsample_dim)))  
+
+        # Initialize the discriminator for the drugs  
+        self.latent_discriminator = DiscriminatorNet(
+            self.init_fm, self.hparams["latent_discr_width"], depth, self.n_seen_drugs
+        ).to(self.device)
+
+        # Crossentropy loss for the prediction of the drug 
+        if self.hparams["weigh_loss"]:
+            weight_tensor = torch.tensor(self.class_weights).float().to(self.device)
+            self.loss_latent_GAN_disc = torch.nn.CrossEntropyLoss(weight = weight_tensor, reduction = 'mean')
+            self.loss_latent_GAN_gen = LabelSmoothingLoss(smoothing=1.0, reduction='mean', weight=weight_tensor)
+        else:
+            self.loss_latent_GAN = torch.nn.CrossEntropyLoss(reduction = 'mean')
+            self.loss_latent_GAN_gen = LabelSmoothingLoss(smoothing=1.0, reduction='mean')
+
+        # Optimizer for the drug adversary
+        _parameters = self.get_params(self.latent_discriminator, True)
+        
+        self.optimizer_adversaries = torch.optim.Adam(
+            _parameters,
+            lr=self.hparams["adversary_lr"],
+            weight_decay=self.hparams["adversary_wd"],
         )
 
         self.scheduler_adversaries = torch.optim.lr_scheduler.StepLR(
@@ -208,58 +203,40 @@ class CPA(TemplateModel):
         self.adversarial = True
         
         # Update the scheduling cycle
-        self.update_cycle('ADV', self.hparams['adversary_steps'])
+        self.update_cycle('lat_disc', self.hparams['latent_gan_steps'])
 
 
-    def initialize_recons_GAN(self):
+    def initialize_recons_classifier_GAN(self):
         print('Initialize recognition GAN')
         # Discriminator on the output pixel state (True vs False)
-        self.recon_predictor = GANDiscriminator(self.in_width, self.in_channels, init_fm=64, device=self.device).to(self.device)
+        self.discriminator = DiscriminatorClassifier(self.in_width, 
+                                                        self.in_channels, 
+                                                        init_fm=64, 
+                                                        num_outputs_drug=self.n_seen_drugs,
+                                                        device=self.device).to(self.device)
                
-        # Loss for the GAN on the pixel space
+        # Losses for predictor and classifier
         self.recon_predictor_loss = torch.nn.BCELoss()
+        self.classifier_predictor_loss = torch.nn.CrossEntropyLoss(reduction = 'mean')
     
-        # Reconstruction GAN is to be trained 
-        _parameters = (self.get_params(self.recon_predictor, True))
-        self.recon_discriminator_optimizer = torch.optim.Adam(
+        # Discriminator optimizer
+        _parameters = (self.get_params(self.discriminator, True))
+        self.discriminator_optimizer = torch.optim.Adam(
                                             _parameters,
                                             lr=self.hparams["adversary_lr"],
                                             weight_decay=self.hparams["adversary_wd"])
 
         # Scheduler
-        self.recon_discriminator_scheduler = torch.optim.lr_scheduler.StepLR(
-                                                self.recon_discriminator_optimizer,
+        self.discriminator_scheduler = torch.optim.lr_scheduler.StepLR(
+                                                self.discriminator_optimizer,
                                                 step_size=self.hparams["step_size_lr"],
                                                 gamma=0.5)
 
+        # Turn adversarial to True
+        self.adversarial = True
+
         # Update the scheduling cycle 
-        self.update_cycle('recon_GAN', self.hparams['recon_gan_steps'])
-
-
-    def initialize_classific_GAN(self):
-        print('Initialize reconstruction GAN')
-        # Discriminator on the output pixel state (True vs False)
-        self.classifier_predictor = GANClassifier(self.in_width, self.in_channels, init_fm=64, num_outputs_drug=self.n_seen_drugs).to(self.device)
-
-        self.classifier_predictor_loss = torch.nn.CrossEntropyLoss(reduction = 'mean')
-
-        # GAN discriminator optimizers 
-        _parameters = (self.get_params(self.classifier_predictor, True))
-
-        self.classifier_predictor_optimizer = torch.optim.Adam(
-                                            _parameters,
-                                            lr=self.hparams["adversary_lr"],
-                                            weight_decay=self.hparams["adversary_wd"])
-
-        # Scheduler
-        self.classifier_predictor_scheduler = torch.optim.lr_scheduler.StepLR(
-                                                self.classifier_predictor_optimizer,
-                                                step_size=self.hparams["step_size_lr"],
-                                                gamma=0.5,
-                                            )
-        
-        # Update the scheduling cycle  
-        self.update_cycle('classific_GAN', self.hparams['classification_gan_steps'])
+        self.update_cycle('discr', self.hparams['discriminator_steps'])
 
 
     def set_hparams_(self, seed, hparams):
@@ -281,36 +258,43 @@ class CPA(TemplateModel):
             "dropout_ae": False if default else np.random.choice([True, False]),
             "dropout_rate_ae": 0.1 if default else np.random.choice([0.1, 0.5, 0.8]),
             "weigh_loss": False if default else np.random.choice([True, False]),
+            "step_size_lr": 45 if default else int(np.random.choice([15, 25, 45])),
 
             # General autoencoder specifics
-            "autoencoder_type": 'resnet_drit' if default else np.random.choice(['resnet_dri', 'unet']),
+            "autoencoder_type": 'resnet_drit' if default else np.random.choice(['resnet_drit', 'unet']),
             "init_fm": 64 if default else int(np.random.choice([32, 64, 128])),  # Will be upsampled depth times
             "n_conv": 3 if default else int(np.random.choice([3, 4, 5])),
             "n_residual_blocks": 4 if default else int(np.random.choice([2, 46, 12])),
             "autoencoder_lr": 1e-4 if default else float(10 ** np.random.uniform(-5, -3)),
             "autoencoder_wd": 1e-6 if default else float(10 ** np.random.uniform(-8, -4)),
             "beta_reconstruction": 1 if default else float(10 ** np.random.uniform(-1, 1)), 
-            "step_size_lr": 45 if default else int(np.random.choice([15, 25, 45])),
+            "reconstruction_steps": 1 if default else np.randm.choice([1, 2, 3]),
+
             "decoding_style": 'sum' if default else np.random.choice(['sum', 'concat']),  # If label must be encoded or added as one-hot
             "anneal_beta": True if default else np.random.choice([True, False]),
             "beta": 0 if default else np.random.choice([1, 5, 10]),
             "max_beta": 1 if default else np.random.choice([1]),
+            "drug_embedding_dimension": 128 if default else int(np.random.choice([128, 256, 512])),
+            "concatenate_one_hot": True if default else np.random.choice([True, False]), 
             
-            
-            # Adversaries
-            "adversary_width_drug": 128 if default else int(np.random.choice([64, 128, 256])),  # Controls the feature map dimensionality of the adversay network on the latent 
+            # General adversaries
             "adversary_lr": 3e-4 if default else float(10 ** np.random.uniform(-5, -3)),
             "adversary_wd": 1e-4 if default else float(10 ** np.random.uniform(-6, -3)),
+
+            "train_latent_gan": True if default else np.random.choice([True, False]), 
+            "latent_discr_width": 128 if default else int(np.random.choice([64, 128, 256])),  # Controls the feature map dimensionality of the adversay network on the latent 
             "beta_latent": 0.1 if default else float(10 ** np.random.uniform(-2, 2)),  # Regularization 
-            "adversary_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),  # To not be confused: the number of adversary steps before the next VAE step 
-            "drug_embedding_dimension": 128 if default else int(np.random.choice([128, 256, 512])),
-            "concatenate_one_hot": True if default else np.random.choice([True, False]),            
-            "recon_gan": True if default else np.random.choice([True, False]),
-            "classification_gan": True if default else np.random.choice([True, False]),
-            "beta_gan_recon": 1,
-            "beta_gan_classific": 1,
-            "recon_gan_steps": 1,
-            "classification_gan_steps":1
+            "latent_gan_steps": 3 if default else int(np.random.choice([1, 2, 3, 4, 5])),  # To not be confused: the number of adversary steps before the next VAE step 
+
+            # GAN hparams
+            "train_discriminator_classifier": True if default else np.random.choice([True, False]), 
+            "beta_discriminator": 1 if default else int(np.random.choice([1, 2, 3, 4, 5])),
+            "beta_classifier": 1 if default else int(np.random.choice([1, 2, 3, 4, 5])),
+            "discriminator_steps": 1,
+
+            # L2 regularization parameters
+            "l2_regularize": True if default else np.random.choice([True, False]), 
+            "l2_penalty": 0.01  if default else int(np.random.choice([0.01, 0.1, 1]))
         }
 
         # the user may fix some hparams
@@ -322,21 +306,6 @@ class CPA(TemplateModel):
 
         return self.hparams
             
-    
-    def early_stopping(self, score):
-        """
-        Possibly early-stops training.
-        """
-        # Keep incremental count of the number of times the score detected is not better than the 
-        # so far best score 
-        cond = (score < self.best_score)
-        if cond:
-            self.best_score = score
-            self.patience_trials = 0
-        else:
-            self.patience_trials += 1
-        return cond, self.patience_trials > self.patience
-    
 
     def update_model(self, train_loader, epoch):
         """
@@ -353,12 +322,21 @@ class CPA(TemplateModel):
 
             # Collect the image data from the batch 
             X = batch['X'].to(self.device)
+            # From the batch, collect the drug one hots
+            y_true = batch['mol_one_hot'].to(self.device).long()  
+            # drug id necessary to extract embedding 
+            drug_id = y_true.argmax(dim=1).to(self.device)
+            # Free memory
+            del batch 
 
             # No adversarial training 
             if not self.adversarial:
-                del batch
+                if self.encoded_covariates:
+                    y_drug = self.encode_cov_labels(drug_id)
+                else:
+                    y_drug = y_true
                 # Update ae
-                out, _, _, _, ae_loss = self.autoencoder.forward_ae(X, y_drug=None, mode='train').values()
+                out, _, _, _, ae_loss = self.autoencoder.forward_ae(X, y_drug=y_drug, mode='train').values()
                 loss = ae_loss['total_loss']
                 # Optimizer step 
                 self.optimizer_autoencoder.zero_grad()
@@ -369,24 +347,19 @@ class CPA(TemplateModel):
                 self.losses.update_losses(ae_loss)
 
             else:
-                # From the batch, collect the drug one hots
-                y_adv_drug = batch['mol_one_hot'].to(self.device).long()  
-                # drug id necessary to extract embedding 
-                drug_id = y_adv_drug.argmax(dim=1).to(self.device)
-
-                del batch # Free memory
-
                 # Update autoencoder 
                 if option == 'AE':
-                    out, loss, ae_loss, adv_loss_drug, loss_recon_gan, loss_classification_gan= self.autoencoder_step(X, 
-                                                                                            y_adv_drug, 
+                    out, loss, cc_loss, latent_gan_loss_gen, discr_gan_loss_gen, classif_loss_gen, l2_loss, kl_loss = self.autoencoder_step(X, 
+                                                                                            y_true, 
                                                                                             drug_id).values()
 
                     # Update losses 
-                    loss_dict = {'ae_loss': ae_loss,
-                                'adv_loss_drug': adv_loss_drug,
-                                'loss_recon_gan': loss_recon_gan,
-                                'loss_classification_gan': loss_classification_gan
+                    loss_dict = {'cc_loss': cc_loss,
+                                'latent_gan_loss_gen': latent_gan_loss_gen,
+                                'discr_gan_loss_gen': discr_gan_loss_gen,
+                                'classif_loss_gen': classif_loss_gen,
+                                'l2_loss': l2_loss,
+                                'kl_loss': kl_loss
                                 }   
                     
                     loss_dict = configure_loss_dict(loss_dict)  # From utils
@@ -395,26 +368,21 @@ class CPA(TemplateModel):
                     # Update metrics 
                     self.metrics.update_rmse(X, out)
 
-                    # Update the bit per dimension metric
-                    recon_loss = loss_dict['recon_loss'] if self.variational else loss_dict['total_loss']
-
                 # Update the latent space discriminator
-                elif option == 'ADV':
-                    self.latent_discriminator_step(X, y_adv_drug)
+                elif option == 'lat_disc':
+                    latent_gan_loss = self.latent_discriminator_step(X, y_true)
+                    self.losses.update_losses(latent_gan_loss)
                 
-                # Update the patch discriminator
-                elif option == 'recon_GAN':
-                    self.recon_GAN_step(X, y_adv_drug)
-
-                # Update the GAN classifier
-                elif option == 'classific_GAN':
-                    self.classific_GAN_step(X, y_adv_drug)
+                # Update the discriminator 
+                elif option == 'discr':
+                    discr_gan_loss = self.discriminator_step(X, y_true)
+                    self.losses.update_losses(discr_gan_loss)
 
                 self.iteration += 1
-        
+                    
         # Average the losses per batch
-        self.losses.average_losses(len(train_loader))
-        self.metrics.average_metrics(len(train_loader))
+        self.losses.average_losses()
+        self.metrics.average_metrics()
 
         # Print losses
         self.losses.print_losses()
@@ -434,57 +402,74 @@ class CPA(TemplateModel):
         # Put the autoencoder back in training mode in case it was in eval after the execution of a GAN step 
         self.autoencoder.train()
 
-        # GET THE RECONSTRUCTION LOSS
+        # 1. SWAP THE LABEL RANDOMLY
+        y_fake = swap_attributes(y_drug=y_adv_drug, drug_id=drug_id, device=self.device)
+        drug_id_fake = y_fake.argmax(1)
+
+        # 2. GET THE RECONSTRUCTION WITH SWAPPED LABEL 
         if self.encoded_covariates:
             # Embed the drug 
-            z_drug = self.encode_cov_labels(drug_id)
-            out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=z_drug, mode='train').values()
-
+            z_drug_fake = self.encode_cov_labels(drug_id_fake)
+            X_fake, _, _, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=z_drug_fake, mode='train').values()
         else:
-            out, _, z, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, mode='train').values()
-
+            # One hot encoding 
+            X_fake, _, _, z_basal, ae_loss =  self.autoencoder.forward_ae(X, y_drug=y_fake, mode='train').values()
         
-        # GET THE ADVERSARIAL LATENT DISCRIMINATOR LOSS 
-        y_adv_hat_drug = self.adversary_drugs(z_basal)    
-        adv_loss_latent_drug = self.loss_adversary_drugs(y_adv_hat_drug, drug_id)
+        # 3. GET THE ADVERSARIAL LATENT DISCRIMINATOR LOSS 
+        if self.hparams["train_latent_gan"]:
+            y_adv_hat_drug = self.latent_discriminator(z_basal)
 
-        # GET THE ADVERSARIAL LOSS DUE TO PATCH GAN 
-        if self.hparams["recon_gan"]:
-            loss_recon_gan = self.recon_predictor.generator_pass(out, self.recon_predictor_loss)
+            # Adversarial loss trying to homogenise the predictor to a uniform distribution
+            adv_loss_latent_drug = self.loss_latent_GAN_gen(y_adv_hat_drug, drug_id)
         else:
-            loss_recon_gan = 0 
+            adv_loss_latent_drug = 0
 
-        # GET THE CLASSIFICATION GAN LOSS 
-        if self.hparams["classification_gan"]:
-            # Permute labels 
-            
-            y_adv_drug_flip = self.swap_attributes(y_drug=y_adv_drug, drug_id = drug_id)
-            drug_id_flip = y_adv_drug_flip.argmax(1)
-            
-            # Encode labels
-            if self.encoded_covariates:
-                z_drug_flip = self.encode_cov_labels(drug_id_flip)
-            else:
-                z_drug_flip = y_adv_drug_flip
-
-            # Perform decoding with randomly flipped attributes
-            x_flipped, _ = self.autoencoder.decoder(z_basal, z_drug_flip)
-
-            loss_classification_gan = self.classifier_predictor.generator_pass(x_flipped, self.classifier_predictor_loss, drug_id_flip)  
+        # 4. GET THE GAN LOSS ON THE COUNTERFACTED EXAMPLE
+        if self.hparams["train_discriminator_classifier"]:
+            # Collect the discriminator losses 
+            loss_fake, loss_class = self.discriminator.generator_pass(X_hat=X_fake, 
+                                                                        y_fake=drug_id_fake, 
+                                                                        loss_discr=self.recon_predictor_loss, 
+                                                                        loss_classif=self.classifier_predictor_loss)
         else:
-            loss_classification_gan = 0
+            loss_fake, loss_class = 0,0
+
+
+        # 5. IF REQUIRED, COMPUTE AN L2 REGULARIZATION LOSS on the content 
+        if self.hparams['l2_regularize']:
+            loss_l2 = self._l2_regularize(z_basal)  
+        else:
+            loss_l2 = 0
+
+        # 6. IF VARIATIONAL, CAPTURE KL DIVERGENCE
+        if self.variational:
+            kl_loss = ae_loss['kl_loss']
+        else: 
+            kl_loss = 0
+        
+        # 7. CODE BACK TO ORIGINAL DOMAIN AND CALCULATE THE RECONSTRUCTION LOSS
+        if self.encoded_covariates:
+            # Embed the drug 
+            z_drug_true = self.encode_cov_labels(drug_id)
+            X_true, _, _, z_basal, _ =  self.autoencoder.forward_ae(X_fake, y_drug=z_drug_true, mode='train').values()
+        else:
+            X_true, _, _, z_basal, _ =  self.autoencoder.forward_ae(X_fake, y_drug=y_adv_drug, mode='train').values() 
+
+        loss_cc = self.autoencoder.reconstruction_loss(X_true, X)
         
         # COMPUTE THE AUTOENCODER LOSS (minimize L1, maximize discriminator losses)
-        loss = self.hparams["beta_reconstruction"] * ae_loss['total_loss'] - self.hparams["beta_latent"] * adv_loss_latent_drug + \
-            self.hparams['beta_gan_recon']*loss_recon_gan + self.hparams['beta_gan_classific']*loss_classification_gan
+        loss = self.hparams["beta_cc"] * loss_cc + self.hparams["beta_latent"] * adv_loss_latent_drug + \
+            self.hparams['beta_discriminator'] * loss_fake + self.hparams['beta_classifier'] * loss_class + \
+            self.hparams['l2_penalty'] * loss_l2 + self.autoencoder.beta * kl_loss
 
         # Backward
         self.optimizer_autoencoder.zero_grad()
         loss.backward()
         self.optimizer_autoencoder.step()
         
-        return dict(out=out, loss=loss, ae_loss=ae_loss, adv_loss_drug=adv_loss_latent_drug,
-                    loss_recon_gan=loss_recon_gan, loss_classification_gan_drug=loss_classification_gan)
+        return dict(out=X_fake, loss=loss, cc_loss=loss_cc, adv_loss_drug_gen=adv_loss_latent_drug,
+                    loss_recon_gan_gen=loss_fake, loss_classification_gan_drug_gen=loss_class,
+                    loss_l2=loss_l2, kl_loss=kl_loss)
 
 
     def latent_discriminator_step(self, X, y_adv_drug):
@@ -497,42 +482,42 @@ class CPA(TemplateModel):
             z_basal = self.autoencoder.reparameterize(mu, log_sigma)  
 
         # GET THE ADVERSARIAL LATENT DISCRIMINATOR ADVERSARIAL LOSS 
-        y_adv_hat_drug = self.adversary_drugs(z_basal)
-        loss = self.loss_adversary_drugs(y_adv_hat_drug, y_adv_drug.argmax(1))
+        y_adv_hat_drug = self.latent_discriminator(z_basal)
+        loss = self.hparams["beta_latent"] * self.loss_latent_GAN_disc(y_adv_hat_drug, y_adv_drug.argmax(1))
 
         # Backward
         self.optimizer_adversaries.zero_grad()
         loss.backward()
         self.optimizer_adversaries.step()
 
+        return dict(latent_gan_loss_discr=loss)
+        
 
-    def recon_GAN_step(self, X, y_adv_drug):
+    def discriminator_step(self, X, y_adv_drug):
         self.autoencoder.eval()
+        drug_id = y_adv_drug.argmax(1)
 
         # Only interested in the outpout of the decoder 
-        if self.encoded_covariates:
-            drug_id = y_adv_drug.argmax(1)
+        if self.encoded_covariates:    
             # Embed the drug and moa
             z_drug = self.encode_cov_labels(drug_id)
+            X_hat, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=z_drug, mode='train').values()
 
-            out, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=z_drug, mode='train').values()
         else:
-            out, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, mode='train').values()
+            X_hat, _, _, _, _ =  self.autoencoder.forward_ae(X, y_drug=y_adv_drug, mode='train').values()
 
-        loss = self.recon_predictor.discriminator_pass(X, out, self.recon_predictor_loss)
+        loss_fake, loss_class = self.discriminator.discriminator_pass(X, 
+                                                    X_hat, 
+                                                    drug_id, 
+                                                    self.recon_predictor_loss, 
+                                                    self.classifier_predictor_loss)
+        loss = self.hparams['beta_classifier'] * loss_class + self.hparams['beta_discriminator'] * loss_fake
 
-        self.recon_discriminator_optimizer.zero_grad()
+        self.discriminator_optimizer.zero_grad()
         loss.backward()
-        self.recon_discriminator_optimizer.step()
+        self.discriminator_optimizer.step()
 
-
-    def classific_GAN_step(self, X, y_adv_drug):
-        loss =  self.classifier_predictor.discriminator_pass(X, self.classifier_predictor_loss, y_adv_drug.argmax(1))
-
-        self.classifier_predictor_optimizer.zero_grad()
-        loss.backward()
-        self.classifier_predictor_optimizer.step()
-
+        return dict(classification_gan_loss_discr=loss_class, discriminator_gan_loss_discr=loss_fake)
 
     def save_history(self, epoch, losses, metrics, fold):
         """Save partial model results in the history dictionary (model attribute) 
@@ -565,25 +550,28 @@ class CPA(TemplateModel):
             self.cycle[val] = name
         self.max_cycle = vals[-1]
     
-
-    def swap_attributes(self, y_drug, drug_id):
-        # Initialize the swapped indices 
-        swapped_idx = torch.zeros_like(y_drug)
-        # Maximum drug index
-        max_drug = y_drug.shape[1] 
-        # Ranges of possible drugs 
-        offsets = torch.randint(1, max_drug, (drug_id.shape[0], 1)).to(self.device)
-        # Permute
-        permutation = drug_id + offsets
-        # Remainder 
-        permutation = torch.remainder(permutation, max_drug)
-        # Add ones 
-        swapped_idx[np.arange(y_drug.shape[0]), permutation.squeeze()] = 1
-        return swapped_idx
-
-    
     def encode_cov_labels(self, drug_id):
         # Embed the drug
         drug_embedding = self.drug_embeddings(drug_id) 
         z_drug = self.drug_embedding_encoder(drug_embedding) 
         return z_drug
+    
+    def early_stopping(self, score):
+        """
+        Possibly early-stops training.
+        """
+        # Keep incremental count of the number of times the score detected is not better than the 
+        # so far best score 
+        cond = (score < self.best_score)
+        if cond:
+            self.best_score = score
+            self.patience_trials = 0
+        else:
+            self.patience_trials += 1
+        return cond, self.patience_trials > self.patience
+
+    # From https://github.com/HsinYingLee/DRIT/blob/master/src/model.py
+    def _l2_regularize(self, mu):
+        mu_2 = torch.pow(mu, 2)
+        encoding_loss = torch.mean(mu_2)
+        return encoding_loss

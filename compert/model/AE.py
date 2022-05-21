@@ -2,10 +2,11 @@ import torch
 import torch.utils.data
 from .autoencoders import initialize_encoder_decoder
 from .CPA import *
+from utils import *
 
 
 class AE(torch.nn.Module):
-    def __init__(self, in_channels, in_width, in_height, variational, hparams, extra_fm, n_seen_drugs, device) -> None:
+    def __init__(self, in_channels, in_width, in_height, variational, hparams, extra_fm, n_seen_drugs, device, normalize) -> None:
      
         super(AE, self).__init__()
         self.in_channels = in_channels
@@ -14,14 +15,17 @@ class AE(torch.nn.Module):
         self.hparams = hparams
         self.variational = variational
         self.extra_fm = extra_fm
+        self.normalize = normalize
         self.encoder, self.decoder  = initialize_encoder_decoder(self.in_channels, 
                                                                 self.in_width, 
                                                                 self.in_height, 
                                                                 self.variational, 
                                                                 self.hparams, 
-                                                                self.extra_fm)
+                                                                self.extra_fm, self.normalize) 
+
         self.n_seen_drugs = n_seen_drugs
         self.device = device
+        
         # Beta is used to control the weight of the kl loss
         self.beta = self.hparams['beta']
 
@@ -95,7 +99,7 @@ class AE(torch.nn.Module):
             z_basal = self.reparameterize(mu, log_sigma)  
                 
         # DECODE THE BASAL STATE ONLY IN EVALUATION MODE
-        if mode=='eval' or y_drug == None:
+        if mode=='eval':
             if self.hparams['decoding_style'] == 'sum':
                 cond_drug = torch.zeros_like(z_basal).to(self.device)
 
@@ -105,19 +109,14 @@ class AE(torch.nn.Module):
             else:
                 cond_drug = torch.zeros(z_basal.shape[0], self.hparams["drug_embedding_dimension"]).to(self.device)
             
-            # DECODE BASAL
+            # DECODE BASAL WITH ZEROED-OUT CONDITION
             out_basal, z = self.decoder(z_basal, cond_drug)
 
         else:
             out_basal = None
     
-        # IF y_drug IS DIFFERENT FROM NONE, WE CONDITION THE LATENT
-        if y_drug != None:
-            # DECODE CONDITIONED SPACE
-            out, z = self.decoder(z_basal, y_drug) 
-            
-        else:
-            out = out_basal
+        # CONDITION THE LATENT
+        out, z = self.decoder(z_basal, y_drug) 
         
         # Compute autoencoder loss
         if self.variational:
@@ -128,7 +127,7 @@ class AE(torch.nn.Module):
         return dict(out=out, out_basal=out_basal, z=z, z_basal=z_basal, ae_loss=ae_loss)
 
     
-    def generate(self, loader, drug_embeddings, drug_embedding_encoder, adversarial):
+    def generate(self, loader, drug_embeddings, drug_embedding_encoder, adversarial, swap=False):
         """
         Given an input image x, returns the reconstructed image
         x: input image
@@ -136,25 +135,35 @@ class AE(torch.nn.Module):
         # COLLECT DATA FROM NEXT BATCH
         original = next(iter(loader))  
         original_X = original['X'][0].to(self.device).unsqueeze(0) 
-        # GROUND TRUTH WITH ONE-HOT VECTORS
+        # GROUND TRUTH WITH ONE-HOT VECTORS AND IDs
         y_drug = original['mol_one_hot'].to(self.device).float()
-        # DRUG ID
         drug_id = y_drug.argmax(1).to(self.device)
+        # RANDOM SWAP
+        y_drug_swap = swap_attributes(y_drug, drug_id, device=self.device)
+        drug_id_swap = y_drug_swap.argmax(1).to(self.device)
 
         with torch.no_grad():
-            # Handle the case training is not adversarial (append zero masks to the )
-            if not adversarial:
-                # From basal reconstruct the image if not adversarial     
-                reconstructed_X, _, _, _, _ = self.forward_ae(original_X, None).values()
+            # If not concat, perform the sum of embeddings 
+            if self.hparams["decoding_style"] == 'sum' or (self.hparams["decoding_style"] == 'concat' and not self.hparams["concatenate_one_hot"]):
+                # Collect the encoders for the drug embeddings to condition the latent space 
+                drug_emb = drug_embeddings(drug_id)
+                drug_emb_swap = drug_embeddings(drug_id_swap)
 
-            if adversarial:
-                # If not concat, perform the sum of embeddings 
-                if self.hparams["decoding_style"] == 'sum' or (self.hparams["decoding_style"] == 'concat' and not self.hparams["concatenate_one_hot"]):
-                    # Collect the encoders for the drug embeddings to condition the latent space 
-                    drug_emb = drug_embeddings(drug_id) 
-                    z_drug = drug_embedding_encoder(drug_emb) 
-                    y_drug = z_drug
-                            
-                # Decode based on drug conditioning 
-                reconstructed_X, _, _, _, _ = self.forward_ae(original_X, y_drug=y_drug).values()
-        return original_X, reconstructed_X
+                z_drug = drug_embedding_encoder(drug_emb) 
+                z_drug_swap =  drug_embedding_encoder(drug_emb_swap) 
+
+                y_drug = z_drug
+                y_drug_swap = z_drug_swap
+                        
+            # Decode based on drug conditioning 
+            reconstructed_X, _, _, _, _ = self.forward_ae(original_X, y_drug=y_drug).values()
+            reconstructed_X_swap, _, _, _, _ = self.forward_ae(original_X, y_drug=y_drug_swap).values()
+
+        return original_X, reconstructed_X, reconstructed_X_swap, drug_id, drug_id_swap 
+
+
+    def _gaussian_weights_init(self, m):
+        classname = m.__class__.__name__
+        if classname.find('Conv') != -1 and classname.find('Conv') == 0:
+            m.weight.data.normal_(0.0, 0.02)
+            
