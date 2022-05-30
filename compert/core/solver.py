@@ -1,5 +1,6 @@
 import os
 from os.path import join as ospj
+from re import A
 import time
 import datetime
 from munch import Munch
@@ -27,9 +28,19 @@ class Solver(nn.Module):
         self.args['num_domains'] = len(self.args['drug_subset'])
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+        if not self.args.encode_rdkit:
+            self.args['style_dim'] = self.args.latent_dim
+        if not self.args.learn_noise:
+            self.args['z_dimension'] = self.args.style_dim
+
+        print(self.args)
+
         # Create directory 
-        task = '_'.join(self.args.drug_subset)
-        self.dest_dir = ospj(self.args.experiment_directory, task, str(self.args.lambda_lat) if args.latent_discriminator else '')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d")
+        if self.args.resume_iter==0:
+            self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+str(self.args[self.args['naming_key']]))
+        else:
+            self.dest_dir = self.args.resume_dir+'_'+str(self.args[self.args['naming_key']])
 
         # Best FID score (used for early stopping)
         self.best_score = np.inf
@@ -62,7 +73,7 @@ class Solver(nn.Module):
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims)]
         if self.args.eval_with_ema:
-            self.c += [CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets_ema.ckpt'), data_parallel=True, **self.nets_ema)]
+            self.ckptios += [CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets_ema.ckpt'), data_parallel=True, **self.nets_ema)]
     
         # Put the model on GPU 
         self.to(self.device)
@@ -90,7 +101,6 @@ class Solver(nn.Module):
 
         # The id of the dmso to exclude from the prediction 
         self.drug2moa = self.training_set.couples_drug_moa 
-        self.class_imbalance_weights = self.training_set.class_imbalances
         print('Successfully loaded the data')
     
     
@@ -98,11 +108,14 @@ class Solver(nn.Module):
         """
         Create dataset compatible with the pytorch training loop 
         """
-        dataset = BBBC021Dataset(self.args.image_path, self.args.data_index_path, device=self.device, augment_train=self.args.augment_train, 
+        dataset = BBBC021Dataset(self.args.image_path, self.args.data_index_path, self.args.drug_embeddings_path, device=self.device, augment_train=self.args.augment_train, 
                                                 normalize=self.args.normalize, drug_subset=self.args.drug_subset) 
         
         # Channel dimension
         self.dim = 3  
+
+        # Drug embeddings 
+        self.embedding_matrix = dataset.embedding_matrix  # RDKit embedding matrix
 
         # Number of drugs and number of modes of action 
         self.n_seen_drugs = dataset.num_drugs
@@ -152,6 +165,7 @@ class Solver(nn.Module):
         print('Start training...')
         start_time = time.time()
         for i in range(args.resume_iter, args.total_iters):
+            
             # Fetch images and labels
             inputs = next(iter(self.loader_train))
 
@@ -159,35 +173,42 @@ class Solver(nn.Module):
             x_real, y_one_hot = inputs['X'].to('cuda'), inputs['mol_one_hot'].to('cuda')
             y_org = y_one_hot.argmax(1).long().to('cuda')
             y_trg = swap_attributes(y_one_hot, y_org, self.device).argmax(1).long().to('cuda')
+            z_emb_trg = self.embedding_matrix(y_trg).to('cuda')  # Get standardized RDKit embedding for the drug
 
             # Get the latent vectors (one is used only for diversity-sensitivity loss)
-            z_trg, z_trg2 = torch.randn(x_real.shape[0], args.latent_dim), torch.randn(x_real.shape[0], args.latent_dim)
+            z_trg, z_trg2 = torch.randn(x_real.shape[0], args.z_dimension).to('cuda'), torch.randn(x_real.shape[0], args.z_dimension).to('cuda')
+            # Encode noise if required
+            if self.args.learn_noise:
+                z_trg, z_trg2 = self.nets.noise_projector(z_trg), self.nets.noise_projector(z_trg2)
 
             # train the discriminator
             d_loss, d_losses_latent = self.compute_d_loss(
-                nets, args, x_real, y_org, y_trg, z_trg=z_trg)
+                nets, args, x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
             self._reset_grad()
             d_loss.backward()
             optims.discriminator.step()
 
             # train the generator
             g_loss, g_losses_latent = self.compute_g_loss(
-                nets, args, x_real, y_org, y_trg, z_trgs=[z_trg, z_trg2])
+                nets, args, x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trgs=[z_trg, z_trg2])
             self._reset_grad()
             g_loss.backward()
-            optims.generator.step()
-            optims.mapping_network.step()
             optims.style_encoder.step()
-
+            optims.generator.step()
+            if self.args.encode_rdkit:
+                optims.mapping_network.step()
+            
             # compute moving average of network parameters
             if nets_ema != None:
                 self.moving_average(nets.generator, nets_ema.generator, beta=0.999)
-                self.moving_average(nets.mapping_network, nets_ema.mapping_network, beta=0.999)
                 self.moving_average(nets.style_encoder, nets_ema.style_encoder, beta=0.999)
-
+                if self.args.encode_rdkit:
+                    self.moving_average(nets.mapping_network, nets_ema.mapping_network, beta=0.999)
+                if self.args.lambda_noise > 0:
+                    self.moving_average(nets.mapping_network, nets_ema.mapping_network, beta=0.999)
                 if args.latent_discriminator:
                     optims.latent_discriminator.step()
-                    self.moving_average(nets.latent_discriminator, nets_ema.latent_discriminator, beta=0.999)
+                    self.moving_average(nets.noise_projector, nets_ema.noise_projector, beta=0.999)
 
             # decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
             if args.lambda_ds > 0:
@@ -210,6 +231,7 @@ class Solver(nn.Module):
             # generate images for debugging
             if (i+1) % args.sample_every == 0:
                 debug_image(nets_ema if nets_ema!=None else nets, 
+                                    self.embedding_matrix, 
                                     args, 
                                     inputs=inputs_val, 
                                     step=i+1, 
@@ -225,12 +247,6 @@ class Solver(nn.Module):
 
             # compute FID and LPIPS if necessary
             if (i+1) % args.eval_every == 0:
-                lpips_dict_val, fid_dict_val = calaculate_fid_and_lpips(self.loader_val, 
-                                                                            nets_ema if nets_ema!=None else nets, 
-                                                                            args, 
-                                                                            i+1, 
-                                                                            self.id2drug)
-
                 rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets_ema if nets_ema!=None else nets,
                                                                                     self.loader_val,
                                                                                     self.device,
@@ -238,29 +254,30 @@ class Solver(nn.Module):
                                                                                     args.embedding_folder,
                                                                                     end=False,
                                                                                     args=args,
-                                                                                    step=i+1)
-                
-                # Save metrics to history 
-                self.save_history(i, lpips_dict_val, 'val')
-                self.save_history(i, fid_dict_val, 'val')
-                self.save_history(i, rmse_disentanglement_dict, 'val')
+                                                                                    step=i+1,
+                                                                                    embedding_matrix=self.embedding_matrix)
 
+                # Save metrics to history 
+                self.save_history(i, rmse_disentanglement_dict, 'val')
                 # Print metrics 
-                print_metrics(lpips_dict_val, i+1)
-                print_metrics(fid_dict_val, i+1)
                 print_metrics(rmse_disentanglement_dict, i+1)
 
-                # Condition and performance of early stopping 
-                self.cond, self.early_stopping = self._early_stopping(fid_dict_val['FID_total_mean'])
-                if self.early_stopping:
-                    break 
-        
-        # Compute the metrics for the test set 
-        lpips_dict_test, fid_dict_test  = calaculate_fid_and_lpips(self.loader_test, 
-                                                                    nets_ema if nets_ema!=None else nets, 
-                                                                    args, 
-                                                                    i+1, 
-                                                                    self.id2drug)
+                # FID score and LPIPS get calculated only if stochastic model is used 
+                if self.args.lambda_noise > 0:
+                    lpips_dict_val, fid_dict_val = calaculate_fid_and_lpips(self.loader_val, 
+                                                                                nets_ema if nets_ema!=None else nets, 
+                                                                                args, 
+                                                                                i+1, 
+                                                                                self.id2drug,
+                                                                                self.embedding_matrix)  
+                    # Save metrics to history 
+                    self.save_history(i, lpips_dict_val, 'val')
+                    self.save_history(i, fid_dict_val, 'val')
+                    # Print metrics 
+                    print_metrics(lpips_dict_val, i+1)
+                    print_metrics(fid_dict_val, i+1)
+
+        # Final evaluations on the test set 
         rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets_ema if nets_ema!=None else nets,
                                                                                     self.loader_test,
                                                                                     self.device,
@@ -268,16 +285,28 @@ class Solver(nn.Module):
                                                                                     args.embedding_folder,
                                                                                     end=True,
                                                                                     args=args,
-                                                                                    step=i+1)
+                                                                                    step=i+1,
+                                                                                    embedding_matrix=self.embedding_matrix)
+        
+        # Compute the metrics for the test set 
+        if args.lambda_noise > 0:
+            lpips_dict_test, fid_dict_test  = calaculate_fid_and_lpips(self.loader_test, 
+                                                                        nets_ema if nets_ema!=None else nets, 
+                                                                        args, 
+                                                                        i+1, 
+                                                                        self.id2drug,
+                                                                        self.embedding_matrix)  
+            self.save_history(i, lpips_dict_test, 'test')
+            self.save_history(i, fid_dict_test, 'test')
+
+            # Print metrics 
+            print_metrics(lpips_dict_val, i+1)
+            print_metrics(fid_dict_val, i+1)
+
 
         # Save metrics to history 
-        self.save_history(i, lpips_dict_test, 'test')
-        self.save_history(i, fid_dict_test, 'test')
         self.save_history(i, rmse_disentanglement_dict, 'test')
-
-        # Print metrics 
-        print_metrics(lpips_dict_val, i+1)
-        print_metrics(fid_dict_val, i+1)
+        # Print metrics
         print_metrics(rmse_disentanglement_dict, i+1)
 
         results = self.format_seml_results(self.history)
@@ -315,7 +344,7 @@ class Solver(nn.Module):
                 self.history[fold][loss].append(losses[loss])
 
 
-    def compute_d_loss(self, nets, args, x_real, y_org, y_trg, z_trg):
+    def compute_d_loss(self, nets, args, x_real, y_org, y_trg, z_emb_trg, z_trg):
         # With real images
         x_real.requires_grad_()
         out = nets.discriminator(x_real, y_org)
@@ -326,7 +355,8 @@ class Solver(nn.Module):
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
-            s_trg = nets.mapping_network(z_trg, y_trg)
+            s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  # Single of the noisy embedding vector to a style vector 
+            s_trg += args.lambda_noise*z_trg
             z, x_fake = nets.generator(x_real, s_trg)
 
         out = nets.discriminator(x_fake, y_trg)
@@ -346,15 +376,16 @@ class Solver(nn.Module):
                         lat=loss_latent.item())
 
 
-    def compute_g_loss(self, nets, args, x_real, y_org, y_trg, z_trgs=None):
+    def compute_g_loss(self, nets, args, x_real, y_org, y_trg, z_emb_trg, z_trgs=None):
         # Couple of random vectors for the difference-sensitivity loss
         z_trg, z_trg2 = z_trgs
 
         # Adversarial loss
-        s_trg = nets.mapping_network(z_trg, y_trg)
+        s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  # Style of the noisy vector 
+        s_trg1 = s_trg + args.lambda_noise*z_trg
 
         # Generator for fake images 
-        z, x_fake = nets.generator(x_real, s_trg)
+        z, x_fake = nets.generator(x_real, s_trg1)
         # Try to deceive the generator such that it is persuaded that the generated image is from the target domain
         out = nets.discriminator(x_fake, y_trg)
         # Adversarial loss setting the output of the network to 1 
@@ -362,13 +393,16 @@ class Solver(nn.Module):
 
         # Encode the fake image and measure the distance from the encoded style
         s_pred = nets.style_encoder(x_fake, y_trg)
-        loss_sty = torch.mean(torch.abs(s_pred - s_trg))  # Predict style back from image 
+        loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  # Predict style back from image 
 
-        # Diversity sensitive loss
-        s_trg2 = nets.mapping_network(z_trg2, y_trg)  # Select y_target from the embeddings 
-        _, x_fake2 = nets.generator(x_real, s_trg2)
-        x_fake2 = x_fake2.detach()
-        loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # Generate outputs as far as possible from each other 
+        # Diversity sensitive loss - only if stochastic 
+        if args.lambda_noise > 0:
+            s_trg2 = s_trg + args.lambda_noise*z_trg2  # Select y_target from the embeddings 
+            _, x_fake2 = nets.generator(x_real, s_trg2)
+            x_fake2 = x_fake2.detach()
+            loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # Generate outputs as far as possible from each other 
+        else:
+            loss_ds = torch.tensor(0)
 
         # If applicable, discriminator on the latent
         if args.latent_discriminator:
@@ -377,7 +411,7 @@ class Solver(nn.Module):
         else:
             loss_latent = torch.tensor(0)
 
-        # cycle-consistency loss
+        # Cycle-consistency loss
         s_org = nets.style_encoder(x_real, y_org)  # Encode the style of the real image and use it to reconstruct it from the fake
         _, x_rec = nets.generator(x_fake, s_org)
         loss_cyc = torch.mean(torch.abs(x_rec - x_real))  # Mean absolute error reconstructed versus real 

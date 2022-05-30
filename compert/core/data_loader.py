@@ -53,6 +53,7 @@ class BBBC021Dataset:
     def __init__(self, 
                 image_path, 
                 data_index_path, 
+                embedding_path,
                 device='cuda', 
                 return_labels=False, 
                 augment_train=False, 
@@ -68,6 +69,7 @@ class BBBC021Dataset:
         self.augment_train = augment_train  
         self.normalize = normalize  # Controls whether the input lies between 0 and 1 or -1 and 1
         self.drug_subset = drug_subset  # list of drugs extracted and used for the transformation/conversion 
+        self.embedding_path = embedding_path
 
         # Fix the training specifics 
         self.device = device 
@@ -82,6 +84,13 @@ class BBBC021Dataset:
         # Count the number of drugs and MOAs 
         self.num_drugs = len(self.drug_names) 
         self.num_moa = len(self.moa_names)
+
+        # Create the embeddings
+        embedding_matrix = pd.read_pickle(self.embedding_path)
+        embedding_matrix = embedding_matrix.loc[self.drug_names]  # Sort based on the drug names 
+        embedding_matrix = torch.tensor(embedding_matrix.iloc[:, 2:].values, 
+                                                dtype=torch.float32, device=self.device)
+        self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
 
         # Keep track of the indices and numbers 
         self.drugs2idx = {mol: idx for idx, mol in enumerate(self.drug_names)}
@@ -176,9 +185,6 @@ class BBBC021Fold(Dataset):
             self.transform = CustomTransform(augment=False, normalize=normalize)
         
         if self.fold ==  'train':
-            # Compute class imbalance weights
-            self.class_imbalances = self.compute_class_imbalance_weights(self.mol_names)
-             
             # Map drugs to moas
             drug_ids, moa_ids = [self.drugs2idx[mol] for mol in self.mol_names] , [self.moa2idx[moa] for moa in self.moa]
             self.couples_drug_moa = {drug:moa for drug, moa in zip(drug_ids, moa_ids)}
@@ -217,7 +223,8 @@ class BBBC021Fold(Dataset):
         return dict(X=img, 
                     mol_one_hot=self.one_hot_drugs[idx],
                     moa_id=self.moa2idx[self.moa[idx]],
-                    dose = self.dose[idx])
+                    dose=self.dose[idx],
+                    file_names=img_file)
 
 
     def sample(self, n, seed=42):
@@ -281,15 +288,3 @@ class BBBC021Fold(Dataset):
                 drugs=mols,
                 moas=moas,
                 dose=doses) 
-            
-    def compute_class_imbalance_weights(self, class_vector):
-        """Compute the sklearn class imbalance weight for a determined class vector 
-
-        Args:
-            class_vector (np.array): numpy array with the classes 
-        """
-        # Unique classes
-        classes_unique = np.unique(class_vector)
-        # Compute the weight vector to make the classes balanced 
-        weight_vector = compute_class_weight('balanced', classes=classes_unique, y=class_vector)
-        return weight_vector

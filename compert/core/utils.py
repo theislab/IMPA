@@ -76,16 +76,16 @@ def plot_transformation_channel(x, id2drug, y, y_transf, filename):
         numpy_img = denormalize(x[col_to_show][row_to_show]).detach().cpu().permute((1,2,0)).numpy()
         ax[-1].imshow(numpy_img)
         if col_to_show == 0:
-            ax[-1].set_title(id2drug[y[row_to_show]]+' '+str(row_to_show))
+            ax[-1].set_title(id2drug[y[row_to_show]])
         else:
-            ax[-1].set_title(id2drug[y_transf[row_to_show]]+' '+str(row_to_show))
+            ax[-1].set_title(id2drug[y_transf[row_to_show]])
         ax[-1].axis("off")
     filename = filename + '_transformations.jpg'
     plt.savefig(filename)
 
 
 @torch.no_grad()
-def debug_image(nets, args, inputs, step, device, id2drug, dest_dir):
+def debug_image(nets, embedding_matrix, args, inputs, step, device, id2drug, dest_dir):
     # Fetch the real and fake inputs and outputs 
     x_real, y_one_hot = inputs['X'].to(device), inputs['mol_one_hot'].to(device)
     y_real = y_one_hot.argmax(1).to(device)
@@ -94,12 +94,22 @@ def debug_image(nets, args, inputs, step, device, id2drug, dest_dir):
     device = x_real.device
     N = x_real.size(0)
 
+    # Extract id of dmso and put it at the end of the queue
+    drug2id = {val:key for key,val in id2drug.items()}
+    dmso_id = drug2id['DMSO']
+
     # Get all the possible output targets
+    range_classes = list(range(args.num_domains))
+    range_classes = range_classes[:dmso_id] + range_classes[dmso_id+1:] + [dmso_id]  # Put dmso id at the end of the plot 
     y_trg_list = [torch.tensor(y).repeat(N).to(device)
-                  for y in range(min(args.num_domains, 5))] 
+                  for y in range_classes] 
 
     # Produce broad transformation panel 
-    z_trg_list = torch.randn(args.num_outs_per_domain, 1, args.latent_dim).repeat(1, N, 1).to(device)    
+    num_transf_plot = 3 if args.lambda_noise>0 else 1  # Plot only one transformation for non-stochastic run 
+    z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)
+    # Encode noise if required
+    if args.learn_noise:
+        z_trg_list = nets.noise_projector(z_trg_list)    
 
     # Swap attributes for smaller cross-transformation panel 
     y_swapped_one_hot = swap_attributes(y_drug=y_one_hot, drug_id=y_real, device=device)
@@ -107,7 +117,8 @@ def debug_image(nets, args, inputs, step, device, id2drug, dest_dir):
 
     for psi in [0.5, 0.7, 1.0]:
         filename = ospj(dest_dir, args.sample_dir, '%06d_latent_psi_%.1f' % (step, psi))
-        translate_using_latent(nets, 
+        translate_using_latent(nets,
+                                embedding_matrix, 
                                 args, 
                                 x_real,
                                 y_real,
@@ -119,9 +130,9 @@ def debug_image(nets, args, inputs, step, device, id2drug, dest_dir):
                                 id2drug)
 
 
-
 @torch.no_grad()
 def translate_using_latent(nets, 
+                            embedding_matrix,
                             args, 
                             x_real,
                             y_real,
@@ -134,21 +145,30 @@ def translate_using_latent(nets,
 
     # Batch dimension, channel dimension, height and width dimensions 
     N, _, _, _ = x_real.size()
-    # Latent dimension embedding size 
-    latent_dim = z_trg_list[0].size(1)
     # Place the validation input in list for concatenation 
     x_concat = [x_real]
     
     # For each domain, collect a latent mean vector 
     for _, y_trg in enumerate(y_trg_list):
-        z_many = torch.randn(10000, latent_dim).to(x_real.device)
+        z_many = torch.randn(10000, args.z_dimension).to(x_real.device)
+        # Encode noise if required
+        if args.learn_noise:
+            z_many = nets.noise_projector(z_many)  
+        
         y_many = torch.LongTensor(10000).to(x_real.device).fill_(y_trg[0])
-        s_many = nets.mapping_network(z_many, y_many)
+
+        # Add noise to rdkit embedding 
+        z_emb_many = embedding_matrix(y_many) 
+
+        s_many = nets.mapping_network(z_emb_many) if args.encode_rdkit else z_emb_many
+        s_many += args.lambda_noise*z_many
         s_avg = torch.mean(s_many, dim=0, keepdim=True)
-        s_avg = s_avg.repeat(N, 1)
+        s_avg = s_avg.repeat(N, 1)  # Have a batch of average response
 
         for z_trg in z_trg_list:
-            s_trg = nets.mapping_network(z_trg, y_trg)
+            z_emb_trg = embedding_matrix(y_trg) 
+            s_trg = nets.mapping_network(z_emb_trg) if args.encode_rdkit else z_emb_trg
+            s_trg += args.lambda_noise*z_trg
             s_trg = torch.lerp(s_avg, s_trg, psi)
             _, x_fake = nets.generator(x_real, s_trg)
             x_concat += [x_fake]
@@ -162,8 +182,10 @@ def translate_using_latent(nets,
     # Only for psi = 1.0
     if psi == 1.0:
         # Plot the single transformations
-        for z_trg in z_trg_list[:args.num_translations]:  # Only a certain number of targets is kept 
-            s_trg = nets.mapping_network(z_trg[:5], y_swapped[:5])
+        for z_trg in z_trg_list:  # Only a certain number of targets is kept 
+            z_emb_trg = embedding_matrix(y_swapped[:5]) 
+            s_trg = nets.mapping_network(z_emb_trg) if args.encode_rdkit else z_emb_trg 
+            s_trg += args.lambda_noise*z_trg[:5]
             _, x_fake = nets.generator(x_real[:5], s_trg)
             x_concat += [x_fake]
 

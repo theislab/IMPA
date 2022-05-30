@@ -194,38 +194,27 @@ class Generator(nn.Module):
 
 
 class MappingNetwork(nn.Module):
-    def __init__(self, latent_dim=16, style_dim=64, num_domains=2):
+    def __init__(self, latent_dim=160, style_dim=64, hidden_dim=512, num_layers=4):
         super().__init__()
-        # Build shared layers with a hidden dimension of 512
+        # Single neural network starting from the rdkit embeddings 
+        in_dim = latent_dim 
+        out_dim = hidden_dim 
         layers = []
-        layers += [nn.Linear(latent_dim, 512)]
-        layers += [nn.ReLU()]
-        for _ in range(3):
-            layers += [nn.Linear(512, 512)]
-            layers += [nn.ReLU()]
-        self.shared = nn.Sequential(*layers)
+        
+        for i in range(num_layers):
+            # Style dimension 
+            out_dim = hidden_dim if i < num_layers-1 else style_dim
+            # Linear layer
+            layers += [nn.Linear(in_dim, out_dim)]
+            # Increase in_dim
+            in_dim = out_dim
+            if i < num_layers-1:
+                layers += [nn.ReLU()]                
+        self.layers = nn.Sequential(*layers)
 
-        # Single layers per domain (very deep)
-        self.unshared = nn.ModuleList()
-        for _ in range(num_domains):
-            self.unshared += [nn.Sequential(nn.Linear(512, 512),
-                                            nn.ReLU(),
-                                            nn.Linear(512, 512),
-                                            nn.ReLU(),
-                                            nn.Linear(512, 512),
-                                            nn.ReLU(),
-                                            nn.Linear(512, style_dim))]
-
-    def forward(self, z, y):
-        h = self.shared(z)  # Bx512 
-        out = []
-        # For each domain, apply unshared layer 
-        for layer in self.unshared:
-            out += [layer(h)]   
-        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim) - torch adds the number of list elements as second dimension 
-        idx = torch.LongTensor(range(y.size(0))).to(y.device)  # Used to select the right domain for the inputs in the batch 
-        s = out[idx, y]  # (batch, style_dim) - collect the right columns from the output
-        return s
+    def forward(self, z):
+        h = self.layers(z) 
+        return h
 
 
 ##################### ENCODER FROM IMAGE TO STYLE #####################
@@ -356,31 +345,45 @@ class DisentanglementClassifier(nn.Module):
 
 def build_model(args):
     generator = nn.DataParallel(Generator(args.img_size, args.style_dim))
-    mapping_network = nn.DataParallel(MappingNetwork(args.latent_dim, args.style_dim, args.num_domains))
     style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains))
     discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains))
 
     nets = Munch(generator=generator,
-                mapping_network=mapping_network,
-                style_encoder=style_encoder,
-                discriminator=discriminator)
+            style_encoder=style_encoder,
+            discriminator=discriminator)
+    
+    # RDKit can be encoded or left pure
+    if args.encode_rdkit:  
+        mapping_network = nn.DataParallel(MappingNetwork(args.latent_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
+        nets['mapping_network'] = mapping_network
+
+    # Noise can be learnt or not
+    if args.learn_noise:
+        noise_projector = nn.DataParallel(nn.Linear(args.z_dimension, args.style_dim))
+        nets['noise_projector'] = noise_projector
+
+    if args.latent_discriminator:
+        latent_discriminator = nn.DataParallel(Discriminator(12, args.num_domains, in_channels=512))
+        nets['latent_discriminator'] = latent_discriminator
 
     # For evaluation
     if args.eval_with_ema:
         generator_ema = copy.deepcopy(generator)
-        mapping_network_ema = copy.deepcopy(mapping_network)
         style_encoder_ema = copy.deepcopy(style_encoder)
 
         nets_ema = Munch(generator=generator_ema,
-                        mapping_network=mapping_network_ema,
                         style_encoder=style_encoder_ema)
-    
-    if args.latent_discriminator:
-        depth = math.ceil(np.log2(args.img_size)) 
-        latent_discriminator = nn.DataParallel(Discriminator(12, args.num_domains, in_channels=512))
-        nets['latent_discriminator'] = latent_discriminator
-        if args.eval_with_ema:
-            latent_discriminator_ema = nn.DataParallel(Discriminator(12, args.num_domains, in_channels=512))
+        
+        if args.encode_rdkit:
+            mapping_network_ema = copy.deepcopy(mapping_network)
+            nets_ema['mapping_network'] = mapping_network_ema
+
+        if args.learn_noise:
+            noise_projector_ema = copy.deepcopy(noise_projector)
+            nets_ema['noise_projector'] = noise_projector_ema
+        
+        if args.latent_discriminator:
+            latent_discriminator_ema = copy.deepcopy(latent_discriminator)
             nets_ema['latent_discriminator_ema'] = latent_discriminator_ema
     
     # Return either nets and their copies for exponential moving average or only the nets 

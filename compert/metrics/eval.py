@@ -8,11 +8,10 @@ http://creativecommons.org/licenses/by-nc/4.0/ or send a letter to
 Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 """
 
+from ast import arg
 import sys
 sys.path.insert(0, '../..')
 
-import os
-import shutil
 from collections import OrderedDict
 from attr import fields_dict
 from tqdm import tqdm
@@ -36,7 +35,8 @@ def calculate_rmse_and_disentanglement_score(nets,
                                             embedding_path, 
                                             end,
                                             args, 
-                                            step):
+                                            step,
+                                            embedding_matrix):
 
     # The difference between a decoded image with and without addition of the drug and moa
     rmse_basal_full = 0  
@@ -64,14 +64,18 @@ def calculate_rmse_and_disentanglement_score(nets,
         # Append drug label to cache
         y_true_ds_drugs.append(y)  # Record the labels 
         # Draw random vector 
-        z = torch.randn(X.shape[0], args.latent_dim)
+        z = torch.randn(X.shape[0], args.z_dimension).to(device)
+        if args.learn_noise:
+            z = nets.noise_projector(z)  # Project random noise 
 
         with torch.no_grad():
             # We generate in basal mode, so without really conditining on s_trg
             s = None
-            z_basal, x_rec_basal = nets.generator(X, s, basal=True)
+            z_basal, x_rec_basal = nets.generator(X, s, basal=True)  
             # We generate in normal mode
-            s = nets.mapping_network(z, y)
+            z_emb = embedding_matrix(y)
+            s = nets.mapping_network(z_emb) if args.encode_rdkit else z_emb
+            s += args.lambda_noise*z
             _, x_rec_rand = nets.generator(X, s)
             # Reconstruct from style vector 
             s_post = nets.style_encoder(X, y)
@@ -106,9 +110,9 @@ def calculate_rmse_and_disentanglement_score(nets,
     filename_rec_rand = ospj(dest_dir, args.basal_vs_real_folder, '%06d_random_decoded_latent.png' % (step))
     filename_rec_post = ospj(dest_dir, args.basal_vs_real_folder, '%06d_post_decoded_latent.png' % (step))
 
-    save_image(x_rec_basal_to_plot[:8], 4, filename_basal)
-    save_image(x_rec_post_to_plot[:8], 4, filename_rec_rand)
-    save_image(x_rec_rand_to_plot[:8], 4, filename_rec_post)
+    save_image(x_rec_basal_to_plot[:16], 4, filename_basal)
+    save_image(x_rec_post_to_plot[:16], 4, filename_rec_rand)
+    save_image(x_rec_rand_to_plot[:16], 4, filename_rec_post)
 
     if end:
         emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
@@ -122,7 +126,13 @@ def calculate_rmse_and_disentanglement_score(nets,
 
 
 @torch.no_grad()
-def calaculate_fid_and_lpips(loader, nets, args, step, id2drug):
+def calaculate_fid_and_lpips(loader, 
+                            nets, 
+                            args, 
+                            step, 
+                            id2drug, 
+                            embedding_matrix):
+
     print('Calculating evaluation metrics...')
     # Device of data and the model 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -137,11 +147,11 @@ def calaculate_fid_and_lpips(loader, nets, args, step, id2drug):
     lpips_dict = OrderedDict()
     fid_dict = OrderedDict()
 
-    for trg_idx, trg_domain in enumerate(domains):
+    for trg_domain in domains:
         # All domains but the target one 
         src_domains = [x for x in domains if x != trg_domain]
 
-        for src_idx, src_domain in enumerate(src_domains):
+        for src_domain in src_domains:
             # Task is a conversion from a target to a destination domain
             task = '%s2%s' % (id2drug[src_domain], id2drug[trg_domain])
 
@@ -171,8 +181,14 @@ def calaculate_fid_and_lpips(loader, nets, args, step, id2drug):
 
                 for j in range(args.num_outs_per_domain):
                     # Generate fake vector and the associated style 
-                    z_trg = torch.randn(N_source, args.latent_dim).to(device)
-                    s_trg = nets.mapping_network(z_trg, trg_domain*torch.ones(N_source).to(z_trg.device).long())
+                    z_trg = torch.randn(N_source, args.z_dimension).to(device)
+                    if args.learn_noise:
+                        z_trg = nets.noise_projector(z_trg)
+
+                    y_trg = trg_domain*torch.ones(N_source).to(z_trg.device).long()
+                    z_emb_trg = embedding_matrix(y_trg) 
+                    s_trg = nets.mapping_network(z_emb_trg) if args.encode_rdkit else z_emb_trg
+                    s_trg += args.lambda_noise*z_trg
 
                     # Generate a group of fake images 
                     _, x_fake = nets.generator(x_src, s_trg)
