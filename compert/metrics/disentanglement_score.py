@@ -8,8 +8,8 @@ import sys
 
 import sys
 sys.path.insert(0, '../..')
-from compert.core.model import DisentanglementClassifier
-# from core.model import DisentanglementClassifier
+# from compert.core.model import DisentanglementClassifier
+from core.model import DisentanglementClassifier
 
 def compute_disentanglement_score(X, y, return_misclass_report=False):
     """Train a classifier that evaluates the disentanglement of the latents space from the information

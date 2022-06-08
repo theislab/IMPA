@@ -17,21 +17,23 @@ from .checkpoint import CheckpointIO
 from .utils import *  
 
 sys.path.insert(0, '../..')
-from compert.metrics.eval import * 
-# from metrics.eval import * 
+# from compert.metrics.eval import * 
+from metrics.eval import * 
 
 class Solver(nn.Module):
     def __init__(self, args):
         super().__init__()
         # Pass arguments in as a dictionary "args"
         self.args = args
-        self.args['num_domains'] = len(self.args['drug_subset'])
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Initialize datasets
+        self.init_dataset()
+        args['num_domains'] = self.n_seen_drugs
 
+        # If the RDKit embeddings are not encoded their dimension is also the dimension of the style
         if not self.args.encode_rdkit:
             self.args['style_dim'] = self.args.latent_dim
-        if not self.args.learn_noise:
-            self.args['z_dimension'] = self.args.style_dim
 
         print(self.args)
 
@@ -40,25 +42,15 @@ class Solver(nn.Module):
         if self.args.resume_iter==0:
             self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+str(self.args[self.args['naming_key']]))
         else:
-            self.dest_dir = self.args.resume_dir+'_'+str(self.args[self.args['naming_key']])
-
-        # Best FID score (used for early stopping)
-        self.best_score = np.inf
+            self.dest_dir = self.args.resume_dir
 
         # Get the nets 
-        if self.args.eval_with_ema:
-            self.nets, self.nets_ema = build_model(args)  # Ema is exponential moving average net for evaluation  
-        else:
-            self.nets = build_model(args)
+        self.nets = build_model(args)
         
         # Set modules as attributes of the class
         for name, module in self.nets.items():
             print_network(module, name)
             setattr(self, name, module)
-
-        if self.args.eval_with_ema:
-            for name, module in self.nets_ema.items():
-                setattr(self, name + '_ema', module)
         
         # Initialize optimizers and checkpoint path 
         self.optims = Munch()
@@ -72,30 +64,25 @@ class Solver(nn.Module):
         self.ckptios = [
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims)]
-        if self.args.eval_with_ema:
-            self.ckptios += [CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets_ema.ckpt'), data_parallel=True, **self.nets_ema)]
-    
+   
         # Put the model on GPU 
         self.to(self.device)
         for name, network in self.named_children():
-            if ('ema' not in name):
-                print('Initializing %s...' % name)
-                network.apply(he_init) 
+            print('Initializing %s...' % name)
+            network.apply(he_init) 
 
 
     def init_dataset(self):
         """Initialize dataset and data loaders
         """
-        # # Prepare the data
+        # Prepare the data
         print('Lodading the data...') 
-        self.training_set, self.validation_set, self.test_set = self.create_torch_datasets()
+        self.training_set, self.test_set = self.create_torch_datasets()
         
         # Create data loaders 
         self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.args.batch_size, shuffle=True, 
                                                     num_workers=self.args.num_workers, drop_last=True)  # Drop last batch for a better estimate of the accuracy 
-        # For validation, it is better to keep the batch size as small as possible  
-        self.loader_val = torch.utils.data.DataLoader(self.validation_set, batch_size=self.args.val_batch_size, shuffle=True, 
-                                                    num_workers=self.args.num_workers, drop_last=False)
+
         self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=self.args.val_batch_size, shuffle=True, 
                                                     num_workers=self.args.num_workers, drop_last=False)
 
@@ -109,7 +96,7 @@ class Solver(nn.Module):
         Create dataset compatible with the pytorch training loop 
         """
         dataset = BBBC021Dataset(self.args.image_path, self.args.data_index_path, self.args.drug_embeddings_path, device=self.device, augment_train=self.args.augment_train, 
-                                                normalize=self.args.normalize, drug_subset=self.args.drug_subset) 
+                                                normalize=self.args.normalize) 
         
         # Channel dimension
         self.dim = 3  
@@ -127,12 +114,12 @@ class Solver(nn.Module):
         self.id2drug = {val:key for key,val in self.drug2idx.items()}
         self.id2moa = {val:key for key,val in self.moa2idx.items()}        
 
-        # Collect training, test and validation sets
-        training_set, validation_set, test_set = dataset.fold_datasets.values()  
+        # Collect training and test set 
+        training_set, test_set = dataset.fold_datasets.values()  
 
         # Free cell painting dataset memory
         del dataset
-        return training_set, validation_set, test_set
+        return training_set, test_set
 
 
     def train(self):        
@@ -148,12 +135,10 @@ class Solver(nn.Module):
 
         args = self.args  # Hparams
         nets = self.nets  # Neural networks 
-        nets_ema = self.nets_ema  if self.args.eval_with_ema else None  # Not None only if exponential moving average 
         optims = self.optims  # Optimizers
 
-        # Initialize datasets
-        self.init_dataset()
-        inputs_val = next(iter(self.loader_val))  # Fixed batch used for the evaluation on the validation set 
+        # Fixed batch used for the evaluation on the validation set 
+        inputs_val = next(iter(self.loader_test))  
 
         # Resume training if necessary
         if args.resume_iter > 0:
@@ -173,13 +158,11 @@ class Solver(nn.Module):
             x_real, y_one_hot = inputs['X'].to('cuda'), inputs['mol_one_hot'].to('cuda')
             y_org = y_one_hot.argmax(1).long().to('cuda')
             y_trg = swap_attributes(y_one_hot, y_org, self.device).argmax(1).long().to('cuda')
-            z_emb_trg = self.embedding_matrix(y_trg).to('cuda')  # Get standardized RDKit embedding for the drug
+            # Get standardized RDKit embedding for the target drug
+            z_emb_trg = self.embedding_matrix(y_trg).to('cuda')  
 
-            # Get the latent vectors (one is used only for diversity-sensitivity loss)
+
             z_trg, z_trg2 = torch.randn(x_real.shape[0], args.z_dimension).to('cuda'), torch.randn(x_real.shape[0], args.z_dimension).to('cuda')
-            # Encode noise if required
-            if self.args.learn_noise:
-                z_trg, z_trg2 = self.nets.noise_projector(z_trg), self.nets.noise_projector(z_trg2)
 
             # train the discriminator
             d_loss, d_losses_latent = self.compute_d_loss(
@@ -197,19 +180,7 @@ class Solver(nn.Module):
             optims.generator.step()
             if self.args.encode_rdkit:
                 optims.mapping_network.step()
-            
-            # compute moving average of network parameters
-            if nets_ema != None:
-                self.moving_average(nets.generator, nets_ema.generator, beta=0.999)
-                self.moving_average(nets.style_encoder, nets_ema.style_encoder, beta=0.999)
-                if self.args.encode_rdkit:
-                    self.moving_average(nets.mapping_network, nets_ema.mapping_network, beta=0.999)
-                if self.args.lambda_noise > 0:
-                    self.moving_average(nets.mapping_network, nets_ema.mapping_network, beta=0.999)
-                if args.latent_discriminator:
-                    optims.latent_discriminator.step()
-                    self.moving_average(nets.noise_projector, nets_ema.noise_projector, beta=0.999)
-
+        
             # decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
             if args.lambda_ds > 0:
                 args.lambda_ds -= (initial_lambda_ds / args.ds_iter)
@@ -230,14 +201,14 @@ class Solver(nn.Module):
 
             # generate images for debugging
             if (i+1) % args.sample_every == 0:
-                debug_image(nets_ema if nets_ema!=None else nets, 
-                                    self.embedding_matrix, 
-                                    args, 
-                                    inputs=inputs_val, 
-                                    step=i+1, 
-                                    device=self.device, 
-                                    id2drug=self.id2drug,
-                                    dest_dir=self.dest_dir)
+                debug_image(nets, 
+                            self.embedding_matrix, 
+                            args, 
+                            inputs=inputs_val, 
+                            step=i+1, 
+                            device=self.device, 
+                            id2drug=self.id2drug,
+                            dest_dir=self.dest_dir)
 
             # save model checkpoints
             if (i+1) % args.save_every == 0:
@@ -247,67 +218,19 @@ class Solver(nn.Module):
 
             # compute FID and LPIPS if necessary
             if (i+1) % args.eval_every == 0:
-                rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets_ema if nets_ema!=None else nets,
-                                                                                    self.loader_val,
+                rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets,
+                                                                                    self.loader_test,
                                                                                     self.device,
                                                                                     self.dest_dir,
                                                                                     args.embedding_folder,
-                                                                                    end=False,
                                                                                     args=args,
                                                                                     step=i+1,
                                                                                     embedding_matrix=self.embedding_matrix)
 
                 # Save metrics to history 
-                self.save_history(i, rmse_disentanglement_dict, 'val')
+                self.save_history(i, rmse_disentanglement_dict, 'test')
                 # Print metrics 
                 print_metrics(rmse_disentanglement_dict, i+1)
-
-                # FID score and LPIPS get calculated only if stochastic model is used 
-                if self.args.lambda_noise > 0:
-                    lpips_dict_val, fid_dict_val = calaculate_fid_and_lpips(self.loader_val, 
-                                                                                nets_ema if nets_ema!=None else nets, 
-                                                                                args, 
-                                                                                i+1, 
-                                                                                self.id2drug,
-                                                                                self.embedding_matrix)  
-                    # Save metrics to history 
-                    self.save_history(i, lpips_dict_val, 'val')
-                    self.save_history(i, fid_dict_val, 'val')
-                    # Print metrics 
-                    print_metrics(lpips_dict_val, i+1)
-                    print_metrics(fid_dict_val, i+1)
-
-        # Final evaluations on the test set 
-        rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets_ema if nets_ema!=None else nets,
-                                                                                    self.loader_test,
-                                                                                    self.device,
-                                                                                    self.dest_dir,
-                                                                                    args.embedding_folder,
-                                                                                    end=True,
-                                                                                    args=args,
-                                                                                    step=i+1,
-                                                                                    embedding_matrix=self.embedding_matrix)
-        
-        # Compute the metrics for the test set 
-        if args.lambda_noise > 0:
-            lpips_dict_test, fid_dict_test  = calaculate_fid_and_lpips(self.loader_test, 
-                                                                        nets_ema if nets_ema!=None else nets, 
-                                                                        args, 
-                                                                        i+1, 
-                                                                        self.id2drug,
-                                                                        self.embedding_matrix)  
-            self.save_history(i, lpips_dict_test, 'test')
-            self.save_history(i, fid_dict_test, 'test')
-
-            # Print metrics 
-            print_metrics(lpips_dict_val, i+1)
-            print_metrics(fid_dict_val, i+1)
-
-
-        # Save metrics to history 
-        self.save_history(i, rmse_disentanglement_dict, 'test')
-        # Print metrics
-        print_metrics(rmse_disentanglement_dict, i+1)
 
         results = self.format_seml_results(self.history)
         return results 
@@ -355,25 +278,24 @@ class Solver(nn.Module):
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
-            s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  # Single of the noisy embedding vector to a style vector 
-            s_trg += args.lambda_noise*z_trg
-            z, x_fake = nets.generator(x_real, s_trg)
+
+            # If stochastic, concatenate embeddings with noise
+            if self.args.stochastic:
+                z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
+
+            # Single of the noisy embedding vector to a style vector 
+            s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  
+            
+            # Generate the fake image
+            _, x_fake = nets.generator(x_real, s_trg)
 
         out = nets.discriminator(x_fake, y_trg)
         loss_fake = self.adv_loss(out, 0)
 
-        # If applicable, discriminator on the latent
-        if args.latent_discriminator:
-            out_latent = nets.latent_discriminator(z, y_org)
-            loss_latent = self.adv_loss(out_latent, 1)
-        else:
-            loss_latent = torch.tensor(0)
-
-        loss = loss_real + loss_fake + args.lambda_reg * loss_reg + args.lambda_lat * loss_latent
+        loss = loss_real + loss_fake + args.lambda_reg * loss_reg 
         return loss, Munch(real=loss_real.item(),
                         fake=loss_fake.item(),
-                        reg=loss_reg.item(),
-                        lat=loss_latent.item())
+                        reg=loss_reg.item())
 
 
     def compute_g_loss(self, nets, args, x_real, y_org, y_trg, z_emb_trg, z_trgs=None):
@@ -381,55 +303,56 @@ class Solver(nn.Module):
         z_trg, z_trg2 = z_trgs
 
         # Adversarial loss
-        s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  # Style of the noisy vector 
-        s_trg1 = s_trg + args.lambda_noise*z_trg
+        if self.args.stochastic:
+            z_emb_trg1 = torch.cat([z_emb_trg, z_trg], dim=1)
+        else:
+            z_emb_trg1 = z_emb_trg
+
+        # Single of the noisy embedding vector to a style vector 
+        s_trg1 = nets.mapping_network(z_emb_trg1) if self.args.encode_rdkit else z_emb_trg1 
 
         # Generator for fake images 
-        z, x_fake = nets.generator(x_real, s_trg1)
+        _, x_fake = nets.generator(x_real, s_trg1)
         # Try to deceive the generator such that it is persuaded that the generated image is from the target domain
         out = nets.discriminator(x_fake, y_trg)
         # Adversarial loss setting the output of the network to 1 
         loss_adv = self.adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
-        s_pred = nets.style_encoder(x_fake, y_trg)
+        if not args.single_style:
+            s_pred = nets.style_encoder(x_fake, y_trg)
+        else:
+            s_pred = nets.style_encoder(x_fake)
+        
         loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  # Predict style back from image 
 
         # Diversity sensitive loss - only if stochastic 
-        if args.lambda_noise > 0:
-            s_trg2 = s_trg + args.lambda_noise*z_trg2  # Select y_target from the embeddings 
+        if args.stochastic:
+            z_emb_trg2 = torch.cat([z_emb_trg, z_trg2], dim=1)
+            s_trg2 = nets.mapping_network(z_emb_trg2) if self.args.encode_rdkit else z_emb_trg2 
             _, x_fake2 = nets.generator(x_real, s_trg2)
             x_fake2 = x_fake2.detach()
             loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # Generate outputs as far as possible from each other 
         else:
             loss_ds = torch.tensor(0)
 
-        # If applicable, discriminator on the latent
-        if args.latent_discriminator:
-            out_latent = nets.latent_discriminator(z, y_org)
-            loss_latent = self.adv_loss(out_latent, 0)
-        else:
-            loss_latent = torch.tensor(0)
-
         # Cycle-consistency loss
-        s_org = nets.style_encoder(x_real, y_org)  # Encode the style of the real image and use it to reconstruct it from the fake
+        if not args.single_style:
+            s_org = nets.style_encoder(x_real, y_org)
+        else:
+            s_org = nets.style_encoder(x_real)
+
         _, x_rec = nets.generator(x_fake, s_org)
         loss_cyc = torch.mean(torch.abs(x_rec - x_real))  # Mean absolute error reconstructed versus real 
 
         loss = loss_adv + args.lambda_sty * loss_sty \
-            - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc + args.lambda_lat * loss_latent
+            - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc
 
         return loss, Munch(adv=loss_adv.item(),
                         sty=loss_sty.item(),
                         ds=loss_ds.item(),
                         cyc=loss_cyc.item(),
-                        lat = loss_latent.item(),
                         rmse=torch.sqrt(torch.mean((x_rec.detach()-x_real)**2)).item())
-
-
-    def moving_average(self, model, model_test, beta=0.999):
-        for param, param_test in zip(model.parameters(), model_test.parameters()):
-            param_test.data = torch.lerp(param.data, param_test.data, beta)
 
 
     def adv_loss(self, logits, target):

@@ -55,20 +55,17 @@ class BBBC021Dataset:
                 data_index_path, 
                 embedding_path,
                 device='cuda', 
-                return_labels=False, 
                 augment_train=False, 
-                normalize=False,
-                drug_subset=['taxol', 'cytochalasin B']):
+                normalize=False):
 
         assert os.path.exists(image_path), 'The data path does not exist'
         assert os.path.exists(data_index_path), 'The data index path does not exist'
 
         # Set up the variables 
-        self.image_path = image_path  # Path to the image folder
+        self.image_path = image_path  # Path to the image folder (pickle file)
         self.data_index_path = data_index_path  # Path to data index (.csv file) 
         self.augment_train = augment_train  
         self.normalize = normalize  # Controls whether the input lies between 0 and 1 or -1 and 1
-        self.drug_subset = drug_subset  # list of drugs extracted and used for the transformation/conversion 
         self.embedding_path = embedding_path
 
         # Fix the training specifics 
@@ -88,7 +85,7 @@ class BBBC021Dataset:
         # Create the embeddings
         embedding_matrix = pd.read_pickle(self.embedding_path)
         embedding_matrix = embedding_matrix.loc[self.drug_names]  # Sort based on the drug names 
-        embedding_matrix = torch.tensor(embedding_matrix.iloc[:, 2:].values, 
+        embedding_matrix = torch.tensor(embedding_matrix.iloc[:, 1:].values, 
                                                 dtype=torch.float32, device=self.device)
         self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
 
@@ -109,13 +106,6 @@ class BBBC021Dataset:
                                                         self.augment_train, 
                                                         normalize),
 
-                            'val': BBBC021Fold('val', self.fold_datasets['valid'], 
-                                                    self.image_path, 
-                                                    encoder_drug, 
-                                                    self.drugs2idx, 
-                                                    self.moa2idx, 
-                                                    self.augment_train, 
-                                                    normalize),
 
                             'test': BBBC021Fold('test', self.fold_datasets['test'], 
                                                     self.image_path, 
@@ -129,20 +119,20 @@ class BBBC021Dataset:
 
     def read_folds(self):
         """
-        Extract the filenames of images in the train, test and validation sets from the 
+        Extract the filenames of images in the train and test sets 
         associated folder
         """
         # Read the index csv file
         dataset = pd.read_csv(self.data_index_path)
-        # Get the file names and molecules of training, test and validation sets
+        # Get the file names and molecules of training and test sets
         dataset_splits = dict()
         
-        for fold_name in ['train', 'valid', 'test']:
+        for fold_name in ['train', 'test']:
             # Divide the dataset in splits 
             dataset_splits[fold_name] = {}
 
             # Subset of dataframe corresponding to the split 
-            subset = dataset.loc[np.logical_and(dataset.SPLIT == fold_name, dataset.CPD_NAME.isin(self.drug_subset))]
+            subset = dataset.loc[dataset.SPLIT == fold_name]
 
             # Add the  important entries to the dataset
             dataset_splits[fold_name]['file_names'] = np.array(subset.SAMPLE_KEY)
@@ -153,12 +143,11 @@ class BBBC021Dataset:
         return dataset_splits
 
 
-
 class BBBC021Fold(Dataset):
     def __init__(self, fold, data, image_path, drug_encoder, drugs2idx, moa2idx, augment_train=True, normalize=False):
         super(BBBC021Fold, self).__init__() 
 
-        self.fold = fold  # train, test or validation set
+        self.fold = fold  # train and test set
         # For each piece of the data create its own object
         self.file_names = data['file_names']
         self.mol_names = data['mol_names']
@@ -249,7 +238,7 @@ class BBBC021Fold(Dataset):
         subset_dose = []
         
         for i in idx_sample:
-            X, mol_one_hot, smile_id, moa_id, dose, _, _ = self.__getitem__(i).values()
+            X, mol_one_hot, moa_id, dose, _, _ = self.__getitem__(i).values()
             
             imgs.append(X.unsqueeze(0))  # Unsqueeze batch dimension
             subset_mol_one_hot.append(mol_one_hot)
@@ -261,30 +250,3 @@ class BBBC021Fold(Dataset):
                     mol_one_hot = subset_mol_one_hot,
                     moa_id = subset_moa_id,
                     dose = self.dose[idx]) 
-
-    
-    def drug_or_moa_by_name(self, get_moa, name):
-        """Load the images of specific drugs or moas by name
-
-        Args:
-            get_moa (bool): Whether the name refers to moa
-            name (str): The name of the drug of interest  
-        """
-        file_name_set = self.moa if get_moa else self.mol_names
-        doses = []
-        mols = []
-        moas = []
-        images = []
-        idxs = [idx for idx in range(len(file_name_set)) if file_name_set[idx]==name]
-
-        for idx in idxs:
-            X, _, _, smile_id, moa_id, dose, _, _ = self.__getitem__(idx).values()
-            images.append(X.unsqueeze(0))
-            doses.append(dose)
-            mols.append(smile_id)
-            moas.append(moa_id)
-
-        return dict(X=torch.cat(images, dim=0), 
-                drugs=mols,
-                moas=moas,
-                dose=doses) 

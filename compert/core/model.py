@@ -1,13 +1,3 @@
-"""
-StarGAN v2
-Copyright (c) 2020-present NAVER Corp.
-
-This work is licensed under the Creative Commons Attribution-NonCommercial
-4.0 International License. To view a copy of this license, visit
-http://creativecommons.org/licenses/by-nc/4.0/ or send a letter to
-Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
-"""
-
 import copy
 import math
 
@@ -188,6 +178,17 @@ class Generator(nn.Module):
         for block in self.decode:
             x = block(x, s, basal)  # If basal is true we will have absence of conditioning 
         return z, self.to_rgb(x)
+    
+    def encode_single(self, x):
+        x = self.from_rgb(x)
+        for block in self.encode:    
+            x = block(x)
+        return x
+
+    def decode_single(self, x, s, basal=False):
+        for block in self.decode:
+            x = block(x, s, basal)  # If basal is true we will have absence of conditioning 
+        return self.to_rgb(x) 
 
 
 ##################### MAPPING NETWORK FROM LATENT TO STYLE VECTOR #####################
@@ -257,6 +258,35 @@ class StyleEncoder(nn.Module):
         idx = torch.LongTensor(range(y.size(0))).to(y.device)
         s = out[idx, y]  # (batch, style_dim)
         return s
+
+class StyleEncoderSingle(nn.Module):
+    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512):
+        super().__init__()
+        # Encoder for the style applied to the input data downsampling to the style vector dimension 
+        dim_in = 2**14 // img_size
+        blocks = []
+        blocks += [nn.Conv2d(3, dim_in, 3, 1, 1)]
+
+        # For 96x96 image this downsamples till 3x3 spatial dimension 
+        repeat_num = math.ceil(np.log2(img_size)) - 2
+        for _ in range(repeat_num):
+            dim_out = min(dim_in*2, max_conv_dim)
+            blocks += [ResBlk(dim_in, dim_out, downsample=True)]
+            dim_in = dim_out
+
+        blocks += [nn.LeakyReLU(0.2)]
+        blocks += [nn.Conv2d(dim_out, dim_out, 3, 1, 0)]
+        blocks += [nn.LeakyReLU(0.2)]
+        self.conv = torch.nn.Sequential(*blocks)
+
+        self.linear = nn.Linear(dim_out, style_dim)
+
+    def forward(self, x):
+        # Apply shared layer and linearize 
+        h = self.conv(x)
+        h = h.view(h.size(0), -1)
+        z_style = self.linear(h)
+        return z_style
 
 
 ##################### MULTI-TASK DISCRIMINATOR FOR TRUE/FALSE #####################
@@ -344,8 +374,16 @@ class DisentanglementClassifier(nn.Module):
 ##################### GENERAL FUNCTION BUILDING THE NETS #####################
 
 def build_model(args):
+    # Generator autoencoder
     generator = nn.DataParallel(Generator(args.img_size, args.style_dim))
-    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains))
+
+    # Style encoder for the images 
+    if not args.single_style:
+        style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains))
+    else:
+        style_encoder = nn.DataParallel(StyleEncoderSingle(args.img_size, args.style_dim))
+
+    # Discriminator network 
     discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains))
 
     nets = Munch(generator=generator,
@@ -354,40 +392,9 @@ def build_model(args):
     
     # RDKit can be encoded or left pure
     if args.encode_rdkit:  
-        mapping_network = nn.DataParallel(MappingNetwork(args.latent_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
+        # The rdkit embeddings can be collected together with noise 
+        input_dim = args.latent_dim if not args.stochastic else args.latent_dim + args.z_dimension
+        mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
         nets['mapping_network'] = mapping_network
 
-    # Noise can be learnt or not
-    if args.learn_noise:
-        noise_projector = nn.DataParallel(nn.Linear(args.z_dimension, args.style_dim))
-        nets['noise_projector'] = noise_projector
-
-    if args.latent_discriminator:
-        latent_discriminator = nn.DataParallel(Discriminator(12, args.num_domains, in_channels=512))
-        nets['latent_discriminator'] = latent_discriminator
-
-    # For evaluation
-    if args.eval_with_ema:
-        generator_ema = copy.deepcopy(generator)
-        style_encoder_ema = copy.deepcopy(style_encoder)
-
-        nets_ema = Munch(generator=generator_ema,
-                        style_encoder=style_encoder_ema)
-        
-        if args.encode_rdkit:
-            mapping_network_ema = copy.deepcopy(mapping_network)
-            nets_ema['mapping_network'] = mapping_network_ema
-
-        if args.learn_noise:
-            noise_projector_ema = copy.deepcopy(noise_projector)
-            nets_ema['noise_projector'] = noise_projector_ema
-        
-        if args.latent_discriminator:
-            latent_discriminator_ema = copy.deepcopy(latent_discriminator)
-            nets_ema['latent_discriminator_ema'] = latent_discriminator_ema
-    
-    # Return either nets and their copies for exponential moving average or only the nets 
-    if args.eval_with_ema:
-        return nets, nets_ema
-    else:
-        return nets
+    return nets

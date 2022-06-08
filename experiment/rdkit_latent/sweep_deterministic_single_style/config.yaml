@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: sweep_deterministic
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic
+  name: sweep_deterministic_single_style
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic_single_style/
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -15,7 +15,7 @@ slurm:
     cpus-per-task: 6  # num cores
     time: 2-00:00     # max time, D-HH:MM
 
-########## HUPERPARAMETER TUNING ##########
+########## HYPERPARAMETER TUNING ##########
 
 fixed: 
   # General parameters
@@ -35,9 +35,9 @@ fixed:
   train.args.lambda_noise: 0 # No noise
 
   # training arguments
-  train.args.total_iters: 50000
-  train.args.ds_iter: 30000  
-  train.args.resume_iter: 30000
+  train.args.total_iters: 40000
+  train.args.ds_iter: 40000  
+  train.args.resume_iter: 0
   train.args.batch_size: 32
   train.args.val_batch_size: 20
   train.args.lr: 0.0001
@@ -55,18 +55,18 @@ fixed:
   train.args.seed: 42  
     
   # directory for training
-  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/stargan/data/bbbc021_six_drugs.pkl   
-  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/fluorescence/metadata_processed/final_dataset/final_df_filtered.csv 
+  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/images/old/bbbc021_six_drugs.pkl   
+  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/metadata/final_df_filtered.csv 
   train.args.drug_embeddings_path:  /home/icb/alessandro.palma/imCPA/embeddings/pkl/emb_rdkit.pkl
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic_single_style/
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
   train.args.naming_key: num_layers_mapping_net
   train.args.embedding_folder: embeddings 
-  train.args.resume_dir: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic/20220524
+  train.args.resume_dir: Null
 
   # face alignment
   train.args.augment_train: True 
@@ -77,19 +77,10 @@ fixed:
   train.args.sample_every: 1000
   train.args.save_every: 1000
   train.args.eval_every: 500
-  train.args.drug_subset: [DMSO, AZ138, AZ258, vincristine, cytochalasin B, taxol]
 
   # Neural network parameters
   train.args.encode_rdkit: True
-  # train.args.num_layers_mapping_net: 1
+  train.args.num_layers_mapping_net: 1
   train.args.learn_noise: False 
   train.args.z_dimension: 16
-
-grid:
-  train.args.num_layers_mapping_net:
-    type: choice
-    options:
-      - 1
-      - 3
-      - 5
   
