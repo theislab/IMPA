@@ -1,5 +1,6 @@
 import sys
-sys.path.insert(0, '../..')
+
+sys.path.insert(0, '../')
 
 from collections import OrderedDict
 from tqdm import tqdm
@@ -47,7 +48,7 @@ def calculate_rmse_and_disentanglement_score(nets,
         y_one_hot = observation['mol_one_hot'].to(device) 
         y = y_one_hot.argmax(1) 
         # Append drug label to cache
-        y_true_ds_drugs.append(y)  # Record the labels 
+        y_true_ds_drugs.append(y.to('cpu'))  # Record the labels 
 
         # Prepare noise if the stochastic version is run 
         if args.stochastic > 0:
@@ -76,7 +77,7 @@ def calculate_rmse_and_disentanglement_score(nets,
             _, x_rec_post = nets.generator(X, s_post)
 
             # Image that will be plotted 
-            if x_rec_rand_to_plot == None and x_rec_basal_to_plot == None:
+            if x_rec_rand_to_plot == None and x_rec_basal_to_plot == None and args.dataset_name == 'bbbc021':
                 x_rec_rand_to_plot = x_rec_rand
                 x_rec_basal_to_plot = x_rec_basal
                 x_rec_post_to_plot = x_rec_post
@@ -86,28 +87,32 @@ def calculate_rmse_and_disentanglement_score(nets,
         rmse += torch.sqrt(torch.mean((x_rec_post-X)**2))
 
         # Save the basal state and style for later visualization 
-        z_basal_ds.append(z_basal)
-        z_style.append(s_post)
+        z_basal_ds.append(z_basal.detach().to('cpu'))
+        z_style.append(s_post.detach().to('cpu'))
+
+    del X
+    del y_one_hot
+    del z
 
     # Transform basal state and labels to tensors
     z_basal_ds = torch.cat(z_basal_ds, dim=0)
     z_style = torch.cat(z_style, dim=0)
     y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-    disentanglement_score = compute_disentanglement_score(z_basal_ds, y_true_ds_drugs)
+    # disentanglement_score = compute_disentanglement_score(z_basal_ds, y_true_ds_drugs)
 
     # Print metrics 
-    dict_metrics = {'Disentanglement_score': disentanglement_score, 
-                    'rmse': rmse.item()/len(loader),
+    dict_metrics = {'rmse': rmse.item()/len(loader),
                     'rmse_basal_full': rmse_basal_full.item()/len(loader)}
     
     # Plot the last reconstructed basal 
     filename_basal = ospj(dest_dir, args.basal_vs_real_folder, '%06d_basal_decoded_latent.png' % (step))
     filename_rec_rand = ospj(dest_dir, args.basal_vs_real_folder, '%06d_random_decoded_latent.png' % (step))
     filename_rec_post = ospj(dest_dir, args.basal_vs_real_folder, '%06d_post_decoded_latent.png' % (step))
-
-    save_image(x_rec_basal_to_plot[:16], 4, filename_basal)
-    save_image(x_rec_post_to_plot[:16], 4, filename_rec_post)
-    save_image(x_rec_rand_to_plot[:16], 4, filename_rec_rand)
+    
+    if args.dataset_name == 'bbbc021':
+        save_image(x_rec_basal_to_plot[:16], 4, filename_basal)
+        save_image(x_rec_post_to_plot[:16], 4, filename_rec_post)
+        save_image(x_rec_rand_to_plot[:16], 4, filename_rec_rand)
 
 
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')

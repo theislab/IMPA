@@ -24,7 +24,9 @@ fixed:
   train.args.hidden_dim: 512
   train.args.style_dim: 64
   train.args.stochastic: True
-  # train.args.z_dimension: 16
+  train.args.z_dimension: 64
+  train.args.drug_list: Null
+  train.args.ood_set: Null
 
   # weight for objective functions
   train.args.lambda_reg: 1
@@ -78,12 +80,3 @@ fixed:
   # Neural network parameters
   train.args.encode_rdkit: True
   train.args.num_layers_mapping_net: 1
-  
-grid:
-  train.args.z_dimension:
-    type: choice
-    options:
-      - 8
-      - 16
-      - 32
-  

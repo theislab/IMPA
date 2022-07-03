@@ -74,10 +74,10 @@ class NDB:
         # Randomly pick pixel dimensions 
         self.used_d_indices = np.random.choice(d, d_used, replace=False)
 
-        print('Performing K-Means clustering of {} samples in dimension {} / {} to {} clusters ...'.format(n, d_used, d, k))
-        print('Can take a couple of minutes...')
-        if n//k > 1000:
-            print('Training data size should be ~500 times the number of bins (for reasonable speed and accuracy)')
+        # print('Performing K-Means clustering of {} samples in dimension {} / {} to {} clusters ...'.format(n, d_used, d, k))
+        # print('Can take a couple of minutes...')
+        # if n//k > 1000:
+            # print('Training data size should be ~500 times the number of bins (for reasonable speed and accuracy)')
 
         clusters = KMeans(n_clusters=k, max_iter=100).fit(whitened_samples[:, self.used_d_indices])
         
@@ -127,7 +127,7 @@ class NDB:
                 # print('Storing result to', self.results_file)
                 pkl.dump(self.cached_results, open(self.results_file, 'wb'))
 
-        print('NDB =', ndb, 'NDB/K =', ndb/self.number_of_bins, ', JS =', js)
+        # print('NDB =', ndb, 'NDB/K =', ndb/self.number_of_bins, ', JS =', js)
         return results
 
     def print_results(self):
@@ -184,14 +184,14 @@ class NDB:
         k = self.bin_centers.shape[0]  # Number of centres 
         D = np.zeros([n, k], dtype=samples.dtype)
 
-        print('Calculating bin assignments for {} samples...'.format(n))
+        # print('Calculating bin assignments for {} samples...'.format(n))
         whitened_samples = (samples-self.training_mean)/self.training_std
         for i in range(k):
-            print('.', end='', flush=True)
+            # print('.', end='', flush=True)
             # For each sample you measure its distance from all the kmeans centres 
             D[:, i] = np.linalg.norm(whitened_samples[:, self.used_d_indices] - self.bin_centers[i, self.used_d_indices],
                                      ord=2, axis=1)
-        print()
+        # print()
         labels = np.argmin(D, axis=1)
         probs = np.zeros([k])
         label_vals, label_counts = np.unique(labels, return_counts=True)

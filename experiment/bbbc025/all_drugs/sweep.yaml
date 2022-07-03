@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: sweep_multi_style
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/sweeps_all_drugs/mult_styles/
+  name: sweep_embeddings_bbbc025
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/sweep_embeddings
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -20,11 +20,11 @@ slurm:
 fixed: 
   # General parameters
   train.args.img_size: 96
-  train.args.latent_dim: 160
+  train.args.latent_dim: 100
   train.args.hidden_dim: 512
   train.args.style_dim: 64
   train.args.stochastic: True
-  train.args.z_dimension: 8
+  train.args.z_dimension: 32
 
   # weight for objective functions
   train.args.lambda_reg: 1
@@ -33,18 +33,25 @@ fixed:
   train.args.lambda_ds: 1
 
   # training arguments
-  train.args.total_iters: 100000
-  train.args.ds_iter: 100000  
+  train.args.total_iters: 300000
+  train.args.ds_iter: 300000  
   train.args.resume_iter: 0
-  train.args.batch_size: 32
-  train.args.val_batch_size: 20
+  train.args.batch_size: 4
+  train.args.val_batch_size: 2
   train.args.lr: 0.0001
   train.args.f_lr: 0.000001
   train.args.beta1: 0
   train.args.beta2: 0.99
   train.args.weight_decay: 0.0001
   train.args.num_outs_per_domain: 10
-  train.args.single_style: False
+  train.args.single_style: True
+  train.args.ood_set: []
+  train.args.mol_list: Null
+  train.args.balanced: True
+  train.args.trainable_emb: False
+  train.args.dataset_name: 'bbbc025'
+  train.args.n_channels: 5
+
 
   # misc
   train.args.mode: train
@@ -52,16 +59,16 @@ fixed:
   train.args.seed: 42  
     
   # directory for training
-  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/images/bbbc021_total_corrected_single_cells.pkl
-  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/metadata/metadata_complete_dataset.csv
-  train.args.drug_embeddings_path:  /home/icb/alessandro.palma/imCPA/embeddings/pkl/emb_rdkit.pkl
+  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc025/processed_data/subset_ds/images_bbbc025_subset_corr.pkl
+  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc025/processed_data/subset_ds/final_df_splits.csv
+  train.args.embedding_path:  /home/icb/alessandro.palma/imCPA/embeddings/bbbc025/seed_embeddings.csv
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/sweeps_all_drugs/mult_styles/
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/sweep_embeddings
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: lr
+  train.args.naming_key: embedding_folder
   train.args.embedding_folder: embeddings 
   train.args.resume_dir: Null
 
@@ -70,11 +77,24 @@ fixed:
   train.args.normalize: True
 
   # step size
-  train.args.print_every: 10
-  train.args.sample_every: 1000
-  train.args.save_every: 1000
-  train.args.eval_every: 500
+  # train.args.print_every: 10
+  # train.args.sample_every: 1000
+  # train.args.save_every: 1000
+  # train.args.eval_every: 10000
+
+  train.args.print_every: 1
+  train.args.sample_every: 1
+  train.args.save_every: 1
+  train.args.eval_every: 1
 
   # Neural network parameters
   train.args.encode_rdkit: True
-  train.args.num_layers_mapping_net: 1  
+  train.args.num_layers_mapping_net: 1
+
+# grid:
+#   train.args.trainable_emb:
+#     type: choice
+#     options:
+#       - True
+#       - False
+      

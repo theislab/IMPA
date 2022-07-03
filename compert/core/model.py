@@ -131,13 +131,13 @@ class AdainResBlk(nn.Module):
 ##################### GENERATOR (Autoencoder structure) #####################
 
 class Generator(nn.Module):
-    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512):
+    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512, in_channels=3):
         super().__init__()
         # Initial dimension of the feature map
-        dim_in = 2**14 // img_size
+        dim_in = 64
         self.img_size = img_size
         # First convolutional layer 
-        self.from_rgb = nn.Conv2d(3, dim_in, 3, 1, 1)
+        self.from_rgb = nn.Conv2d(in_channels, dim_in, 3, 1, 1)
         # Encoding modules and decoding modules
         self.encode = nn.ModuleList()
         self.decode = nn.ModuleList()
@@ -145,7 +145,7 @@ class Generator(nn.Module):
         self.to_rgb = nn.Sequential(
             nn.InstanceNorm2d(dim_in, affine=True),
             nn.LeakyReLU(0.2),
-            nn.Conv2d(dim_in, 3, 1, 1, 0))
+            nn.Conv2d(dim_in, in_channels, 1, 1, 0))
 
         # For images of size 96x96 you have 3 convolutions and reach spatial dimension of 12x12 on conv filters
         repeat_num = math.ceil(np.log2(img_size)) - 4
@@ -222,12 +222,12 @@ class MappingNetwork(nn.Module):
 
 
 class StyleEncoder(nn.Module):
-    def __init__(self, img_size=96, style_dim=64, num_domains=2, max_conv_dim=512):
+    def __init__(self, img_size=96, style_dim=64, num_domains=2, max_conv_dim=512, in_channels=3):
         super().__init__()
         # Encoder for the style applied to the input data downsampling to the style vector dimension 
-        dim_in = 2**14 // img_size
+        dim_in = 64
         blocks = []
-        blocks += [nn.Conv2d(3, dim_in, 3, 1, 1)]
+        blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
 
         # For 96x96 image this downsamples till 3x3 spatial dimension 
         repeat_num = math.ceil(np.log2(img_size)) - 2
@@ -260,12 +260,12 @@ class StyleEncoder(nn.Module):
         return s
 
 class StyleEncoderSingle(nn.Module):
-    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512):
+    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512, in_channels=3):
         super().__init__()
         # Encoder for the style applied to the input data downsampling to the style vector dimension 
-        dim_in = 2**14 // img_size
+        dim_in = 64
         blocks = []
-        blocks += [nn.Conv2d(3, dim_in, 3, 1, 1)]
+        blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
 
         # For 96x96 image this downsamples till 3x3 spatial dimension 
         repeat_num = math.ceil(np.log2(img_size)) - 2
@@ -295,7 +295,7 @@ class StyleEncoderSingle(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, img_size=96, num_domains=2, max_conv_dim=512, in_channels=3):
         super().__init__()
-        dim_in = 2**14 // img_size
+        dim_in = 64
         blocks = []
         blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
 
@@ -305,9 +305,9 @@ class Discriminator(nn.Module):
             blocks += [ResBlk(dim_in, dim_out, downsample=True)]
             dim_in = dim_out
 
-        blocks += [nn.LeakyReLU(0.2)]
+        blocks += [nn.LeakyReLU(0.2, inplace=True)]
         blocks += [nn.Conv2d(dim_out, dim_out, 3, 1, 0)]
-        blocks += [nn.LeakyReLU(0.2)]
+        blocks += [nn.LeakyReLU(0.2, inplace=True)]
         # Final convolutional layer that points to the number of domains 
         blocks += [nn.Conv2d(dim_out, num_domains, 1, 1, 0)]
         self.main = nn.Sequential(*blocks)
@@ -375,16 +375,16 @@ class DisentanglementClassifier(nn.Module):
 
 def build_model(args):
     # Generator autoencoder
-    generator = nn.DataParallel(Generator(args.img_size, args.style_dim))
+    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, in_channels=args.n_channels))
 
     # Style encoder for the images 
     if not args.single_style:
-        style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains))
+        style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, args.num_domains, in_channels=args.n_channels))
     else:
-        style_encoder = nn.DataParallel(StyleEncoderSingle(args.img_size, args.style_dim))
+        style_encoder = nn.DataParallel(StyleEncoderSingle(args.img_size, args.style_dim, in_channels=args.n_channels))
 
     # Discriminator network 
-    discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains))
+    discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains, in_channels=args.n_channels))
 
     nets = Munch(generator=generator,
             style_encoder=style_encoder,

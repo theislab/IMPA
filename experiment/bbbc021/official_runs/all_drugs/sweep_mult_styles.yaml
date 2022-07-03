@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: official_run_6_drugs_set
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/official/official_6_drugs/
+  name: sweep_multi_style
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/sweeps_all_drugs/mult_styles/
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -23,19 +23,20 @@ fixed:
   train.args.latent_dim: 160
   train.args.hidden_dim: 512
   train.args.style_dim: 64
-  train.args.latent_discriminator: False
+  train.args.stochastic: True
+  train.args.z_dimension: 8
+  train.args.drug_list: Null
+  train.args.ood_set: Null
 
   # weight for objective functions
   train.args.lambda_reg: 1
   train.args.lambda_cyc: 1
   train.args.lambda_sty: 1
-  train.args.lambda_ds: 0
-  train.args.lambda_lat: 0
-  train.args.lambda_noise: 0 # No noise
+  train.args.lambda_ds: 1
 
   # training arguments
-  train.args.total_iters: 50000
-  train.args.ds_iter: 50000  
+  train.args.total_iters: 100000
+  train.args.ds_iter: 100000  
   train.args.resume_iter: 0
   train.args.batch_size: 32
   train.args.val_batch_size: 20
@@ -45,8 +46,7 @@ fixed:
   train.args.beta2: 0.99
   train.args.weight_decay: 0.0001
   train.args.num_outs_per_domain: 10
-  train.args.num_translations: 3
-  train.args.single_style: True
+  train.args.single_style: False
 
   # misc
   train.args.mode: train
@@ -54,16 +54,16 @@ fixed:
   train.args.seed: 42  
     
   # directory for training
-  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/images/bbbc021_six_drugs_corrected_single_cells.pkl
-  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/metadata/metadata_six_drugs_dataset.csv
+  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/images/bbbc021_total_corrected_single_cells.pkl
+  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/metadata/metadata_complete_dataset.csv
   train.args.drug_embeddings_path:  /home/icb/alessandro.palma/imCPA/embeddings/pkl/emb_rdkit.pkl
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/official/official_6_drugs/
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/sweeps_all_drugs/mult_styles/
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: num_layers_mapping_net
+  train.args.naming_key: lr
   train.args.embedding_folder: embeddings 
   train.args.resume_dir: Null
 
@@ -79,7 +79,4 @@ fixed:
 
   # Neural network parameters
   train.args.encode_rdkit: True
-  train.args.num_layers_mapping_net: 1
-  train.args.learn_noise: False 
-  train.args.z_dimension: 16
-  
+  train.args.num_layers_mapping_net: 1  
