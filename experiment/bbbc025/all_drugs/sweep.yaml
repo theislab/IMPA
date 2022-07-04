@@ -77,15 +77,11 @@ fixed:
   train.args.normalize: True
 
   # step size
-  # train.args.print_every: 10
-  # train.args.sample_every: 1000
-  # train.args.save_every: 1000
-  # train.args.eval_every: 10000
+  train.args.print_every: 10
+  train.args.sample_every: 1000
+  train.args.save_every: 1000
+  train.args.eval_every: 10000
 
-  train.args.print_every: 1
-  train.args.sample_every: 1
-  train.args.save_every: 1
-  train.args.eval_every: 1
 
   # Neural network parameters
   train.args.encode_rdkit: True

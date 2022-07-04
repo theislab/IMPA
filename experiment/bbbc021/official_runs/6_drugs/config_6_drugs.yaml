@@ -1,7 +1,7 @@
 seml:
-  executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: sweep_deterministic
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic
+  executable: /lustre/home/icb/alessandro.palma/imCPA/compert/main.py
+  name: config_6_drug_exp
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc021/rdkit_results/official/official_6_drugs_random
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -20,23 +20,21 @@ slurm:
 fixed: 
   # General parameters
   train.args.img_size: 96
-  train.args.latent_dim: 159
+  train.args.latent_dim: 160
   train.args.hidden_dim: 512
   train.args.style_dim: 64
-  train.args.eval_with_ema: False
-  train.args.latent_discriminator: False
+  train.args.stochastic: True
+  train.args.z_dimension: 8
 
   # weight for objective functions
   train.args.lambda_reg: 1
   train.args.lambda_cyc: 1
   train.args.lambda_sty: 1
-  train.args.lambda_ds: 0
-  train.args.lambda_lat: 0
-  train.args.lambda_noise: 0 # No noise
+  train.args.lambda_ds: 1
 
   # training arguments
-  train.args.total_iters: 30000
-  train.args.ds_iter: 30000  
+  train.args.total_iters: 50000
+  train.args.ds_iter: 50000  
   train.args.resume_iter: 0
   train.args.batch_size: 32
   train.args.val_batch_size: 20
@@ -46,7 +44,13 @@ fixed:
   train.args.beta2: 0.99
   train.args.weight_decay: 0.0001
   train.args.num_outs_per_domain: 10
-  train.args.num_translations: 3
+  train.args.single_style: True
+  train.args.ood_set: [docetaxel, MG-132, AZ841, cytochalasin D]
+  train.args.mol_list: ['AZ138', 'AZ258', 'cytochalasin B', 'DMSO', 'taxol', 'vincristine']
+  train.args.balanced: True
+  train.args.trainable_emb: False
+  train.args.dataset_name: 'bbbc021'
+  train.args.n_channels: 3
 
   # misc
   train.args.mode: train
@@ -54,17 +58,18 @@ fixed:
   train.args.seed: 42  
     
   # directory for training
-  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/stargan/data/bbbc021_six_drugs.pkl   
-  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/fluorescence/metadata_processed/final_dataset/final_df_filtered.csv 
-  train.args.drug_embeddings_path:  /home/icb/alessandro.palma/imCPA/embeddings/pkl/emb_rdkit.pkl
+  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/images/bbbc021_six_drugs_corrected_single_cells.pkl
+  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/metadata/metadata_six_drugs_dataset.csv
+  train.args.embedding_path:  /home/icb/alessandro.palma/imCPA/embeddings/bbbc021/csv/emb_rdkit.csv
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/rdkit_results/deterministic
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc021/rdkit_results/official/official_6_drugs_random
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: lambda_noise
+  train.args.naming_key: balanced
   train.args.embedding_folder: embeddings 
+  train.args.resume_dir: Null
 
   # face alignment
   train.args.augment_train: True 
@@ -75,20 +80,7 @@ fixed:
   train.args.sample_every: 1000
   train.args.save_every: 1000
   train.args.eval_every: 500
-  train.args.drug_subset: [DMSO, AZ138, AZ258, vincristine, cytochalasin B, taxol]
 
   # Neural network parameters
   train.args.encode_rdkit: True
-  # train.args.num_layers_mapping_net: 1
-  train.args.learn_noise: False 
-  train.args.z_dimension: 16
-
-grid:
-  train.args.num_layers_mapping_net:
-    type: choice
-    options:
-      - 1
-      - 3
-      - 5
-
-  
+  train.args.num_layers_mapping_net: 1

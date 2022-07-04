@@ -59,6 +59,7 @@ class Solver(nn.Module):
                 betas=[args.beta1, args.beta2],
                 weight_decay=args.weight_decay)
 
+        # Checkpoints of the save weights 
         self.ckptios = [
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims)]
@@ -135,7 +136,7 @@ class Solver(nn.Module):
         os.makedirs(ospj(self.dest_dir, self.args.embedding_folder), exist_ok=True)
 
         # The history of the training process (useful to keep track of the metrics and tor return)
-        self.history = {"train":{'epoch':[]}, "val":{'epoch':[]}, "test":{'epoch':[]}}
+        self.history = {"train":{'epoch':[]}, "test":{'epoch':[]}}
 
         args = self.args  # Hparams
         nets = self.nets  # Neural networks 
@@ -169,7 +170,6 @@ class Solver(nn.Module):
             z_trg, z_trg2 = torch.randn(x_real.shape[0], args.z_dimension).to(self.device), torch.randn(x_real.shape[0], args.z_dimension).to(self.device)
 
             # train the discriminator
-            self._print_mem()
             d_loss, d_losses_latent = self.compute_d_loss(
                 nets, args, x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
             self._reset_grad()
@@ -178,7 +178,6 @@ class Solver(nn.Module):
             
 
             # train the generator
-            self._print_mem()
             g_loss, g_losses_latent = self.compute_g_loss(
                 nets, args, x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trgs=[z_trg, z_trg2])
             self._reset_grad()
@@ -208,38 +207,39 @@ class Solver(nn.Module):
                 log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
                 print(log)
 
-        #     # generate images for debugging
-        #     if (i+1) % args.sample_every == 0:
-        #         debug_image(nets, 
-        #                     self.embedding_matrix, 
-        #                     args, 
-        #                     inputs=inputs_val, 
-        #                     step=i+1, 
-        #                     device=self.device, 
-        #                     id2mol=self.id2mol,
-        #                     dest_dir=self.dest_dir)
 
-        #     # save model checkpoints
-        #     if (i+1) % args.save_every == 0:
-        #         self._save_checkpoint(step=i+1)
-        #         # Save losses in the history 
-        #         self.save_history(i, all_losses, 'train')
+            # generate images for debugging
+            if (i+1) % args.sample_every == 0:
+                debug_image(nets, 
+                            self.embedding_matrix, 
+                            args, 
+                            inputs=inputs_val, 
+                            step=i+1, 
+                            device=self.device, 
+                            id2mol=self.id2mol,
+                            dest_dir=self.dest_dir)
 
-        #     # compute FID and LPIPS if necessary
-        #     if (i+1) % args.eval_every == 0:
-        #         rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets,
-        #                                                                             self.loader_test,
-        #                                                                             self.device,
-        #                                                                             self.dest_dir,
-        #                                                                             args.embedding_folder,
-        #                                                                             args=args,
-        #                                                                             step=i+1,
-        #                                                                             embedding_matrix=self.embedding_matrix)
+            # save model checkpoints
+            if (i+1) % args.save_every == 0:
+                self._save_checkpoint(step=i+1)
+                # Save losses in the history 
+                self.save_history(i, all_losses, 'train')
 
-                # # Save metrics to history 
-                # self.save_history(i, rmse_disentanglement_dict, 'test')
-                # # Print metrics 
-                # print_metrics(rmse_disentanglement_dict, i+1)
+            # compute FID and LPIPS if necessary
+            if (i+1) % args.eval_every == 0:
+                rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets,
+                                                                                    self.loader_test,
+                                                                                    self.device,
+                                                                                    self.dest_dir,
+                                                                                    args.embedding_folder,
+                                                                                    args=args,
+                                                                                    step=i+1,
+                                                                                    embedding_matrix=self.embedding_matrix)
+
+                # Save metrics to history 
+                self.save_history(i, rmse_disentanglement_dict, 'test')
+                # Print metrics 
+                print_metrics(rmse_disentanglement_dict, i+1)
 
         results = self.format_seml_results(self.history)
         return results 
@@ -291,7 +291,6 @@ class Solver(nn.Module):
             if self.args.stochastic:
                 z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
 
-            
             # Single of the noisy embedding vector to a style vector 
             s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  
             
