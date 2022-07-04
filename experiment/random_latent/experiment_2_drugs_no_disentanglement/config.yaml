@@ -1,0 +1,86 @@
+seml:
+  executable: /home/icb/alessandro.palma/imCPA/compert/main.py
+  name: experiment_2_drugs_no_disentanglement 
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/experiment_2_drugs_no_disentanglement
+  conda_environment: imgCPA
+  project_root_dir: /home/icb/alessandro.palma/imCPA/
+
+slurm:
+  max_simultaneous_jobs: 10
+  experiments_per_job: 1
+  sbatch_options_template: GPU
+  sbatch_options:
+    gres: gpu:1       # num GPUs
+    mem: 90G          # memory
+    cpus-per-task: 6  # num cores
+    time: 2-00:00     # max time, D-HH:MM
+
+########## HUPERPARAMETER TUNING ##########
+
+fixed: 
+  # General parameters
+  train.args.img_size: 96
+  train.args.latent_dim: 16
+  train.args.hidden_dim: 512
+  train.args.style_dim: 64
+  train.args.eval_with_ema: False
+  train.args.latent_discriminator: False
+
+  # weight for objective functions
+  train.args.lambda_reg: 1
+  train.args.lambda_cyc: 1
+  train.args.lambda_sty: 1
+  train.args.lambda_ds: 1
+  train.args.lambda_lat: 0
+
+  # training arguments
+  train.args.total_iters: 25000
+  train.args.ds_iter: 25000  
+  train.args.resume_iter: 15000
+  train.args.batch_size: 32
+  train.args.val_batch_size: 10
+  train.args.lr: 0.0001
+  train.args.f_lr: 0.000001
+  train.args.beta1: 0
+  train.args.beta2: 0.99
+  train.args.weight_decay: 0.0001
+  train.args.num_outs_per_domain: 5
+  train.args.num_translations: 3
+  train.args.patience: 50
+
+  # misc
+  train.args.mode: train
+  train.args.num_workers: 6
+  train.args.seed: 42  
+    
+  # directory for training
+  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/stargan/data/bbbc021_six_drugs.pkl
+  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA/fluorescence/metadata_processed/final_dataset/final_df_filtered.csv
+
+  # Directories for results
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/stargan/results/experiment_2_drugs_no_disentanglement  # Directory to dump experiments
+  train.args.sample_dir: sample   # Name of directory for sampled images 
+  train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
+  train.args.basal_vs_real_folder: basal_vs_real
+  train.args.embedding_folder: embeddings 
+
+  # face alignment
+  train.args.augment_train: True 
+  train.args.normalize: True
+
+  # step size
+  train.args.print_every: 10
+  train.args.sample_every: 1000
+  train.args.save_every: 1000
+  train.args.eval_every: 500
+
+
+grid:
+  train.args.drug_subset:
+    type: choice
+    options:
+      # - [DMSO, taxol]
+      - [DMSO, vincristine]
+      - [DMSO, AZ138]
+      - [DMSO, AZ258]
+      # - [DMSO, cytochalasin B]
