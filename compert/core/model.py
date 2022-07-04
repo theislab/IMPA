@@ -387,6 +387,7 @@ def build_model(args):
     discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains, in_channels=args.n_channels))
 
     nets = Munch(generator=generator,
+            style_encoder=style_encoder, 
             discriminator=discriminator)
     
     # RDKit can be encoded or left pure
