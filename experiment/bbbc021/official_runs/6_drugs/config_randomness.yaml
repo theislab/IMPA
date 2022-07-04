@@ -25,10 +25,6 @@ fixed:
   train.args.style_dim: 64
   train.args.stochastic: True
   train.args.z_dimension: 8
-  train.args.balanced: True
-  train.args.trainable_emb: False
-  train.args.dataset_name: 'bbbc021'
-  train.args.n_channels: 3
 
   # weight for objective functions
   train.args.lambda_reg: 1
@@ -49,6 +45,12 @@ fixed:
   train.args.weight_decay: 0.0001
   train.args.num_outs_per_domain: 10
   train.args.single_style: True
+  train.args.ood_set: []
+  train.args.mol_list: ['AZ138', 'AZ258', 'cytochalasin B', 'DMSO', 'taxol', 'vincristine']
+  train.args.balanced: True
+  train.args.trainable_emb: False
+  train.args.dataset_name: 'bbbc021'
+  train.args.n_channels: 3
 
   # misc
   train.args.mode: train
