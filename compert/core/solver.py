@@ -413,15 +413,18 @@ class Solver(nn.Module):
     def _create_dirs(self):
         # Create directory 
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
+        # Setup the key naming the folder
+        if type(self.args['naming_key']) == list: 
+            keys = [str(self.args[key]) for key in self.args['naming_key']]
+            keys_str = '_'.join(keys)
+        else:
+            keys_str = str(self.args[self.args['naming_key']])
+        print(self.args.resume_iter)
+        # Set the directory for the results 
         if self.args.resume_iter==0:
-            if type(self.args['naming_key']) == list: 
-                keys = [str(self.args[key]) for key in self.args['naming_key']]
-                keys_str = '_'.join(keys)
-            else:
-                keys_str = str(self.args[self.args['naming_key']])
             self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+keys_str)
         else:
-            self.dest_dir = self.args.resume_dir
+            self.dest_dir = self.args.resume_dir+'_'+keys_str
 
     def _print_mem(self):
         t = torch.cuda.get_device_properties(0).total_memory
@@ -429,3 +432,4 @@ class Solver(nn.Module):
         a = torch.cuda.memory_allocated(0)
         f = r-a  # free inside reserved 
         print(f)
+        

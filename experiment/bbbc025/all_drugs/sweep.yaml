@@ -1,9 +1,10 @@
 seml:
-  executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: sweep_embeddings_bbbc025
+  executable: /lustre/home/icb/alessandro.palma/imCPA/compert/main.py
+  # sweep_embeddings_bbbc025
+  name: sweep_embeddings_bbbc025_re1
   output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/sweep_embeddings
   conda_environment: imgCPA
-  project_root_dir: /home/icb/alessandro.palma/imCPA
+  project_root_dir: /lustre/home/icb/alessandro.palma/imCPA
 
 slurm:
   max_simultaneous_jobs: 10
@@ -35,7 +36,7 @@ fixed:
   # training arguments
   train.args.total_iters: 300000
   train.args.ds_iter: 300000  
-  train.args.resume_iter: 0
+  train.args.resume_iter: 20000
   train.args.batch_size: 4
   train.args.val_batch_size: 2
   train.args.lr: 0.0001
@@ -48,7 +49,7 @@ fixed:
   train.args.ood_set: []
   train.args.mol_list: Null
   train.args.balanced: True
-  train.args.trainable_emb: False
+  # train.args.trainable_emb: False
   train.args.dataset_name: 'bbbc025'
   train.args.n_channels: 5
 
@@ -64,14 +65,13 @@ fixed:
   train.args.embedding_path:  /home/icb/alessandro.palma/imCPA/embeddings/bbbc025/seed_embeddings.csv
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/sweep_embeddings
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/sweep_embeddings/20220702
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: embedding_folder
+  train.args.naming_key: trainable_emb
   train.args.embedding_folder: embeddings 
-  train.args.resume_dir: Null
-
+  train.args.resume_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/sweep_embeddings/20220702
   # face alignment
   train.args.augment_train: True 
   train.args.normalize: True
@@ -87,10 +87,10 @@ fixed:
   train.args.encode_rdkit: True
   train.args.num_layers_mapping_net: 1
 
-# grid:
-#   train.args.trainable_emb:
-#     type: choice
-#     options:
-#       - True
-#       - False
+grid:
+  train.args.trainable_emb:
+    type: choice
+    options:
+      - True
+      - False
       

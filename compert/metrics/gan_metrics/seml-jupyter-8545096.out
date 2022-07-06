@@ -1,0 +1,20 @@
+Starting job 8545096
+SLURM assigned me the node(s): gpusrv15
+[W 16:42:08.679 NotebookApp] WARNING: The notebook server is listening on all IP addresses and not using encryption. This is not recommended.
+[W 2022-07-05 16:42:13.517 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2022-07-05 16:42:13.517 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2022-07-05 16:42:13.517 LabApp] 'ip' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[I 2022-07-05 16:42:13.525 LabApp] JupyterLab extension loaded from /home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/jupyterlab
+[I 2022-07-05 16:42:13.525 LabApp] JupyterLab application directory is /mnt/home/icb/alessandro.palma/miniconda3/envs/imgCPA/share/jupyter/lab
+[I 16:42:13.531 NotebookApp] Serving notebooks from local directory: /lustre/home/icb/alessandro.palma/imCPA/compert/metrics/gan_metrics
+[I 16:42:13.531 NotebookApp] Jupyter Notebook 6.4.8 is running at:
+[I 16:42:13.531 NotebookApp] http://gpusrv15.scidom.de:8888/?token=bf4c9afb44c460de81d26ff58e971d4904c858ec601fe63e
+[I 16:42:13.531 NotebookApp]  or http://127.0.0.1:8888/?token=bf4c9afb44c460de81d26ff58e971d4904c858ec601fe63e
+[I 16:42:13.531 NotebookApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[C 16:42:13.608 NotebookApp] 
+    
+    To access the notebook, open this file in a browser:
+        file:///mnt/home/icb/alessandro.palma/.local/share/jupyter/runtime/nbserver-35438-open.html
+    Or copy and paste one of these URLs:
+        http://gpusrv15.scidom.de:8888/?token=bf4c9afb44c460de81d26ff58e971d4904c858ec601fe63e
+     or http://127.0.0.1:8888/?token=bf4c9afb44c460de81d26ff58e971d4904c858ec601fe63e
