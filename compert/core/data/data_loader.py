@@ -97,7 +97,7 @@ class CellDataset:
         dataset = pd.read_csv(self.data_index_path, index_col=0)
 
         # Only embeddable results
-        if not self.trainable_emb:
+        if not self.trainable_emb and self.dataset_name=='bbbc025':
             dataset = dataset.loc[dataset.CPD_NAME != '0']
 
         # Remove the out of distribution drugs from the dataset if necessary
