@@ -45,10 +45,10 @@ fixed:
   train.args.weight_decay: 0.0001
   train.args.num_outs_per_domain: 10
   train.args.single_style: True
-  train.args.ood_set: [docetaxel, MG-132, AZ841, cytochalasin D]
+  train.args.ood_set: Null
   train.args.mol_list: ['AZ138', 'AZ258', 'cytochalasin B', 'DMSO', 'taxol', 'vincristine']
   train.args.balanced: True
-  train.args.trainable_emb: False
+  train.args.trainable_emb: True
   train.args.dataset_name: 'bbbc021'
   train.args.n_channels: 3
 
