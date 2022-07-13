@@ -3,6 +3,7 @@ import torch
 
 import seml
 from sacred import Experiment
+from sacred import SETTINGS
 
 import sys
 
@@ -10,6 +11,7 @@ sys.path.insert(0, '../..')
 # from compert.core.solver import Solver
 from core.solver import Solver
 
+SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 # Initialize seml experiment
 ex = Experiment()

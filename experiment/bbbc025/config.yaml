@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: sweep_batch_recursion2
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/recursion/sweep_batch
+  name: bbbc025_official
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/bbbc025_official
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -36,7 +36,7 @@ fixed:
   train.args.total_iters: 100000
   train.args.ds_iter: 100000  
   train.args.resume_iter: 0
-  # train.args.batch_size: 32
+  train.args.batch_size: 32
   train.args.val_batch_size: 3
   train.args.lr: 0.0001
   train.args.f_lr: 0.000001
@@ -47,10 +47,10 @@ fixed:
   train.args.single_style: True
   train.args.ood_set: []
   train.args.mol_list: Null
-  train.args.balanced: True 
+  train.args.balanced: True
   train.args.trainable_emb: True
-  train.args.dataset_name: 'recursion'
-  train.args.n_channels: 6
+  train.args.dataset_name: 'bbbc025'
+  train.args.n_channels: 5
 
   # misc
   train.args.mode: train
@@ -58,19 +58,18 @@ fixed:
   train.args.seed: 42  
     
   # directory for training
-  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/recursion_dataset/processed_data/subset_images_corr.pkl
-  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/recursion_dataset/processed_data/data_index.csv
+  train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc025/processed_data/subset_ds/image_df_corrected_subsample.pkl
+  train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc025/processed_data/subset_ds/final_df_splits_subsample.csv
   train.args.embedding_path:  ''
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/recursion/sweep_batch
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc025/bbbc025_official
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: [batch_size, embedding_folder]
+  train.args.naming_key: trainable_emb
   train.args.embedding_folder: embeddings 
   train.args.resume_dir: ''
-
   # face alignment
   train.args.augment_train: True 
   train.args.normalize: True
@@ -78,17 +77,11 @@ fixed:
   # step size
   train.args.print_every: 10
   train.args.sample_every: 1000
-  train.args.save_every: 1000
+  # train.args.save_every: 1000
+  train.args.save_every: 10
   train.args.eval_every: 10000
 
   # Neural network parameters
   train.args.encode_rdkit: True
   train.args.num_layers_mapping_net: 1
-
-grid:
-  train.args.batch_size:
-    type: choice
-    options:
-      - 32
-      - 64
       

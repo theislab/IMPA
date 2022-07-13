@@ -18,7 +18,6 @@ from .utils import *
 from .data.data_loader import CellDataset
 
 sys.path.insert(0, '../')
-# from compert.metrics.eval import * 
 from metrics.eval import * 
 
 
@@ -32,7 +31,7 @@ class Solver(nn.Module):
         self.init_dataset()
         args['num_domains'] = self.n_mol 
 
-        # If the RDKit embeddings are not encoded their dimension is also the dimension of the style
+        # If the embeddings are not encoded their dimension is also the dimension of the style
         if not self.args.encode_rdkit:
             self.args['style_dim'] = self.args.latent_dim
         
@@ -45,7 +44,7 @@ class Solver(nn.Module):
         # Get the nets 
         self.nets = build_model(args)
         
-        # Set modules as attributes of the class
+        # Set modules as attributes of the solver class
         for name, module in self.nets.items():
             print_network(module, name)
             setattr(self, name, module)
@@ -62,7 +61,8 @@ class Solver(nn.Module):
         # Checkpoints of the save weights 
         self.ckptios = [
             CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
-            CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims)]
+            CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims),
+            CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]
    
         # Perform network initialization 
         self.to(self.device)
@@ -206,7 +206,6 @@ class Solver(nn.Module):
                 all_losses['G/lambda_ds'] = args.lambda_ds
                 log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
                 print(log)
-
 
             # generate images for debugging
             if (i+1) % args.sample_every == 0:
@@ -357,20 +356,6 @@ class Solver(nn.Module):
             - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc
 
         rmse = torch.sqrt(torch.mean((x_rec.detach()-x_real)**2)).item()
-        
-        # Free memory 
-        del x_real
-        del z_trg
-        del z_trg2
-        del z_emb_trg
-        del z_emb_trg1
-        del z_emb_trg2
-        del s_pred
-        del s_trg1
-        del s_trg2
-        del x_fake
-        del x_fake2
-        del out
 
         return loss, Munch(adv=loss_adv.item(),
                         sty=loss_sty.item(),
@@ -414,12 +399,12 @@ class Solver(nn.Module):
         # Create directory 
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
         # Setup the key naming the folder
+        print(type(self.args['naming_key']))
         if type(self.args['naming_key']) == list: 
             keys = [str(self.args[key]) for key in self.args['naming_key']]
             keys_str = '_'.join(keys)
         else:
             keys_str = str(self.args[self.args['naming_key']])
-        print(self.args.resume_iter)
         # Set the directory for the results 
         if self.args.resume_iter==0:
             self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+keys_str)

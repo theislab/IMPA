@@ -21,8 +21,7 @@ class CheckpointIO(object):
             if self.data_parallel:
                 outdict[name] = module.module.state_dict()
             else:
-                outdict[name] = module.state_dict()
-                        
+                outdict[name] = module.state_dict()  
         torch.save(outdict, fname)
 
     def load(self, step):

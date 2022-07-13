@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: sweep_batch_recursion2
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/recursion/sweep_batch
+  name: sweep_z_dim_style_dim1
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/recursion/sweep_z_dim_style_dim
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -20,11 +20,11 @@ slurm:
 fixed: 
   # General parameters
   train.args.img_size: 96
-  train.args.latent_dim: 100
+  # train.args.latent_dim: 100
   train.args.hidden_dim: 512
   train.args.style_dim: 64
   train.args.stochastic: True
-  train.args.z_dimension: 32
+  # train.args.z_dimension: 32
 
   # weight for objective functions
   train.args.lambda_reg: 1
@@ -36,7 +36,7 @@ fixed:
   train.args.total_iters: 100000
   train.args.ds_iter: 100000  
   train.args.resume_iter: 0
-  # train.args.batch_size: 32
+  train.args.batch_size: 32
   train.args.val_batch_size: 3
   train.args.lr: 0.0001
   train.args.f_lr: 0.000001
@@ -63,11 +63,11 @@ fixed:
   train.args.embedding_path:  ''
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/recursion/sweep_batch
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/recursion/sweep_z_dim_style_dim
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: [batch_size, embedding_folder]
+  train.args.naming_key: [z_dimension, latent_dim]
   train.args.embedding_folder: embeddings 
   train.args.resume_dir: ''
 
@@ -86,9 +86,19 @@ fixed:
   train.args.num_layers_mapping_net: 1
 
 grid:
-  train.args.batch_size:
+  train.args.z_dimension:
     type: choice
     options:
+      - 8
+      - 16
       - 32
-      - 64
+
+  train.args.latent_dim:
+    type: choice
+    options:
+      - 50
+      - 100
+      - 150
+
+  
       
