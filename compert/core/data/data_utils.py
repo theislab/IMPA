@@ -5,9 +5,10 @@ class CustomTransform:
     """
     Scale and resize an input image 
     """
-    def __init__(self, augment=False, normalize=False):
+    def __init__(self, augment=False, normalize=False, dim=0):
         self.augment = augment 
         self.normalize = normalize 
+        self.dim = dim
         
     def __call__(self, X):
         """
@@ -20,7 +21,7 @@ class CustomTransform:
         t = []
         # Normalize the input between -1 and 1 
         if self.normalize==True:
-            t.append(T.Normalize(mean=[0.5 for _ in range(X.shape[0])], std=[0.5 for _ in range(X.shape[0])]))
+            t.append(T.Normalize(mean=[0.5 for _ in range(X.shape[self.dim])], std=[0.5 for _ in range(X.shape[self.dim])]))
         
         # Perform augmentation step
         if self.augment:

@@ -1,20 +1,31 @@
-# From https://github.com/clovaai/stargan-v2/blob/master/core/checkpoint.py
+# Inspired by https://github.com/clovaai/stargan-v2/blob/master/core/checkpoint.py
+
 import os
 import torch
 
-class CheckpointIO(object):
-    def __init__(self, fname_template, data_parallel=False, **kwargs):
-        os.makedirs(os.path.dirname(fname_template), exist_ok=True)
-        self.fname_template = fname_template
-        # Module dictiornoary contains the networks whose checkpoints are saved 
+class CheckpointIO:
+    """
+    Checkpoint class for saving model snapshots during training. 
+    """
+    def __init__(self, file_template, data_parallel=False, **kwargs):
+        """
+        Args:
+            file_template (str): name of destination directory for the checkpoints.
+            data_parallel (bool, optional): True if the model is wrapped in a torch.nn.DataParallel module. Defaults to False.
+        """
+        os.makedirs(os.path.dirname(file_template), exist_ok=True)
+        self.file_template = file_template 
         self.module_dict = kwargs
         self.data_parallel = data_parallel
 
-    def register(self, **kwargs):
-        self.module_dict.update(kwargs)
-
     def save(self, step):
-        fname = self.fname_template.format(step)
+        """
+        Save the module checkpoints.
+
+        Args:
+            step (int): the iteration step at which the model is saved.
+        """
+        fname = self.file_template.format(step)
         print('Saving checkpoint into %s...' % fname)
         outdict = {}
         for name, module in self.module_dict.items():
@@ -25,7 +36,13 @@ class CheckpointIO(object):
         torch.save(outdict, fname)
 
     def load(self, step):
-        fname = self.fname_template.format(step)
+        """
+        Load a checkpoint dictionary. 
+
+        Args:
+            step (int): the iteration step of the loaded model.
+        """
+        fname = self.file_template.format(step)
         assert os.path.exists(fname), fname + ' does not exist!'
         print('Loading checkpoint from %s...' % fname)
         if torch.cuda.is_available():
@@ -33,6 +50,7 @@ class CheckpointIO(object):
             module_dict = torch.load(fname)
         else:
             module_dict = torch.load(fname, map_location=torch.device('cpu'))
+        # Parametrise the modules 
         for name, module in self.module_dict.items():
             if self.data_parallel:
                 module.module.load_state_dict(module_dict[name])

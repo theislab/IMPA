@@ -6,14 +6,17 @@ from torch.nn.functional import adaptive_avg_pool2d
 
 from .inception import InceptionV3
 
-def inception_activations(data_generator, model, dims=2048, use_cuda=True):
+def inception_activations(data_generator, model, dims=2048, custom_channels=None, use_cuda=True):
     """
     Derive the activations from the inceptionV3 network
     """
     device = 'cuda' if use_cuda==True else 'cpu'
     scores = []
     for batch in data_generator:
-        pred = model(batch[0])[0]
+        batch_data = batch[0]
+        if batch_data.shape[1]>3:
+            batch_data = batch_data[:,custom_channels, :, :]
+        pred = model(batch_data)[0] 
         # Append the scores for each batch
         scores.append(pred.view(-1, dims))
         
@@ -76,7 +79,7 @@ def cal_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
             np.trace(sigma2) - 2 * tr_covmean)
 
 
-def cal_fid(data1, data2, dims, use_cuda):
+def cal_fid(data1, data2, dims, use_cuda, custom_channels=None):
     """Calculates the FID of two data generator.
     Params:
     -- data1   : generator of data one.
@@ -94,8 +97,8 @@ def cal_fid(data1, data2, dims, use_cuda):
     model.eval()
 
     # Compute mean and standard deviation of the two distributions (real vs fake) 
-    m1, s1 = inception_activations(data1, model, dims, use_cuda)
-    m2, s2 = inception_activations(data2, model, dims, use_cuda)
+    m1, s1 = inception_activations(data1, model, dims, custom_channels, use_cuda)
+    m2, s2 = inception_activations(data2, model, dims, custom_channels, use_cuda)
     fid_value = cal_frechet_distance(m1, s1, m2, s2)
 
     return fid_value

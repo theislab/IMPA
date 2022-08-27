@@ -6,14 +6,15 @@ from collections import OrderedDict
 from tqdm import tqdm
 from os.path import join as ospj
 
+import ot
 import numpy as np
 import torch
 import pickle as pkl
 
 # from compert.core.utils import save_image 
-from core.utils import save_image 
+from core.utils import save_image, swap_attributes
 
-from .disentanglement_score import compute_disentanglement_score
+from .gan_metrics.fid import *
 
 def calculate_rmse_and_disentanglement_score(nets, 
                                             loader, 
@@ -21,34 +22,33 @@ def calculate_rmse_and_disentanglement_score(nets,
                                             dest_dir,
                                             embedding_path, 
                                             args, 
-                                            step,
                                             embedding_matrix):
 
     # The difference between a decoded image with and without addition of the drug and moa
-    rmse_basal_full = 0  
-    rmse = 0 
+    rmse_transformations = 0  
 
     # The lists containing the true labels of the batch 
-    y_true_ds_drugs = []  
+    y_true_ds = []  
+    y_fake_ds = []
+    X_real = []
+    X_swapped = []
 
     # STORE THE LATENTS FOR LATER ANALYSIS
     z_basal_ds = []  
-    z_style = []
-
-    # IMAGES TO PLOT
-    x_rec_post_to_plot = None
-    x_rec_rand_to_plot = None
-    x_rec_basal_to_plot = None
+    z_style_ds = []
 
     # LOOP OVER SINGLE OBSERVATIONS 
     for observation in tqdm(loader):
         # Data matrix
         X = observation['X'].to(device)  
         # Labelled observations
-        y_one_hot = observation['mol_one_hot'].to(device) 
-        y = y_one_hot.argmax(1) 
+        y_one_hot_src = observation['mol_one_hot'].to(device) 
+        y_src = y_one_hot_src.argmax(1).long()
+        y_trg = swap_attributes(y_one_hot_src, y_src, device).long().argmax(1)
+
         # Append drug label to cache
-        y_true_ds_drugs.append(y.to('cpu'))  # Record the labels 
+        y_true_ds.append(y_src.to('cpu'))  # Record the labels 
+        y_fake_ds.append(y_trg.to('cpu'))
 
         # Prepare noise if the stochastic version is run 
         if args.stochastic > 0:
@@ -56,70 +56,53 @@ def calculate_rmse_and_disentanglement_score(nets,
             z = torch.randn(X.shape[0], args.z_dimension).to(device)
 
         with torch.no_grad():
-            # We generate in basal mode, so without really conditining on s_trg
-            s = None
-            z_basal, x_rec_basal = nets.generator(X, s, basal=True)  
-
             # We generate in normal mode
-            z_emb = embedding_matrix(y)
+            z_emb = embedding_matrix(y_trg)
+
             if args.stochastic:
                 z_emb = torch.cat([z_emb, z], dim=1)
+            
+            # Map to style
+            s = nets.mapping_network(z_emb) 
+            z_basal, X_fake = nets.generator(X, s)
+            X_swapped.append(X_fake.cpu())
+            X_real.append(X.cpu())
+            
+            # Save the basal state and style for later visualization 
+            z_basal_ds.append(z_basal.detach().to('cpu'))
+            z_style_ds.append(s.detach().to('cpu'))
 
-            s = nets.mapping_network(z_emb) if args.encode_rdkit else z_emb
 
-            _, x_rec_rand = nets.generator(X, s)
+    # Perform list concatenation on all of the results 
+    y_true_ds = torch.cat(y_true_ds).to('cpu').numpy()
+    y_fake_ds = torch.cat(y_fake_ds).to('cpu').numpy()
+    X_swapped = torch.cat(X_swapped, dim=0)
+    X_swapped = X_swapped.view(len(X_swapped),-1)
+    X_real = torch.cat(X_real, dim=0)
+    X_real = X_real.view(len(X_real),-1)
+    categories = np.unique(y_true_ds)
 
-            # Reconstruct from style vector - can be multi-task style encoding or single task style encoding 
-            if not args.single_style:
-                s_post = nets.style_encoder(X, y)
-            else:
-                s_post = nets.style_encoder(X)  
-            _, x_rec_post = nets.generator(X, s_post)
-
-            # Image that will be plotted 
-            if x_rec_rand_to_plot == None and x_rec_basal_to_plot == None and args.dataset_name == 'bbbc021':
-                x_rec_rand_to_plot = x_rec_rand
-                x_rec_basal_to_plot = x_rec_basal
-                x_rec_post_to_plot = x_rec_post
-        
-        # Update the RMSEs
-        rmse_basal_full += torch.sqrt(torch.mean((x_rec_post-x_rec_basal)**2))
-        rmse += torch.sqrt(torch.mean((x_rec_post-X)**2))
-
-        # Save the basal state and style for later visualization 
-        z_basal_ds.append(z_basal.detach().to('cpu'))
-        z_style.append(s_post.detach().to('cpu'))
-
-    del X
-    del y_one_hot
-    del z
+    # Update the RMSEs
+    for cat in tqdm(categories):
+        X_real_cat = X_real[y_true_ds==cat]
+        X_swapped_cat = X_swapped[y_fake_ds==cat]
+        diff = wd_score=ot.emd2(torch.tensor([]), torch.tensor([]), ot.dist(X_real_cat, 
+                                                                                X_swapped_cat, 
+                                                                                'euclidean'), 1)
+        # diff =  np.mean(np.sqrt(np.mean((X_real_cat - X_swapped_cat)**2, axis=2)))
+        rmse_transformations += diff
 
     # Transform basal state and labels to tensors
-    z_basal_ds = torch.cat(z_basal_ds, dim=0)
-    z_style = torch.cat(z_style, dim=0)
-    y_true_ds_drugs = torch.cat(y_true_ds_drugs, dim=0).to('cpu').numpy()
-    # disentanglement_score = compute_disentanglement_score(z_basal_ds, y_true_ds_drugs)
+    z_basal_ds = torch.cat(z_basal_ds, dim=0).detach().cpu().numpy()
+    z_style_ds = torch.cat(z_style_ds, dim=0).cpu().numpy()
 
     # Print metrics 
-    dict_metrics = {'rmse': rmse.item()/len(loader),
-                    'rmse_basal_full': rmse_basal_full.item()/len(loader)}
-    
-    # Plot the last reconstructed basal 
-    filename_basal = ospj(dest_dir, args.basal_vs_real_folder, '%06d_basal_decoded_latent.png' % (step))
-    filename_rec_rand = ospj(dest_dir, args.basal_vs_real_folder, '%06d_random_decoded_latent.png' % (step))
-    filename_rec_post = ospj(dest_dir, args.basal_vs_real_folder, '%06d_post_decoded_latent.png' % (step))
-    
-    if args.dataset_name == 'bbbc021':
-        save_image(x_rec_basal_to_plot[:16], 4, filename_basal)
-        save_image(x_rec_post_to_plot[:16], 4, filename_rec_post)
-        save_image(x_rec_rand_to_plot[:16], 4, filename_rec_rand)
+    dict_metrics = {'rmse_transformations': rmse_transformations/len(categories)}
 
-
+    # Embeddings 
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
     print(f"Save embeddings at {emb_path}")
-    z_basal_ds = z_basal_ds.detach().cpu().numpy()
-    z_style = z_style.detach().cpu().numpy()
     with open(emb_path, 'wb') as file:
-        pkl.dump([z_basal_ds, z_style, y_true_ds_drugs], file)
+        pkl.dump([z_basal_ds, z_style_ds, y_fake_ds], file)
 
     return dict_metrics

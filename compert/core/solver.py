@@ -8,7 +8,6 @@ from munch import Munch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 from torch.utils.data import WeightedRandomSampler
 import sys
 
@@ -22,6 +21,9 @@ from metrics.eval import *
 
 
 class Solver(nn.Module):
+    """
+    Solver class embedding attributes and methods for training the model. 
+    """
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -30,13 +32,9 @@ class Solver(nn.Module):
         # Initialize datasets
         self.init_dataset()
         args['num_domains'] = self.n_mol 
-
-        # If the embeddings are not encoded their dimension is also the dimension of the style
-        if not self.args.encode_rdkit:
-            self.args['style_dim'] = self.args.latent_dim
         
         # Log the parameters 
-        print(self.args)
+        print('Solver loaded with parameters: \n', self.args)
 
         # Create directories 
         self._create_dirs()
@@ -52,18 +50,22 @@ class Solver(nn.Module):
         # Initialize optimizers and checkpoint path 
         self.optims = Munch()
         for net in self.nets.keys():
+            # Optimize the embeddings with the mapping network 
+            if net == 'mapping_network' and self.args.trainable_emb:
+                params = list(self.nets[net].parameters()) + list(self.embedding_matrix.parameters())
+            else:
+                params = self.nets[net].parameters()
+
             self.optims[net] = torch.optim.Adam(
-                params=self.nets[net].parameters(),
+                params=params,
                 lr=args.f_lr if net == 'mapping_network' else args.lr,  # The mapping network has a different learning rate 
                 betas=[args.beta1, args.beta2],
                 weight_decay=args.weight_decay)
 
-        # Checkpoints of the save weights 
-        self.ckptios = [
-            CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
-            CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims),
-            CheckpointIO(ospj(self.dest_dir, args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]
-   
+        
+        # Initialize checkpoints
+        self._create_checkpoints()
+
         # Perform network initialization 
         self.to(self.device)
         for name, network in self.named_children():
@@ -81,6 +83,7 @@ class Solver(nn.Module):
         
         # Create data loaders 
         if self.args.balanced:
+            # Balanced sampler
             sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
             self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.args.batch_size, sampler=sampler, 
                                             num_workers=self.args.num_workers, drop_last=True)  # Drop last batch for a better estimate of the accuracy 
@@ -105,10 +108,10 @@ class Solver(nn.Module):
         # Channel dimension
         self.dim = self.args['n_channels']
 
-        # mol embeddings 
+        # Integrate embeddings as class attribute
         self.embedding_matrix = dataset.embedding_matrix  # RDKit embedding matrix
 
-        # Number of mols and number of modes of action 
+        # Number of mols and annotations (the latter can be mode of actions/genes...)
         self.n_mol = dataset.n_mol
         print(f'Training with {self.n_mol} mols')
         self.num_y = dataset.n_y
@@ -127,91 +130,83 @@ class Solver(nn.Module):
         return training_set, test_set
 
 
-    def train(self):        
-        # Create directories to save partial and definitive results 
-        os.makedirs(self.dest_dir, exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.sample_dir), exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.checkpoint_dir), exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.basal_vs_real_folder), exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.embedding_folder), exist_ok=True)
-
+    def train(self):     
+        """
+        Method for IMPA training across a pre-defined number of iterations. 
+        """
         # The history of the training process (useful to keep track of the metrics and tor return)
         self.history = {"train":{'epoch':[]}, "test":{'epoch':[]}}
-
-        args = self.args  # Hparams
-        nets = self.nets  # Neural networks 
-        optims = self.optims  # Optimizers
 
         # Fixed batch used for the evaluation on the validation set 
         inputs_val = next(iter(self.loader_test))  
 
         # Resume training if necessary
-        if args.resume_iter > 0:
-            self._load_checkpoint(args.resume_iter)
+        if self.args.resume_iter > 0:
+            self._load_checkpoint(self.args.resume_iter)
+
 
         # Remember the initial value of diversity-sensitivity weight and decay it 
-        initial_lambda_ds = args.lambda_ds
+        initial_lambda_ds = self.args.lambda_ds
 
         print('Start training...')
         start_time = time.time()
-        for i in range(args.resume_iter, args.total_iters):
+        for i in range(self.args.resume_iter, self.args.total_iters):
             
-            # Fetch images and labels
+            # Fetch images and labels as iteration batch
             inputs = next(iter(self.loader_train))
 
             # Fetch the real and fake inputs and outputs 
-            x_real, y_one_hot = inputs['X'].to(self.device), inputs['mol_one_hot'].to(self.device)
+            x_real, y_one_hot = inputs['X'].to(self.device), inputs['mol_one_hot']
             y_org = y_one_hot.argmax(1).long().to(self.device)
             y_trg = swap_attributes(y_one_hot, y_org, self.device).argmax(1).long().to(self.device)
-            # Get standardized RDKit embedding for the target mol
-            z_emb_trg = self.embedding_matrix(y_trg).to(self.device)  
+
+            # Get the perturbation embedding for the target mol
+            z_emb_trg = self.embedding_matrix(y_trg).to(self.device)
+            z_emb_org =  self.embedding_matrix(y_org).to(self.device)
 
             # Pick two random weight vectors 
-            z_trg, z_trg2 = torch.randn(x_real.shape[0], args.z_dimension).to(self.device), torch.randn(x_real.shape[0], args.z_dimension).to(self.device)
+            z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device)
 
             # train the discriminator
             d_loss, d_losses_latent = self.compute_d_loss(
-                nets, args, x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
+                x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
             self._reset_grad()
             d_loss.backward()
-            optims.discriminator.step()
+            self.optims.discriminator.step()
             
-
             # train the generator
             g_loss, g_losses_latent = self.compute_g_loss(
-                nets, args, x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trgs=[z_trg, z_trg2])
+                x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
             self._reset_grad()
             g_loss.backward()
-            optims.style_encoder.step()
-            optims.generator.step()
-            if self.args.encode_rdkit:
-                optims.mapping_network.step()
-            
+            self.optims.style_encoder.step()
+            self.optims.generator.step()
+            self.optims.mapping_network.step()
         
             # decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
-            if args.lambda_ds > 0:
-                args.lambda_ds -= (initial_lambda_ds / args.ds_iter)
+            if self.args.lambda_ds > 0:
+                self.args.lambda_ds -= (initial_lambda_ds / self.args.ds_iter)
 
-
-            # print out log info
-            if (i+1) % args.print_every == 0:
-                elapsed = time.time() - start_time
-                elapsed = str(datetime.timedelta(seconds=elapsed))[:-7]
-                log = "Elapsed time [%s], Iteration [%i/%i], " % (elapsed, i+1, args.total_iters)
-                all_losses = dict()
-                for loss, prefix in zip([d_losses_latent, g_losses_latent],
-                                        ['D/latent_', 'G/latent_']):
-                    for key, value in loss.items():
-                        all_losses[prefix + key] = value
-                all_losses['G/lambda_ds'] = args.lambda_ds
-                log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
-                print(log)
+            # Format the losses
+            all_losses = dict()
+            for loss, prefix in zip([d_losses_latent, g_losses_latent],
+                                    ['D/latent_', 'G/latent_']):
+                for key, value in loss.items():
+                    all_losses[prefix + key] = value
+            all_losses['G/lambda_ds'] = self.args.lambda_ds
+            
+            # Log time and losses
+            if (i+1) % self.args.print_every == 0:
+                print_time(i, start_time, 
+                        self.args.total_iters, 
+                        all_losses, 
+                        self.args.lambda_ds)
 
             # generate images for debugging
-            if (i+1) % args.sample_every == 0:
-                debug_image(nets, 
+            if (i+1) % self.args.sample_every == 0:
+                debug_image(self.nets, 
                             self.embedding_matrix, 
-                            args, 
+                            self.args, 
                             inputs=inputs_val, 
                             step=i+1, 
                             device=self.device, 
@@ -219,27 +214,28 @@ class Solver(nn.Module):
                             dest_dir=self.dest_dir)
 
             # save model checkpoints
-            if (i+1) % args.save_every == 0:
+            if (i+1) % self.args.save_every == 0:
                 self._save_checkpoint(step=i+1)
                 # Save losses in the history 
                 self.save_history(i, all_losses, 'train')
 
             # compute FID and LPIPS if necessary
-            if (i+1) % args.eval_every == 0:
-                rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(nets,
+            if (i+1) % self.args.eval_every == 0:
+                rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(self.nets,
                                                                                     self.loader_test,
                                                                                     self.device,
                                                                                     self.dest_dir,
-                                                                                    args.embedding_folder,
-                                                                                    args=args,
-                                                                                    step=i+1,
+                                                                                    self.args.embedding_folder,
+                                                                                    args=self.args,
                                                                                     embedding_matrix=self.embedding_matrix)
 
                 # Save metrics to history 
                 self.save_history(i, rmse_disentanglement_dict, 'test')
                 # Print metrics 
                 print_metrics(rmse_disentanglement_dict, i+1)
+                
 
+        # Format the history results to proper storage in Mongo DB
         results = self.format_seml_results(self.history)
         return results 
     
@@ -275,10 +271,20 @@ class Solver(nn.Module):
                 self.history[fold][loss].append(losses[loss])
 
 
-    def compute_d_loss(self, nets, args, x_real, y_org, y_trg, z_emb_trg, z_trg):
-        # With real images
+    def compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):
+        """Compute the discriminator loss real batches
+
+        Args:
+            x_real (torch.tensor): batch of real data
+            y_org (torch.tensor): domain labels of the real data 
+            y_trg (torch.tensor): domain labels of the fake data 
+            z_emb_trg (torch.tensor): embedding of the target perturbation 
+            z_trg (torch.tensor): random noise vector 
+        """
+
+        # Gradient requirement for gradient penalty loss
         x_real.requires_grad_()
-        out = nets.discriminator(x_real, y_org)
+        out = self.nets.discriminator(x_real, y_org)
         # Discriminator assigns a 1 to the real 
         loss_real = self.adv_loss(out, 1)
         # Gradient-based regularization (penalize high gradient on the discriminator)
@@ -291,70 +297,87 @@ class Solver(nn.Module):
                 z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
 
             # Single of the noisy embedding vector to a style vector 
-            s_trg = nets.mapping_network(z_emb_trg) if self.args.encode_rdkit else z_emb_trg  
+            s_trg = self.nets.mapping_network(z_emb_trg)  
             
             # Generate the fake image
-            _, x_fake = nets.generator(x_real, s_trg)
+            _, x_fake = self.nets.generator(x_real, s_trg)
 
-        out = nets.discriminator(x_fake, y_trg)
+        # Discriminator trained to predict transformed image as fake in its domain 
+        out = self.nets.discriminator(x_fake, y_trg)
         loss_fake = self.adv_loss(out, 0)
+        loss = loss_real + loss_fake + self.args.lambda_reg * loss_reg 
 
-        loss = loss_real + loss_fake + args.lambda_reg * loss_reg 
         return loss, Munch(real=loss_real.item(),
                         fake=loss_fake.item(),
                         reg=loss_reg.item())
 
 
-    def compute_g_loss(self, nets, args, x_real, y_org, y_trg, z_emb_trg, z_trgs=None):
+    def compute_g_loss(self, x_real, y_org, y_trg, z_emb_trg, z_emb_org, z_trgs=None):
+        """_summary_
+
+        Args:
+            x_real (torch.tensor): real data batch
+            y_org (torch.tensor): labels of real data batch
+            y_trg (torch.tensor): labels of fake data batch
+            z_emb_trg (torch.tensor): embedding vector for swapped labels
+            z_trgs (torch.tensor, optional): pair of randomly drawn noise vectors. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         # Couple of random vectors for the difference-sensitivity loss
         z_trg, z_trg2 = z_trgs
 
         # Adversarial loss
         if self.args.stochastic:
             z_emb_trg1 = torch.cat([z_emb_trg, z_trg], dim=1)
+            z_emb_org = torch.cat([z_emb_org, z_trg], dim=1)
         else:
             z_emb_trg1 = z_emb_trg
 
-        # Single of the noisy embedding vector to a style vector 
-        s_trg1 = nets.mapping_network(z_emb_trg1) if self.args.encode_rdkit else z_emb_trg1 
+        # Style vector with the first random component 
+        s_trg1 = self.nets.mapping_network(z_emb_trg1)  
 
-        # Generator for fake images 
-        _, x_fake = nets.generator(x_real, s_trg1)
-        # Try to deceive the generator such that it is persuaded that the generated image is from the target domain
-        out = nets.discriminator(x_fake, y_trg)
-        # Adversarial loss setting the output of the network to 1 
+        # Generation of fake images 
+        _, x_fake = self.nets.generator(x_real, s_trg1)
+        # Try to deceive the discriminator 
+        out = self.nets.discriminator(x_fake, y_trg)
         loss_adv = self.adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
-        if not args.single_style:
-            s_pred = nets.style_encoder(x_fake, y_trg)
+        if not self.args.single_style:
+            s_pred = self.nets.style_encoder(x_fake, y_trg)
         else:
-            s_pred = nets.style_encoder(x_fake)
-        
-        loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  # Predict style back from image 
+            s_pred = self.nets.style_encoder(x_fake)
+
+        # Predict style back from image 
+        loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  
 
         # Diversity sensitive loss - only if stochastic 
-        if args.stochastic:
+        if self.args.stochastic:
             z_emb_trg2 = torch.cat([z_emb_trg, z_trg2], dim=1)
-            s_trg2 = nets.mapping_network(z_emb_trg2) if self.args.encode_rdkit else z_emb_trg2 
-            _, x_fake2 = nets.generator(x_real, s_trg2)
+            s_trg2 = self.nets.mapping_network(z_emb_trg2) 
+            _, x_fake2 = self.nets.generator(x_real, s_trg2)
             x_fake2 = x_fake2.detach()
             loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # Generate outputs as far as possible from each other 
         else:
             loss_ds = torch.tensor(0)
 
         # Cycle-consistency loss
-        if not args.single_style:
-            s_org = nets.style_encoder(x_real, y_org)
+        if not self.args.single_style:
+            s_org = self.nets.style_encoder(x_real, y_org)
+            # s_org = self.nets.mapping_network(z_emb_org)
         else:
-            s_org = nets.style_encoder(x_real)
+            s_org = self.nets.style_encoder(x_real)
+            # s_org = self.nets.mapping_network(z_emb_org)
 
-        _, x_rec = nets.generator(x_fake, s_org)
+        _, x_rec = self.nets.generator(x_fake, s_org)
         loss_cyc = torch.mean(torch.abs(x_rec - x_real))  # Mean absolute error reconstructed versus real 
 
-        loss = loss_adv + args.lambda_sty * loss_sty \
-            - args.lambda_ds * loss_ds + args.lambda_cyc * loss_cyc
-
+        loss = loss_adv + self.args.lambda_sty * loss_sty \
+            - self.args.lambda_ds * loss_ds + self.args.lambda_cyc * loss_cyc
+        
+        # Compute RMSE of reconstruction
         rmse = torch.sqrt(torch.mean((x_rec.detach()-x_real)**2)).item()
 
         return loss, Munch(adv=loss_adv.item(),
@@ -365,56 +388,107 @@ class Solver(nn.Module):
 
 
     def adv_loss(self, logits, target):
-        assert target in [1, 0]
+        """
+        Adversarial loss as binary cross-entropy
+
+        Args:
+            logits (torch.tensor): discriminator prediction 
+            target (torch.tensor): label (0 or 1 depending on what network is trained)
+
+        Returns:
+            torch.tensor: evaluated binary cross-entropy loss
+        """
         targets = torch.full_like(logits, fill_value=target)
         loss = F.binary_cross_entropy_with_logits(logits, targets)
         return loss
 
 
-    def r1_reg(self, d_out, x_in):
-        # zero-centered gradient penalty for real images
-        batch_size = x_in.size(0)
+    def r1_reg(self, logits, x):
+        """
+        Gradient penalty loss on discriminator output
+
+        Args:
+            logits (torch.tensor): discriminator predicition
+            x (torch.tensor): input data tensor
+
+        Returns:
+            torch.tensor: penalty loss
+        """
+        batch_size = x.size(0)
         # Compute the gradient penalty of the discriminator 
-        grad_dout = torch.autograd.grad(
-            outputs=d_out.sum(), inputs=x_in,
+        grad = torch.autograd.grad(
+            outputs=logits.sum(), inputs=x,
             create_graph=True, retain_graph=True, only_inputs=True)[0]
-        grad_dout2 = grad_dout.pow(2)
-        assert(grad_dout2.size() == x_in.size())
-        reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
+        grad = grad.pow(2)
+        assert(grad.size() == x.size())
+        reg = 0.5 * grad.view(batch_size, -1).sum(1).mean(0)
         return reg
 
+
     def _save_checkpoint(self, step):
+        """
+        Save model checkpoints
+
+        Args:
+            step (int): step at which saving is performed
+        """
         for ckptio in self.ckptios:
             ckptio.save(step)
 
+
     def _load_checkpoint(self, step):
+        """
+        Load model checkpoints
+
+        Args:
+            step (int): step at which loading is performed
+        """
         for ckptio in self.ckptios:
             ckptio.load(step)
 
+
     def _reset_grad(self):
+        """
+        Reset the gradient of all optimizers
+        """
         for optim in self.optims.values():
             optim.zero_grad()
 
+
     def _create_dirs(self):
-        # Create directory 
+        """
+        Create the directories and sub-directories for training
+        """
+        # Directory is named based on time stamp
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
-        # Setup the key naming the folder
+        # Setup the key(s) naming the folder (passed as hyperparameter)
         print(type(self.args['naming_key']))
         if type(self.args['naming_key']) == list: 
             keys = [str(self.args[key]) for key in self.args['naming_key']]
             keys_str = '_'.join(keys)
         else:
             keys_str = str(self.args[self.args['naming_key']])
-        # Set the directory for the results 
+
+        # Set the directory for the results based on whether training is from scratch or resumed
         if self.args.resume_iter==0:
             self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+keys_str)
         else:
             self.dest_dir = self.args.resume_dir+'_'+keys_str
 
-    def _print_mem(self):
-        t = torch.cuda.get_device_properties(0).total_memory
-        r = torch.cuda.memory_reserved(0)
-        a = torch.cuda.memory_allocated(0)
-        f = r-a  # free inside reserved 
-        print(f)
-        
+        # Create sub-directories to save partial and definitive results 
+        os.makedirs(self.dest_dir, exist_ok=True)
+        os.makedirs(ospj(self.dest_dir, self.args.sample_dir), exist_ok=True)
+        os.makedirs(ospj(self.dest_dir, self.args.checkpoint_dir), exist_ok=True)
+        os.makedirs(ospj(self.dest_dir, self.args.basal_vs_real_folder), exist_ok=True)
+        os.makedirs(ospj(self.dest_dir, self.args.embedding_folder), exist_ok=True)
+
+
+    def _create_checkpoints(self):
+        """
+        Create the checkpoints objects regulating model weight loading and dumping
+        """
+        # Checkpoints of the save weights 
+        self.ckptios = [
+            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
+            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims),
+            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]

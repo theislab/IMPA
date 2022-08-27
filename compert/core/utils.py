@@ -1,9 +1,8 @@
-from inspect import ArgInfo
 from os.path import join as ospj
 import json
 from shutil import copyfile
-
-import random
+import time
+import datetime
 
 import numpy as np
 import torch
@@ -47,6 +46,14 @@ def flatten_channels(batch):
     x_concat =[list(x.split(split_size=1, dim=1)) for x in x_concat]
     x_concat = list(itertools.chain(*x_concat))
     return x_concat
+
+def print_time(i, start_time, total_iters, all_losses, lambda_ds):
+    # print out log info
+    elapsed = time.time() - start_time
+    elapsed = str(datetime.timedelta(seconds=elapsed))[:-7]
+    log = "Elapsed time [%s], Iteration [%i/%i], " % (elapsed, i+1, total_iters)
+    log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
+    print(log)
 
 
 ########################### PLOTTING FUNCTIONS ###########################
@@ -108,12 +115,8 @@ def translate_using_latent(nets,
     # Batch dimension, channel dimension, height and width dimensions 
     N, _, _, _ = x_real.size()
     # Place the validation input in list for concatenation 
-    if args.dataset_name == 'bbbc021':
-        x_concat = [x_real]
-        ncol = N
-    else:
-        x_concat = flatten_channels(x_real)
-        ncol = N*x_real.shape[1]
+    x_concat = [x_real]
+    ncol = N
 
     # For each domain, collect a latent mean vector 
     for _, y_trg in enumerate(y_trg_list):
@@ -129,14 +132,17 @@ def translate_using_latent(nets,
             s_trg = nets.mapping_network(z_emb_trg) if args.encode_rdkit else z_emb_trg
 
             _, x_fake = nets.generator(x_real, s_trg)
-            if args.dataset_name == 'bbbc021':
-                x_concat += [x_fake]
-            else:
-                x_concat += flatten_channels(x_fake)
+
+            x_concat += [x_fake]
+
     
     x_concat = torch.cat(x_concat, dim=0)
-    # Large panel of transformations 
-    save_image(x_concat, ncol, filename) 
+    if args.dataset_name == 'bbbc021':
+        save_image(x_concat, N, filename)  # SAVE LARGE PANEL OF TRANSFORMATIONS 
+    elif args.dataset_name == 'bbbc025':
+        save_image(x_concat[:,[1,3,4],:,:], N, filename)
+    else :
+        save_image(x_concat[:,[5,1,0],:,:], N, filename)
 
 
 ########################### EXTRA UTILS ###########################

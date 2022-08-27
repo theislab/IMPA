@@ -1,7 +1,7 @@
 seml:
   executable: /home/icb/alessandro.palma/imCPA/compert/main.py
-  name: official_all_drugs
-  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/official/official_all_drugs/
+  name: sweep_all_ood_resume
+  output_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc021/rdkit_results/official/official_ood_complete/second_run_larger_bs
   conda_environment: imgCPA
   project_root_dir: /home/icb/alessandro.palma/imCPA
 
@@ -23,9 +23,9 @@ fixed:
   train.args.latent_dim: 160
   train.args.hidden_dim: 512
   train.args.style_dim: 64
-  train.args.stochastic: False
-  train.args.z_dimension: 16
-  train.args.dim_in: 170
+  train.args.stochastic: True
+  train.args.z_dimension: 64
+  train.args.dim_in: 64
 
   # weight for objective functions
   train.args.lambda_reg: 1
@@ -36,7 +36,7 @@ fixed:
   # training arguments
   train.args.total_iters: 100000
   train.args.ds_iter: 100000  
-  train.args.resume_iter: 30000
+  train.args.resume_iter: 83000
   train.args.batch_size: 32
   train.args.val_batch_size: 20
   train.args.lr: 0.0001
@@ -45,8 +45,13 @@ fixed:
   train.args.beta2: 0.99
   train.args.weight_decay: 0.0001
   train.args.num_outs_per_domain: 10
-  train.args.num_translations: 3
   train.args.single_style: True
+  train.args.ood_set: [docetaxel, MG-132, AZ841, cytochalasin D]
+  train.args.mol_list: Null
+  train.args.balanced: False
+  train.args.trainable_emb: False
+  train.args.dataset_name: 'bbbc021'
+  train.args.n_channels: 3
 
   # misc
   train.args.mode: train
@@ -56,16 +61,16 @@ fixed:
   # directory for training
   train.args.image_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/images/bbbc021_total_corrected_single_cells.pkl
   train.args.data_index_path: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021/metadata/metadata_complete_dataset.csv
-  train.args.drug_embeddings_path:  /home/icb/alessandro.palma/imCPA/embeddings/pkl/emb_rdkit.pkl
+  train.args.embedding_path:  /home/icb/alessandro.palma/imCPA/embeddings/bbbc021/csv/emb_rdkit.csv
 
   # Directories for results
-  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/official/official_all_drugs/
+  train.args.experiment_directory: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/bbbc021/rdkit_results/official/official_ood_complete/second_run_larger_bs/
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: num_layers_mapping_net
+  train.args.naming_key: balanced
   train.args.embedding_folder: embeddings 
-  train.args.resume_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/official/official_all_drugs/20220603_1/
+  train.args.resume_dir: /lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/results/rdkit_results/official/official_all_drugs_ood/20220614_True/
 
   # face alignment
   train.args.augment_train: True 
@@ -80,4 +85,3 @@ fixed:
   # Neural network parameters
   train.args.encode_rdkit: True
   train.args.num_layers_mapping_net: 1
-  

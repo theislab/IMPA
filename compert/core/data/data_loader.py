@@ -10,6 +10,7 @@ import pandas as pd
 import pickle as pkl
 
 from ..utils import *
+import psutil
 
 import torch
 from torch.utils.data import Dataset
@@ -69,9 +70,13 @@ class CellDataset:
         encoder_mol = OneHotEncoder(sparse=False, categories=[self.mol_names])
         encoder_mol.fit(np.array(self.mol_names).reshape((-1,1)))
 
+        # Read images 
+        print('Loading images...')
+        self._read_images()
+
         # Initialize the datasets 
         self.fold_datasets = {'train': CellDatasetFold('train', self.fold_datasets['train'], 
-                                                        self.image_path, 
+                                                        self.image_dict, 
                                                         encoder_mol, 
                                                         self.mol2id, 
                                                         self.y2id, 
@@ -80,12 +85,13 @@ class CellDataset:
 
 
                             'test': CellDatasetFold('test', self.fold_datasets['test'], 
-                                                    self.image_path, 
+                                                    self.image_dict, 
                                                     encoder_mol, 
                                                     self.mol2id, 
                                                     self.y2id, 
                                                     self.augment_train, 
                                                     self.normalize)}
+        del self.image_dict
                                                     
 
     def _read_folds(self):
@@ -121,12 +127,19 @@ class CellDataset:
                 dataset_splits[fold_name][key] = np.array(subset[key])
         return dataset_splits
 
+    def _read_images(self):
+        """
+        Load images into memory
+        """
+        with open(self.image_path, 'rb') as file:
+            self.image_dict = pkl.load(file)
+
 
 class CellDatasetFold(Dataset):
     def __init__(self, 
                 fold, 
                 data, 
-                image_path, 
+                image_dict, 
                 encoder_mol, 
                 mol2id, 
                 y2id, 
@@ -145,10 +158,12 @@ class CellDatasetFold(Dataset):
         self.dose = data['DOSE']
         self.y = data['ANNOT']
 
+        # Keep only fold obs
+        self.image_dict = image_dict
+        self.image_dict = {key:val for key, val in self.image_dict.items() if key in self.file_names}
+
         del data 
 
-        # Image folder paths 
-        self.image_path = image_path
         # Whether to perform training augmentation
         self.augment_train = augment_train
         
@@ -174,22 +189,12 @@ class CellDatasetFold(Dataset):
         # Create sampler weights 
         self._get_sampler_weights()
 
-        # Read images from memory
-        print('Loading images...')
-        self.read_data()    
         
     def __len__(self):
         """
         Total number of samples 
         """
         return len(self.file_names)
-    
-    def read_data(self):
-        """
-        Load images into memory
-        """
-        with open(self.image_path, 'rb') as file:
-            self.image_dict = pkl.load(file)
 
     def __getitem__(self, idx):
         """

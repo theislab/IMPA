@@ -8,9 +8,9 @@ from sacred import SETTINGS
 import sys
 
 sys.path.insert(0, '../..')
-# from compert.core.solver import Solver
 from core.solver import Solver
 
+# Avoid lists in an input configuration to be deemed read-only 
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 # Initialize seml experiment
@@ -32,23 +32,21 @@ def config():
             seml.create_mongodb_observer(db_collection, overwrite=overwrite))
 
 
-#################### ARGS CLASS ####################
-
+# Wrapper around dictionary to make its keys callable attributes
 class Args(dict):
     def __init__(self, *args, **kwargs):
         super(Args, self).__init__(*args, **kwargs)
         self.__dict__ = self
             
 
-#################### MAIN TRAINING FUNCTION ####################
-
+# Training function 
 class Trainer:
     @ex.capture(prefix="train")
     def train(self, args):
-        # Fetch arguments 
-        self.args = Args(args)  # Create argument class to access the args as attributes
+        self.args = Args(args)  
         cudnn.benchmark = True
-        torch.manual_seed(self.args.seed)  # Fix seed for reproducibility
+        # Fix seed for reproducibility
+        torch.manual_seed(self.args.seed)  
 
         # Initialize solver with the defined arguments 
         self.solver = Solver(self.args)
@@ -56,17 +54,14 @@ class Trainer:
         results = self.solver.train()
         return results
 
-# We can call this command, e.g., from a Jupyter notebook with init_all=False to get an "empty" experiment wrapper,
-# where we can then for instance load a pretrained model to inspect the performance.
+
+# Functions to interact with seml (https://github.com/TUM-DAML/seml), an open source python package to interact with the slurm scheduling system
 @ex.command(unobserved=True)
 def get_experiment(init_all=False):
     print("get_experiment")
     experiment = Trainer()
     return experiment
 
-
-# This function will be called by default. Note that we could in principle manually pass an experiment instance,
-# e.g., obtained by loading a model from the database or by calling this from a Jupyter notebook.
 @ex.automain
 def train(experiment=None):
     if experiment is None:
