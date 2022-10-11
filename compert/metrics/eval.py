@@ -104,7 +104,7 @@ def evaluate(nets,
         X_swapped_cat = X_swapped[y_fake_ds==cat]
         
         # Wasserstein distance
-        wd = wd_score=ot.emd2(torch.tensor([]), torch.tensor([]), ot.dist(X_real_cat.view(len(X_real_cat),-1), 
+        wd = ot.emd2(torch.tensor([]), torch.tensor([]), ot.dist(X_real_cat.view(len(X_real_cat),-1), 
                                                                                 X_swapped_cat.view(len(X_swapped_cat),-1), 
                                                                                 'euclidean'), 1)
         wd_transformations += wd
