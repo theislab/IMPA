@@ -10,7 +10,6 @@ import pandas as pd
 import pickle as pkl
 
 from ..utils import *
-import psutil
 
 import torch
 from torch.utils.data import Dataset

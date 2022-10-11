@@ -6,10 +6,18 @@ from numpy.linalg import norm
 from sklearn.neighbors import KNeighborsClassifier
 
 def looknn(true_images, fake_images, k=1):
+    """Leave-one-out knn score 
+
+    Args:
+        true_images (np.array): images from the real dataset 
+        fake_images (np.array): generated images
+        k (int, optional): the number of neighbours used for the score. Defaults to 1.
+
+    Returns:
+        float: the moadn loocv accuracy 
     """
-    Images must be linearized numpy vectors 
-    """
-    # Merge and assign labels
+    
+    # Assign labels
     y_true = np.repeat(1., true_images.shape[0])
     y_fake = np.repeat(0., fake_images.shape[0]) 
     
@@ -17,12 +25,12 @@ def looknn(true_images, fake_images, k=1):
     X = np.concatenate([true_images, fake_images], axis=0)
     y = np.concatenate([y_true, y_fake], axis=0)
 
-    # Create leave one out object and the model 
+    # Create leave-one-out-object  
     loo = LeaveOneOut()
     loo.get_n_splits(X)
 
     # Initialize the classifier 
-    neigh = KNeighborsClassifier(n_neighbors=1)
+    neigh = KNeighborsClassifier(n_neighbors=k)
 
     results = []
 
@@ -35,11 +43,3 @@ def looknn(true_images, fake_images, k=1):
         results.append((pred_test==y_test).astype(np.int))
     
     return np.mean(results)
-
-
-def knn_manual(X_train, X_test, y_train):
-    X_train_t = X_train.T
-    X_test_un = X_test[:,np.newaxis]
-    X_sub = np.pow(X_train_t-X_test_un, 2)
-    X_sub = np.sqrt(np.sum(X_sub, axis=1))
-    return y_train[np.argmax(X_sub)]

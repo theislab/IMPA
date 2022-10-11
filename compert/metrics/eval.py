@@ -1,31 +1,47 @@
+import pickle as pkl
 import sys
 
-sys.path.insert(0, '../')
+import numpy as np
+import torch
+from core.utils import save_image, swap_attributes
 
+sys.path.insert(0, '../')
 from collections import OrderedDict
-from tqdm import tqdm
 from os.path import join as ospj
 
 import ot
-import numpy as np
-import torch
-import pickle as pkl
-
-# from compert.core.utils import save_image 
-from core.utils import save_image, swap_attributes
+from tqdm import tqdm
 
 from .gan_metrics.fid import *
 
-def calculate_rmse_and_disentanglement_score(nets, 
-                                            loader, 
-                                            device, 
-                                            dest_dir,
-                                            embedding_path, 
-                                            args, 
-                                            embedding_matrix):
 
-    # The difference between a decoded image with and without addition of the drug and moa
-    rmse_transformations = 0  
+def evaluate(nets, 
+            loader, 
+            device, 
+            dest_dir,
+            embedding_path, 
+            args, 
+            embedding_matrix, 
+            channels=[0,1,2]):
+    
+    """Evaluate the model during training
+
+    Args:
+        nets (dict): dictionary with model networks
+        loader (torch.data.utils.DataLoader): data loading object
+        device (str): `cuda` or `cpu`
+        dest_dir (str): directory where to save embeddings 
+        embedding_path (str): path to the destination directory
+        args (dict): hyperparameters for the training 
+        embedding_matrix (torch.Tensor): tensor with perturbation embeddings
+
+    Returns:
+        dict: a dictionary storing the evaluation metrics
+    """
+    
+    # Accumulated distance between true and generated images 
+    wd_transformations = 0  
+    fid_transformations = 0  
 
     # The lists containing the true labels of the batch 
     y_true_ds = []  
@@ -33,38 +49,37 @@ def calculate_rmse_and_disentanglement_score(nets,
     X_real = []
     X_swapped = []
 
-    # STORE THE LATENTS FOR LATER ANALYSIS
+    # Store points for the style and the content encoding 
     z_basal_ds = []  
     z_style_ds = []
 
-    # LOOP OVER SINGLE OBSERVATIONS 
+    # Loop over single observations
     for observation in tqdm(loader):
-        # Data matrix
+        # Get the data and swap the labels 
         X = observation['X'].to(device)  
-        # Labelled observations
         y_one_hot_src = observation['mol_one_hot'].to(device) 
         y_src = y_one_hot_src.argmax(1).long()
-        y_trg = swap_attributes(y_one_hot_src, y_src, device).long().argmax(1)
+        y_trg = swap_attributes(y_one_hot_src, y_src, device).long().argmax(1) # random swap
 
-        # Append drug label to cache
-        y_true_ds.append(y_src.to('cpu'))  # Record the labels 
+        # Store perturbation labels
+        y_true_ds.append(y_src.to('cpu'))  
         y_fake_ds.append(y_trg.to('cpu'))
 
-        # Prepare noise if the stochastic version is run 
-        if args.stochastic > 0:
-            # Draw random vector 
-            z = torch.randn(X.shape[0], args.z_dimension).to(device)
+        # Draw random vector for style conditioning
+        z = torch.randn(X.shape[0], args.z_dimension).to(device)
 
         with torch.no_grad():
-            # We generate in normal mode
+            # Get pertrubation embedding and concatenate with the noise vector 
             z_emb = embedding_matrix(y_trg)
-
-            if args.stochastic:
-                z_emb = torch.cat([z_emb, z], dim=1)
+            z_emb = torch.cat([z_emb, z], dim=1)
             
             # Map to style
             s = nets.mapping_network(z_emb) 
+            
+            # Generate
             z_basal, X_fake = nets.generator(X, s)
+            
+            # Saved real and swapped images 
             X_swapped.append(X_fake.cpu())
             X_real.append(X.cpu())
             
@@ -76,30 +91,39 @@ def calculate_rmse_and_disentanglement_score(nets,
     # Perform list concatenation on all of the results 
     y_true_ds = torch.cat(y_true_ds).to('cpu').numpy()
     y_fake_ds = torch.cat(y_fake_ds).to('cpu').numpy()
+    
+    # Concatenate and get the flattened versions of the images
     X_swapped = torch.cat(X_swapped, dim=0)
-    X_swapped = X_swapped.view(len(X_swapped),-1)
     X_real = torch.cat(X_real, dim=0)
-    X_real = X_real.view(len(X_real),-1)
     categories = np.unique(y_true_ds)
 
-    # Update the RMSEs
+    # Update the metrics scores (FID, WD)
     for cat in tqdm(categories):
+        # Compute FID/WD for a class at a time 
         X_real_cat = X_real[y_true_ds==cat]
         X_swapped_cat = X_swapped[y_fake_ds==cat]
-        diff = wd_score=ot.emd2(torch.tensor([]), torch.tensor([]), ot.dist(X_real_cat, 
-                                                                                X_swapped_cat, 
+        
+        # Wasserstein distance
+        wd = wd_score=ot.emd2(torch.tensor([]), torch.tensor([]), ot.dist(X_real_cat.view(len(X_real_cat),-1), 
+                                                                                X_swapped_cat.view(len(X_swapped_cat),-1), 
                                                                                 'euclidean'), 1)
-        # diff =  np.mean(np.sqrt(np.mean((X_real_cat - X_swapped_cat)**2, axis=2)))
-        rmse_transformations += diff
+        wd_transformations += wd
+        
+        # FID  
+        X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat))
+        X_swapped_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_swapped_cat))
+        fid = cal_fid(X_real_dataset, X_swapped_dataset, 2048, True, custom_channels=channels)
+        fid_transformations += fid
 
-    # Transform basal state and labels to tensors
+    # Concatenate style and content vectors 
     z_basal_ds = torch.cat(z_basal_ds, dim=0).detach().cpu().numpy()
-    z_style_ds = torch.cat(z_style_ds, dim=0).cpu().numpy()
+    z_style_ds = torch.cat(z_style_ds, dim=0).detach().cpu().numpy()
 
-    # Print metrics 
-    dict_metrics = {'rmse_transformations': rmse_transformations/len(categories)}
+    # Save metrics 
+    dict_metrics = {'wd_transformations': wd_transformations/len(categories), 
+                    'fid_transformations': fid_transformations}
 
-    # Embeddings 
+    # Dump latent embeddings  
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
     print(f"Save embeddings at {emb_path}")
     with open(emb_path, 'wb') as file:

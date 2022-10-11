@@ -14,9 +14,8 @@ FID_WEIGHTS_URL = 'https://github.com/mseitzer/pytorch-fid/releases/download/fid
 
 class InceptionV3(nn.Module):
     """Pretrained InceptionV3 network returning feature maps"""
-
-    # Index of default block of inception to return,
-    # corresponds to output of final average pooling
+    
+    # Index of the last aerage pooling layer 
     DEFAULT_BLOCK_INDEX = 3
 
     # Maps feature dimensionality to their output blocks indices
@@ -27,41 +26,28 @@ class InceptionV3(nn.Module):
         2048: 3  # Final average pooling features
     }
 
+
     def __init__(self,
                  output_blocks=(DEFAULT_BLOCK_INDEX,),
                  resize_input=True,
-                 normalize_input=True,
+                 normalize_input=False,
                  requires_grad=False,
                  use_fid_inception=True):
+        
         """Build pretrained InceptionV3
-        Parameters
-        ----------
-        output_blocks : list of int
-            Indices of blocks to return features of. Possible values are:
-                - 0: corresponds to output of first max pooling
-                - 1: corresponds to output of second max pooling
-                - 2: corresponds to output which is fed to aux classifier
-                - 3: corresponds to output of final average pooling
-        resize_input : bool
-            If true, bilinearly resizes input to width and height 299 before
-            feeding input to model. As the network without fully connected
-            layers is fully convolutional, it should be able to handle inputs
-            of arbitrary size, so resizing might not be strictly needed
-        normalize_input : bool
-            If true, scales the input from range (0, 1) to the range the
-            pretrained Inception network expects, namely (-1, 1)
-        requires_grad : bool
-            If true, parameters of the model require gradients. Possibly useful
-            for finetuning the network
-        use_fid_inception : bool
-            If true, uses the pretrained Inception model used in Tensorflow's
-            FID implementation. If false, uses the pretrained Inception model
-            available in torchvision. The FID Inception model has different
-            weights and a slightly different structure from torchvision's
-            Inception model. If you want to compute FID scores, you are
-            strongly advised to set this parameter to true to get comparable
-            results.
+        
+            Args:
+                output_blocks (list): the indces of the blocks to return  
+                    - 0: corresponds to output of first max pooling
+                    - 1: corresponds to output of second max pooling
+                    - 2: corresponds to output which is fed to aux classifier
+                    - 3: corresponds to output of final average pooling
+                resize_input (bool): bilinearly resize input to width and height 299 before feeding input to model.
+                normalize_input (bool): if True, scales the input images to values between -1 and 1.
+                requires_grad (bool): the channels used to compute the FID (in case more than 3). Defaults to None.
+                use_fid_inception (bool): If true, uses the pretrained Inception model used in Tensorflow's FID implementation. Defaults to True.
         """
+        
         super(InceptionV3, self).__init__()
 
         self.resize_input = resize_input
@@ -123,23 +109,21 @@ class InceptionV3(nn.Module):
 
         for param in self.parameters():
             param.requires_grad = requires_grad
+            
 
     def forward(self, inp):
-        """Get Inception feature maps
-        Parameters
-        ----------
-        inp : torch.autograd.Variable
-            Input tensor of shape Bx3xHxW. Values are expected to be in
-            range (0, 1)
-        Returns
-        -------
-        List of torch.autograd.Variable, corresponding to the selected output
-        block, sorted ascending by index
+        """Extract Inception V3 features from the input 
+
+        Args:
+            inp (torch.Tensor): input images
+
+        Returns:
+            torch.Tensor: Inception V3 features from the chosen block
         """
+        
         outp = []
         x = inp
-        
-        # Resize the input to inception net's standard spatial dimension 
+        # Resize the input to inception net's standard Inception V3 spatial dimension 
         if self.resize_input:
             x = F.interpolate(x,
                               size=(299, 299),
@@ -147,7 +131,7 @@ class InceptionV3(nn.Module):
                               align_corners=False)
 
         if self.normalize_input:
-            x = 2 * x - 1  # Scale from range (0, 1) to range (-1, 1) --> technically already normalized   
+            x = 2 * x - 1  
 
         for idx, block in enumerate(self.blocks):
             x = block(x)
@@ -168,7 +152,7 @@ def _inception_v3(*args, **kwargs):
     try:
         version = tuple(map(int, torchvision.__version__.split('.')[:2]))
     except ValueError:
-        # Just a caution against weird version strings
+        # Avoid non-canonical versions 
         version = (0,)
 
     if version >= (0, 6):

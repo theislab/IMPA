@@ -1,16 +1,14 @@
-from torch.backends import cudnn
-import torch
-
+import sys
 import seml
+import torch
+from torch.backends import cudnn
 from sacred import Experiment
 from sacred import SETTINGS
-
-import sys
 
 sys.path.insert(0, '../..')
 from core.solver import Solver
 
-# Avoid lists in an input configuration to be deemed read-only 
+# Avoid lists in an input configuration to be read-only 
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
 
 # Initialize seml experiment
@@ -31,14 +29,12 @@ def config():
         ex.observers.append(
             seml.create_mongodb_observer(db_collection, overwrite=overwrite))
 
-
 # Wrapper around dictionary to make its keys callable attributes
 class Args(dict):
     def __init__(self, *args, **kwargs):
         super(Args, self).__init__(*args, **kwargs)
         self.__dict__ = self
             
-
 # Training function 
 class Trainer:
     @ex.capture(prefix="train")
@@ -52,8 +48,6 @@ class Trainer:
         self.solver = Solver(self.args)
         # Launch the training loop 
         results = self.solver.train()
-        return results
-
 
 # Functions to interact with seml (https://github.com/TUM-DAML/seml), an open source python package to interact with the slurm scheduling system
 @ex.command(unobserved=True)

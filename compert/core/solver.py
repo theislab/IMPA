@@ -1,23 +1,23 @@
+import datetime
 import os
+import sys
+import time
 from os.path import join as ospj
 from re import A
-import time
-import datetime
-from munch import Munch
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from munch import Munch
 from torch.utils.data import WeightedRandomSampler
-import sys
 
-from .model import build_model
 from .checkpoint import CheckpointIO
-from .utils import *  
 from .data.data_loader import CellDataset
+from .model import build_model
+from .utils import *
 
 sys.path.insert(0, '../')
-from metrics.eval import * 
+from metrics.eval import *
 
 
 class Solver(nn.Module):
@@ -62,7 +62,6 @@ class Solver(nn.Module):
                 betas=[args.beta1, args.beta2],
                 weight_decay=args.weight_decay)
 
-        
         # Initialize checkpoints
         self._create_checkpoints()
 
@@ -86,10 +85,10 @@ class Solver(nn.Module):
             # Balanced sampler
             sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
             self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.args.batch_size, sampler=sampler, 
-                                            num_workers=self.args.num_workers, drop_last=True)  # Drop last batch for a better estimate of the accuracy 
+                                            num_workers=self.args.num_workers, drop_last=True)   
         else:
             self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.args.batch_size, shuffle=True, 
-                                                        num_workers=self.args.num_workers, drop_last=True)  # Drop last batch for a better estimate of the accuracy 
+                                                        num_workers=self.args.num_workers, drop_last=True)  
 
         self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=self.args.val_batch_size, shuffle=True, 
                                                     num_workers=self.args.num_workers, drop_last=False)
@@ -109,7 +108,7 @@ class Solver(nn.Module):
         self.dim = self.args['n_channels']
 
         # Integrate embeddings as class attribute
-        self.embedding_matrix = dataset.embedding_matrix  # RDKit embedding matrix
+        self.embedding_matrix = dataset.embedding_matrix  
 
         # Number of mols and annotations (the latter can be mode of actions/genes...)
         self.n_mol = dataset.n_mol
@@ -134,7 +133,7 @@ class Solver(nn.Module):
         """
         Method for IMPA training across a pre-defined number of iterations. 
         """
-        # The history of the training process (useful to keep track of the metrics and tor return)
+        # The history of the training process
         self.history = {"train":{'epoch':[]}, "test":{'epoch':[]}}
 
         # Fixed batch used for the evaluation on the validation set 
@@ -143,7 +142,6 @@ class Solver(nn.Module):
         # Resume training if necessary
         if self.args.resume_iter > 0:
             self._load_checkpoint(self.args.resume_iter)
-
 
         # Remember the initial value of diversity-sensitivity weight and decay it 
         initial_lambda_ds = self.args.lambda_ds
@@ -162,19 +160,19 @@ class Solver(nn.Module):
 
             # Get the perturbation embedding for the target mol
             z_emb_trg = self.embedding_matrix(y_trg).to(self.device)
-            z_emb_org =  self.embedding_matrix(y_org).to(self.device)
+            z_emb_org = self.embedding_matrix(y_org).to(self.device)
 
             # Pick two random weight vectors 
             z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device)
 
-            # train the discriminator
+            # Train the discriminator
             d_loss, d_losses_latent = self.compute_d_loss(
                 x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
             self._reset_grad()
             d_loss.backward()
             self.optims.discriminator.step()
             
-            # train the generator
+            # Train the generator
             g_loss, g_losses_latent = self.compute_g_loss(
                 x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
             self._reset_grad()
@@ -183,7 +181,7 @@ class Solver(nn.Module):
             self.optims.generator.step()
             self.optims.mapping_network.step()
         
-            # decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
+            # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
             if self.args.lambda_ds > 0:
                 self.args.lambda_ds -= (initial_lambda_ds / self.args.ds_iter)
 
@@ -202,7 +200,7 @@ class Solver(nn.Module):
                         all_losses, 
                         self.args.lambda_ds)
 
-            # generate images for debugging
+            # Generate images for debugging
             if (i+1) % self.args.sample_every == 0:
                 debug_image(self.nets, 
                             self.embedding_matrix, 
@@ -213,7 +211,7 @@ class Solver(nn.Module):
                             id2mol=self.id2mol,
                             dest_dir=self.dest_dir)
 
-            # save model checkpoints
+            # Save model checkpoints
             if (i+1) % self.args.save_every == 0:
                 self._save_checkpoint(step=i+1)
                 # Save losses in the history 
@@ -221,13 +219,13 @@ class Solver(nn.Module):
 
             # compute FID and LPIPS if necessary
             if (i+1) % self.args.eval_every == 0:
-                rmse_disentanglement_dict = calculate_rmse_and_disentanglement_score(self.nets,
-                                                                                    self.loader_test,
-                                                                                    self.device,
-                                                                                    self.dest_dir,
-                                                                                    self.args.embedding_folder,
-                                                                                    args=self.args,
-                                                                                    embedding_matrix=self.embedding_matrix)
+                rmse_disentanglement_dict = evaluate(self.nets,
+                                                        self.loader_test,
+                                                        self.device,
+                                                        self.dest_dir,
+                                                        self.args.embedding_folder,
+                                                        args=self.args,
+                                                        embedding_matrix=self.embedding_matrix)
 
                 # Save metrics to history 
                 self.save_history(i, rmse_disentanglement_dict, 'test')
@@ -376,15 +374,11 @@ class Solver(nn.Module):
 
         loss = loss_adv + self.args.lambda_sty * loss_sty \
             - self.args.lambda_ds * loss_ds + self.args.lambda_cyc * loss_cyc
-        
-        # Compute RMSE of reconstruction
-        rmse = torch.sqrt(torch.mean((x_rec.detach()-x_real)**2)).item()
 
         return loss, Munch(adv=loss_adv.item(),
                         sty=loss_sty.item(),
                         ds=loss_ds.item(),
-                        cyc=loss_cyc.item(),
-                        rmse=rmse)
+                        cyc=loss_cyc.item())
 
 
     def adv_loss(self, logits, target):
@@ -462,7 +456,6 @@ class Solver(nn.Module):
         # Directory is named based on time stamp
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
         # Setup the key(s) naming the folder (passed as hyperparameter)
-        print(type(self.args['naming_key']))
         if type(self.args['naming_key']) == list: 
             keys = [str(self.args[key]) for key in self.args['naming_key']]
             keys_str = '_'.join(keys)

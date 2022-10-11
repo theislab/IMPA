@@ -1,7 +1,9 @@
 # Inspired by https://github.com/clovaai/stargan-v2/blob/master/core/checkpoint.py
 
 import os
+
 import torch
+
 
 class CheckpointIO:
     """
@@ -25,7 +27,7 @@ class CheckpointIO:
         Args:
             step (int): the iteration step at which the model is saved.
         """
-        fname = self.file_template.format(step)
+        fname = self.file_template + f'_{step}'
         print('Saving checkpoint into %s...' % fname)
         outdict = {}
         for name, module in self.module_dict.items():
