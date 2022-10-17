@@ -189,12 +189,9 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
                             embedding_matrix, 
                             args, 
                             x_real,
-                            y_real,
-                            y_swapped, 
                             y_trg_list, 
                             z_trg_list,
-                            filename, 
-                            id2mol)
+                            filename)
 
 @torch.no_grad()
 def translate_using_latent(nets, 

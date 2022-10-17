@@ -160,8 +160,8 @@ class AdainResBlk(nn.Module):
 
     def forward(self, x, s, basal=False):
         # Apply residual connection to input and condition
-        out = self._residual(x, s, basal)
-        return out
+        out = self._residual(x, s, basal) + self._shortcut(x)
+        return out / math.sqrt(2)
     
 
 class Generator(nn.Module):
@@ -330,15 +330,15 @@ def build_model(args):
 
     # Discriminator network 
     discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains, in_channels=args.n_channels, dim_in=args.dim_in))
+    
+    # The rdkit embeddings can be collected together with noise 
+    input_dim = args.latent_dim + args.z_dimension
+    mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
 
     # Dictionary with the model 
     nets = Munch(generator=generator,
             style_encoder=style_encoder, 
-            discriminator=discriminator)
-     
-    # The rdkit embeddings can be collected together with noise 
-    input_dim = args.latent_dim + args.z_dimension
-    mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
-    nets['mapping_network'] = mapping_network
-
+            discriminator=discriminator, 
+            mapping_network=mapping_network)
+    
     return nets
