@@ -1,6 +1,5 @@
 import datetime
 import os
-import sys
 import time
 from os.path import join as ospj
 from re import A
@@ -8,21 +7,17 @@ from re import A
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from checkpoint import CheckpointIO
+from dataset.data_loader import CellDataset
+from eval.eval import evaluate
+from model import build_model
 from munch import Munch
 from torch.utils.data import WeightedRandomSampler
-
-from .checkpoint import CheckpointIO
-from .data.data_loader import CellDataset
-from .model import build_model
-from .utils import *
-
-sys.path.insert(0, '../')
-from metrics.eval import *
+from utils import *
 
 
 class Solver(nn.Module):
-    """
-    Solver class embedding attributes and methods for training the model. 
+    """Solver class embedding attributes and methods for training the model. 
     """
     def __init__(self, args):
         super().__init__()
@@ -67,16 +62,14 @@ class Solver(nn.Module):
 
         # Perform network initialization 
         self.to(self.device)
-        # for name, network in self.named_children():
-        #     print(self.named_children)
-        #     print('Initializing %s...' % name)
-        #     if name != 'embedding_matrix':
-        #         network.apply(he_init) 
+        for name, network in self.named_children():
+            print('Initializing %s...' % name)
+            if name != 'embedding_matrix':
+                network.apply(he_init) 
 
 
     def init_dataset(self):
-        """
-        Initialize dataset and data loaders
+        """Initialize dataset and data loaders
         """
         # Prepare the data
         print('Lodading the data...') 
@@ -101,8 +94,7 @@ class Solver(nn.Module):
     
     
     def create_torch_datasets(self):
-        """
-        Create dataset compatible with the pytorch training loop 
+        """Create dataset compatible with the pytorch training loop 
         """
         dataset = CellDataset(self.args, device=self.device) 
         
@@ -132,21 +124,23 @@ class Solver(nn.Module):
 
 
     def train(self):     
-        """
-        Method for IMPA training across a pre-defined number of iterations. 
+        """Method for IMPA training across a pre-defined number of iterations. 
         """
         # The history of the training process
         self.history = {"train":{'epoch':[]}, "test":{'epoch':[]}}
 
         # Fixed batch used for the evaluation on the validation set 
-        inputs_val = next(iter(self.loader_test))  
+        inputs_val = next(iter(self.loader_test)) 
+        
+        # Remember the initial value of diversity-sensitivity weight and decay it 
+        initial_lambda_ds = self.args.lambda_ds
 
         # Resume training if necessary
         if self.args.resume_iter > 0:
             self._load_checkpoint(self.args.resume_iter)
-
-        # Remember the initial value of diversity-sensitivity weight and decay it 
-        initial_lambda_ds = self.args.lambda_ds
+            # Initialize decayed lambda
+            self.initial_lambda_ds = self.args.lambda_ds - \
+                            (initial_lambda_ds / self.args.ds_iter)*self.args.resume_iter
 
         print('Start training...')
         start_time = time.time()
@@ -197,7 +191,7 @@ class Solver(nn.Module):
             
             # Log time and losses
             if (i+1) % self.args.print_every == 0:
-                print_time(i, start_time, 
+                print_checkpoint(i, start_time, 
                         self.args.total_iters, 
                         all_losses)
 
@@ -216,9 +210,9 @@ class Solver(nn.Module):
             if (i+1) % self.args.save_every == 0:
                 self._save_checkpoint(step=i+1)
                 # Save losses in the history 
-                self.save_history(i, all_losses, 'train')
+                self._save_history(i, all_losses, 'train')
 
-            # compute FID and LPIPS if necessary
+            # Compute evaluation metrics 
             if (i+1) % self.args.eval_every == 0:
                 rmse_disentanglement_dict = evaluate(self.nets,
                                                         self.loader_test,
@@ -229,12 +223,12 @@ class Solver(nn.Module):
                                                         embedding_matrix=self.embedding_matrix)
 
                 # Save metrics to history 
-                self.save_history(i, rmse_disentanglement_dict, 'test')
+                self._save_history(i, rmse_disentanglement_dict, 'test')
                 # Print metrics 
                 print_metrics(rmse_disentanglement_dict, i+1)
                 
 
-        # Format the history results to proper storage in Mongo DB
+        # Format the history results to proper storage for Mongo DB
         results = self.format_seml_results(self.history)
         return results 
     
@@ -251,24 +245,7 @@ class Solver(nn.Module):
                 key = f'{fold}_{stat}'
                 results[key] = history[fold][stat]
         return results
-
-
-    def save_history(self, epoch, losses, fold):
-        """Save partial model results in the history dictionary (model attribute) 
-        Args:
-            epoch (int): the current epoch 
-            losses (dict): dictionary containing the partial losses of the model 
-            metrics (dict): dictionary containing the partial metrics of the model 
-            fold (str): train or valid
-        """
-        self.history[fold]["epoch"].append(epoch)
-        # Append the losses to the right fold dictionary 
-        for loss in losses:
-            if loss not in self.history[fold]:
-                self.history[fold][loss] = [losses[loss]]
-            else:
-                self.history[fold][loss].append(losses[loss])
-
+    
 
     def compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):
         """Compute the discriminator loss real batches
@@ -285,7 +262,7 @@ class Solver(nn.Module):
         x_real.requires_grad_()
         out = self.nets.discriminator(x_real, y_org)
         # Discriminator assigns a 1 to the real 
-        loss_real = self.adv_loss(out, 1)
+        loss_real = self._adv_loss(out, 1)
         # Gradient-based regularization (penalize high gradient on the discriminator)
         loss_reg = self.r1_reg(out, x_real)
 
@@ -301,7 +278,7 @@ class Solver(nn.Module):
 
         # Discriminator trained to predict transformed image as fake in its domain 
         out = self.nets.discriminator(x_fake, y_trg)
-        loss_fake = self.adv_loss(out, 0)
+        loss_fake = self._adv_loss(out, 0)
         loss = loss_real + loss_fake + self.args.lambda_reg * loss_reg 
 
         return loss, Munch(real=loss_real.item(),
@@ -310,7 +287,7 @@ class Solver(nn.Module):
 
 
     def compute_g_loss(self, x_real, y_org, y_trg, z_emb_trg, z_emb_org, z_trgs=None):
-        """_summary_
+        """Compute the discriminator loss real batches
 
         Args:
             x_real (torch.tensor): real data batch
@@ -336,7 +313,7 @@ class Solver(nn.Module):
         _, x_fake = self.nets.generator(x_real, s_trg1)
         # Try to deceive the discriminator 
         out = self.nets.discriminator(x_fake, y_trg)
-        loss_adv = self.adv_loss(out, 1)
+        loss_adv = self._adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
         if not self.args.single_style:
@@ -352,15 +329,13 @@ class Solver(nn.Module):
         s_trg2 = self.nets.mapping_network(z_emb_trg2) 
         _, x_fake2 = self.nets.generator(x_real, s_trg2)
         x_fake2 = x_fake2.detach()
-        loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # Generate outputs as far as possible from each other 
+        loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 
 
         # Cycle-consistency loss
         if not self.args.single_style:
             s_org = self.nets.style_encoder(x_real, y_org)
-            # s_org = self.nets.mapping_network(z_emb_org)
         else:
             s_org = self.nets.style_encoder(x_real)
-            # s_org = self.nets.mapping_network(z_emb_org)
 
         _, x_rec = self.nets.generator(x_fake, s_org)
         loss_cyc = torch.mean(torch.abs(x_rec - x_real))  # Mean absolute error reconstructed versus real 
@@ -374,9 +349,8 @@ class Solver(nn.Module):
                         cyc=loss_cyc.item())
 
 
-    def adv_loss(self, logits, target):
-        """
-        Adversarial loss as binary cross-entropy
+    def _adv_loss(self, logits, target):
+        """Adversarial loss as binary cross-entropy
 
         Args:
             logits (torch.tensor): discriminator prediction 
@@ -391,8 +365,7 @@ class Solver(nn.Module):
 
 
     def r1_reg(self, logits, x):
-        """
-        Gradient penalty loss on discriminator output
+        """Gradient penalty loss on discriminator output
 
         Args:
             logits (torch.tensor): discriminator predicition
@@ -413,8 +386,7 @@ class Solver(nn.Module):
 
 
     def _save_checkpoint(self, step):
-        """
-        Save model checkpoints
+        """Save model checkpoints
 
         Args:
             step (int): step at which saving is performed
@@ -424,8 +396,7 @@ class Solver(nn.Module):
 
 
     def _load_checkpoint(self, step):
-        """
-        Load model checkpoints
+        """Load model checkpoints
 
         Args:
             step (int): step at which loading is performed
@@ -435,16 +406,14 @@ class Solver(nn.Module):
 
 
     def _reset_grad(self):
-        """
-        Reset the gradient of all optimizers
+        """Reset the gradient of all optimizers
         """
         for optim in self.optims.values():
             optim.zero_grad()
 
 
     def _create_dirs(self):
-        """
-        Create the directories and sub-directories for training
+        """Create the directories and sub-directories for training
         """
         # Directory is named based on time stamp
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
@@ -455,7 +424,7 @@ class Solver(nn.Module):
         else:
             keys_str = str(self.args[self.args['naming_key']])
 
-        # Set the directory for the results based on whether training is from scratch or resumed
+        # Set the directory for the results based on whether training is from begginning or resumed
         if self.args.resume_iter==0:
             self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+keys_str)
         else:
@@ -470,11 +439,27 @@ class Solver(nn.Module):
 
 
     def _create_checkpoints(self):
+        """Create the checkpoints objects regulating model weight loading and dumping
         """
-        Create the checkpoints objects regulating model weight loading and dumping
-        """
-        # Checkpoints of the save weights 
         self.ckptios = [
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims),
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]
+
+    
+    def _save_history(self, epoch, losses, fold):
+        """Save partial model results in the history dictionary (model attribute) 
+        Args:
+            epoch (int): the current epoch 
+            losses (dict): dictionary containing the partial losses of the model 
+            metrics (dict): dictionary containing the partial metrics of the model 
+            fold (str): train or valid
+        """
+        self.history[fold]["epoch"].append(epoch)
+        # Append the losses to the right fold dictionary 
+        for loss in losses:
+            if loss not in self.history[fold]:
+                self.history[fold][loss] = [losses[loss]]
+            else:
+                self.history[fold][loss].append(losses[loss])
+                

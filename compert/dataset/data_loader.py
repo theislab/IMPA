@@ -1,19 +1,19 @@
-"""
-Implement custom dataset 
-"""
 import os
+import pickle as pkl
+import sys
 from random import sample
+
 import numpy as np
+import pandas as pd
+import torch
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils.class_weight import compute_class_weight
-import pandas as pd
-import pickle as pkl
-
-from ..utils import *
-
-import torch
 from torch.utils.data import Dataset
-from .data_utils import CustomTransform
+
+sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
+sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert/')
+from data_utils import CustomTransform
+from utils import *
 
 
 class CellDataset:
@@ -26,7 +26,7 @@ class CellDataset:
         assert os.path.exists(args.data_index_path), 'The data index path does not exist'
 
         # Set up the variables 
-        self.image_path = args.image_path  # Path to the image folder (pickle file)
+        self.image_path = args.image_path  # Path to the image folder (.pkl file)
         self.data_index_path = args.data_index_path  # Path to data index (.csv file) 
         self.embedding_path = args.embedding_path
         self.augment_train = args.augment_train  
@@ -45,7 +45,7 @@ class CellDataset:
         
         # Count the number of compounds 
         self.mol_names = np.unique(self.fold_datasets['train']["CPD_NAME"])  # Sorted drug names
-        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names ù
+        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names 
 
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
@@ -105,9 +105,10 @@ class CellDataset:
         if not self.trainable_emb and self.dataset_name=='bbbc025':
             dataset = dataset.loc[dataset.CPD_NAME != '0']
 
-        # Remove the out of distribution drugs from the dataset if necessary
+        # Subset the perturbations if provided in mol_list
         if self.mol_list != None:
             dataset = dataset.loc[dataset.CPD_NAME.isin(self.mol_list)]
+        # Remove the leave-out drugs if provided in ood_set
         if self.ood_set!=None:
             dataset = dataset.loc[~dataset.CPD_NAME.isin(self.ood_set)]
         
@@ -122,8 +123,8 @@ class CellDataset:
             subset = dataset.loc[dataset.SPLIT == fold_name]
 
             for key in subset.columns:
-                # Add the  important entries to the dataset
                 dataset_splits[fold_name][key] = np.array(subset[key])
+                
         return dataset_splits
 
     def _read_images(self):

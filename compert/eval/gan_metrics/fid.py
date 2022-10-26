@@ -1,10 +1,9 @@
 import numpy as np
+import torch
 from scipy import linalg
 
-import torch
-from torch.nn.functional import adaptive_avg_pool2d
-
 from .inception import InceptionV3
+
 
 def inception_activations(data_generator, model, dims=2048, custom_channels=None, use_cuda=True):
     """Compute the mean and average activations according to Inception V3

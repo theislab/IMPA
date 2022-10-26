@@ -1,8 +1,6 @@
-from os.path import join as ospj
-import json
-from shutil import copyfile
-import time
 import datetime
+import time
+from os.path import join as ospj
 
 import numpy as np
 import torch
@@ -30,12 +28,13 @@ def he_init(module):
     Args:
         module (torch.nn.module): network module to initialize
     """
-    nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
-    if module.bias is not None:
-        nn.init.constant_(module.bias, 0)
+    if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+        nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+        if module.bias is not None:
+            nn.init.constant_(module.bias, 0)
 
 
-def print_time(i, start_time, total_iters, all_losses):
+def print_checkpoint(i, start_time, total_iters, all_losses):
     """Print elapsed time 
 
     Args:
@@ -64,7 +63,7 @@ def print_metrics(metrics_dict, step):
 
 
 def denormalize(x):
-    """Denormalize an imag from range (0,1) to (-1,1)
+    """Denormalize an image from range (-1,1) to (0,1)
 
     Args:
         x (torch.Tensor): input image in range (-1,1) 

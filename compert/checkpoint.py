@@ -27,7 +27,7 @@ class CheckpointIO:
         Args:
             step (int): the iteration step at which the model is saved.
         """
-        fname = self.file_template + f'_{step}'
+        fname = self.file_template.format(step) 
         print('Saving checkpoint into %s...' % fname)
         outdict = {}
         for name, module in self.module_dict.items():
@@ -44,7 +44,7 @@ class CheckpointIO:
         Args:
             step (int): the iteration step of the loaded model.
         """
-        fname = self.file_template.format(step)
+        fname = self.file_template.format(step) 
         assert os.path.exists(fname), fname + ' does not exist!'
         print('Loading checkpoint from %s...' % fname)
         if torch.cuda.is_available():

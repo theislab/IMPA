@@ -1,12 +1,10 @@
 import sys
+
 import seml
 import torch
+from sacred import SETTINGS, Experiment
+from solver import Solver
 from torch.backends import cudnn
-from sacred import Experiment
-from sacred import SETTINGS
-
-sys.path.insert(0, '../..')
-from core.solver import Solver
 
 # Avoid lists in an input configuration to be read-only 
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False

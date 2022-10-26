@@ -1,10 +1,7 @@
-import glob
 import numpy as np
-import scipy.misc
+import torch
 from scipy.spatial.distance import minkowski
 from scipy.stats import ks_2samp
-import time,imageio, os
-import torch
 
 
 def dists(data): 

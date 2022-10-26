@@ -3,16 +3,15 @@ import sys
 
 import numpy as np
 import torch
-from core.utils import save_image, swap_attributes
 
-sys.path.insert(0, '../')
-from collections import OrderedDict
+sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
+sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert')
 from os.path import join as ospj
 
 import ot
+from gan_metrics.fid import *
 from tqdm import tqdm
-
-from .gan_metrics.fid import *
+from utils import swap_attributes
 
 
 def evaluate(nets, 
@@ -57,12 +56,12 @@ def evaluate(nets,
     for observation in tqdm(loader):
         # Get the data and swap the labels 
         X = observation['X'].to(device)  
-        y_one_hot_src = observation['mol_one_hot'].to(device) 
-        y_src = y_one_hot_src.argmax(1).long()
-        y_trg = swap_attributes(y_one_hot_src, y_src, device).long().argmax(1) # random swap
+        y_one_hot_org = observation['mol_one_hot'].to(device) 
+        y_org = y_one_hot_org.argmax(1).long()
+        y_trg = swap_attributes(y_one_hot_org, y_org, device).long().argmax(1) # random swap
 
         # Store perturbation labels
-        y_true_ds.append(y_src.to('cpu'))  
+        y_true_ds.append(y_org.to('cpu'))  
         y_fake_ds.append(y_trg.to('cpu'))
 
         # Draw random vector for style conditioning
@@ -96,6 +95,9 @@ def evaluate(nets,
     X_swapped = torch.cat(X_swapped, dim=0)
     X_real = torch.cat(X_real, dim=0)
     categories = np.unique(y_true_ds)
+    
+    if len(categories) > 100:
+        categories = np.random.choice(categories, 100)
 
     # Update the metrics scores (FID, WD)
     for cat in tqdm(categories):
@@ -121,7 +123,7 @@ def evaluate(nets,
 
     # Save metrics 
     dict_metrics = {'wd_transformations': wd_transformations/len(categories), 
-                    'fid_transformations': fid_transformations}
+                    'fid_transformations': fid_transformations/len(categories)}
 
     # Dump latent embeddings  
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')

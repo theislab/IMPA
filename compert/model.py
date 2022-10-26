@@ -1,4 +1,3 @@
-import copy
 import math
 
 import numpy as np
@@ -186,7 +185,7 @@ class Generator(nn.Module):
             self.encode.append(
                 ResBlk(dim_in, dim_out, normalize=True, downsample=True))
             self.decode.insert(
-                0, AdainResBlk(dim_out, dim_in, style_dim, upsample=True))  # stack-like
+                0, AdainResBlk(dim_out, dim_in, style_dim, upsample=True))  
             dim_in = dim_out
 
         # The bottleneck is residual network 
@@ -204,7 +203,7 @@ class Generator(nn.Module):
         # Save the latent as a return value 
         z = x.clone()
         for block in self.decode:
-            x = block(x, s, basal)  # If basal is true we will have absence of conditioning 
+            x = block(x, s, basal)  # if basal is true we don't condition on the perturbation
         return z, self.to_rgb(x)
     
     def encode_single(self, x):
@@ -333,9 +332,11 @@ def build_model(args):
     
     # The rdkit embeddings can be collected together with noise 
     input_dim = args.latent_dim + args.z_dimension
+    
+    # Mapping network
     mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
 
-    # Dictionary with the model 
+    # Dictionary with the modules 
     nets = Munch(generator=generator,
             style_encoder=style_encoder, 
             discriminator=discriminator, 

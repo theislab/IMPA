@@ -1,9 +1,7 @@
-import sklearn 
-import numpy as np 
+import numpy as np
 from sklearn.model_selection import LeaveOneOut
-from sklearn.model_selection import KFold
-from numpy.linalg import norm
 from sklearn.neighbors import KNeighborsClassifier
+
 
 def looknn(true_images, fake_images, k=1):
     """Leave-one-out knn score 
