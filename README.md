@@ -6,4 +6,4 @@ The perturbation space can be expressed as:
 * A prior on the perturbation space (e.g. drug embeddings reflecting compound-specific physiochemical characteristics)
 * Trainable embeddings optimized alongside the model 
 
-
+If trained on a meaniningful prior perturbation space, IMPA learns to map unseen drugs in proximity of drugs used for training. When proximity also involves functional similarity, IMPA is able to predict the effect of unseen drugs on control cells. Moreover, distances between the style encodings of different perturbations are correlated with distances in the phenotypic space. As a result, IMPA can be used to fastly inspect active compounds based on the comparison of the style vectors learned for different perturbations. 
