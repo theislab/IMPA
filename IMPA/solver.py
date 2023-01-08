@@ -2,14 +2,9 @@ import datetime
 import os
 import time
 from os.path import join as ospj
-from re import A
 
-import sys
 from munch import Munch
 from torch.utils.data import WeightedRandomSampler
-
-sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
-sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
 
 import torch
 import torch.nn as nn
