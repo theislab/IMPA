@@ -12,6 +12,7 @@ dependencies:
   - tensorboard==2.8.0
   - psutil
   - pandas
+  - pip 
   - notebook=6.4.8
   - rdkit=2021.09.2
   - pip:
@@ -25,5 +26,4 @@ dependencies:
     - seaborn==0.11.2
     - seml==0.3.6
     - tqdm==4.62.3
-    - git+https://github.com/bp-kelley/descriptastoru
     

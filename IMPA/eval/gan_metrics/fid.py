@@ -1,8 +1,10 @@
 import numpy as np
 import torch
 from scipy import linalg
+import sys
 
-from .inception import InceptionV3
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval/gan_metrics')
+from inception import InceptionV3
 
 
 def inception_activations(data_generator, model, dims=2048, custom_channels=None, use_cuda=True):

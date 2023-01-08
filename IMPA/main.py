@@ -46,6 +46,8 @@ class Trainer:
         self.solver = Solver(self.args)
         # Launch the training loop 
         results = self.solver.train()
+        
+        return results
 
 # Functions to interact with seml (https://github.com/TUM-DAML/seml), an open source python package to interact with the slurm scheduling system
 @ex.command(unobserved=True)

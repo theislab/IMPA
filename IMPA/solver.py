@@ -4,12 +4,16 @@ import time
 from os.path import join as ospj
 from re import A
 
+import sys
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from checkpoint import CheckpointIO
-from dataset.data_loader import CellDataset
-from eval.eval import evaluate
+from data_loader import CellDataset
+from eval import *
 from model import build_model
 from munch import Munch
 from torch.utils.data import WeightedRandomSampler
@@ -139,7 +143,7 @@ class Solver(nn.Module):
         if self.args.resume_iter > 0:
             self._load_checkpoint(self.args.resume_iter)
             # Initialize decayed lambda
-            self.initial_lambda_ds = self.args.lambda_ds - \
+            self.args.lambda_ds = self.args.lambda_ds - \
                             (initial_lambda_ds / self.args.ds_iter)*self.args.resume_iter
 
         print('Start training...')

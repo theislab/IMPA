@@ -160,7 +160,9 @@ class AdainResBlk(nn.Module):
     def forward(self, x, s, basal=False):
         # Apply residual connection to input and condition
         out = self._residual(x, s, basal) + self._shortcut(x)
+        # out = self._residual(x, s, basal) 
         return out / math.sqrt(2)
+        # return out
     
 
 class Generator(nn.Module):
@@ -215,6 +217,7 @@ class Generator(nn.Module):
         Returns:
             torch.Tensor: processed output images 
         """
+        # x = self.from_rgb(x)
         x = self.from_rgb(x)
         for block in self.encode:    
             x = block(x)
@@ -293,8 +296,9 @@ class StyleEncoder(nn.Module):
 class Discriminator(nn.Module):
     """Discriminator network for the GAN model 
     """
-    def __init__(self, img_size=96, num_domains=2, max_conv_dim=512, in_channels=3, dim_in=64):
+    def __init__(self, img_size=96, num_domains=2, max_conv_dim=512, in_channels=3, dim_in=64, multi_task=True):
         super().__init__()
+        self.multi_task = multi_task
         blocks = []
         blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
 
@@ -314,9 +318,10 @@ class Discriminator(nn.Module):
     def forward(self, x, y):
         # Apply the network on X 
         out = self.conv(x)
-        out = out.view(out.size(0), -1)  # (batch, num_domains)
-        idx = torch.LongTensor(range(y.size(0))).to(y.device)
-        out = out[idx, y]  # (batch)
+        out = out.view(out.size(0), -1)  # (batch, num_domains) 
+        if self.multi_task:
+            idx = torch.LongTensor(range(y.size(0))).to(y.device)
+            out = out[idx, y]  # (batch)
         return out
     
 

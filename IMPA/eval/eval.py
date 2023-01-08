@@ -4,8 +4,8 @@ import sys
 import numpy as np
 import torch
 
-sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
-sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert')
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert')
 from os.path import join as ospj
 
 import ot

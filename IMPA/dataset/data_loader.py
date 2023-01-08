@@ -10,8 +10,8 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
 
-sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
-sys.path.insert(0, '/home/icb/alessandro.palma/IMPA/imCPA/compert/')
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
+sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/')
 from data_utils import CustomTransform
 from utils import *
 

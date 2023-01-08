@@ -6,6 +6,6 @@ setup(
     description='',
     url='https://github.com/theislab/imCPA',
     author='Alessandro Palma, Mohammad Lotfollahi',
-    packages=['IMPA/']+find_packages(),
+    packages=find_packages(),
     include_package_data=True
 )
