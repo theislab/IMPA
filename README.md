@@ -35,3 +35,11 @@ All files related to the model are stored in the  `IMPA` folder.
 * `checkpoint.py`: implements the util class for handling saving and loading checkpoints.
 * `eval/eval.py`: contains the evaluation script used during training by the `Solver` class.
 * `data/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
+
+## Train the models
+
+We trained the models using the [seml](https://github.com/TUM-DAML/seml) framework. Configurations can be found in the `training_config` folder. If the `Slurm` scheduler is not implemented on the server, the `main.py` script can be re-written to run independently. To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
+
+
+## Dataset and checkpoints
+Links to datasets and checkpoints will be provided soon.
