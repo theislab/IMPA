@@ -3,8 +3,7 @@ import torchvision.transforms as T
 
 
 class CustomTransform:
-    """
-    Scale and resize an input image 
+    """Scale and resize an input image 
     """
     def __init__(self, augment=False, normalize=False, dim=0):
         self.augment = augment 

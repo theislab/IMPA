@@ -4,7 +4,7 @@ from scipy import linalg
 import sys
 
 sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval/gan_metrics')
-from inception import InceptionV3
+from IMPA.eval.gan_metrics.inception import InceptionV3
 
 
 def inception_activations(data_generator, model, dims=2048, custom_channels=None, use_cuda=True):

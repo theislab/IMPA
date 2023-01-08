@@ -9,13 +9,13 @@ from torch.utils.data import WeightedRandomSampler
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .checkpoint import CheckpointIO
-from .dataset.data_loader import CellDataset
-from .eval import evaluate
-from .model import build_model
+from IMPA.checkpoint import CheckpointIO
+from IMPA.dataset.data_loader import CellDataset
+from IMPA.eval.eval import evaluate
+from IMPA.model import build_model
 from munch import Munch
 from torch.utils.data import WeightedRandomSampler
-from utils import he_init, print_network, swap_attributes, print_metrics, print_checkpoint, debug_image
+from IMPA.utils import he_init, print_network, swap_attributes, print_metrics, print_checkpoint, debug_image
 
 
 class Solver(nn.Module):

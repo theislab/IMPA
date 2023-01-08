@@ -1,24 +1,18 @@
 import os
 import pickle as pkl
-import sys
-from random import sample
 
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
 
-sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
-sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/')
-from data_utils import CustomTransform
-from utils import *
+from IMPA.dataset.data_utils import CustomTransform
+from IMPA.utils import *
 
 
 class CellDataset:
-    """
-    Dataset class for image data 
+    """Dataset class for image data 
     """
     def __init__(self, args, device):
 
@@ -94,8 +88,7 @@ class CellDataset:
                                                     
 
     def _read_folds(self):
-        """
-        Extract the filenames of images in the train and test sets 
+        """Extract the filenames of images in the train and test sets 
         associated folder
         """
         # Read the index csv file

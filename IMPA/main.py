@@ -1,8 +1,8 @@
 import seml
 import torch
 from sacred import SETTINGS, Experiment
-from .solver import Solver
 from torch.backends import cudnn
+from IMPA.solver import Solver
 
 # Avoid lists in an input configuration to be read-only 
 SETTINGS.CONFIG.READ_ONLY_CONFIG = False
