@@ -1,9 +1,7 @@
-import sys
-
 import seml
 import torch
 from sacred import SETTINGS, Experiment
-from solver import Solver
+from .solver import Solver
 from torch.backends import cudnn
 
 # Avoid lists in an input configuration to be read-only 
