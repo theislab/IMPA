@@ -11,3 +11,16 @@ If trained on a meaniningful prior perturbation space, IMPA learns to map unseen
 <p align="center">
   <img src="https://github.com/theislab/imCPA/blob/add_readme_and_package/docs/IMPA.png">
 </p>
+
+## Install repository 
+To run the model, clone this repository and create the environment via 
+
+```
+conda env create environment.yml
+```
+
+Navigate to the repository and install the Python package. 
+
+```
+pip install -e .
+```
