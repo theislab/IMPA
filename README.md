@@ -11,3 +11,27 @@ If trained on a meaniningful prior perturbation space, IMPA learns to map unseen
 <p align="center">
   <img src="https://github.com/theislab/imCPA/blob/add_readme_and_package/docs/IMPA.png">
 </p>
+
+## Install repository 
+To run the model, clone this repository and create the environment via 
+
+```
+conda env create environment.yml
+```
+
+Navigate to the repository and install the Python package. 
+
+```
+pip install -e .
+```
+
+## Codebase description 
+All files related to the model are stored in the  `IMPA` folder. 
+
+* `utils.py`: contains helper 
+* `solver.py`: contains the `Solver` class implementing the model setup, data loading and training loop. 
+* `model.py`: implements the neural network modules and initialization function.
+* `main.py`: calls the `Solver` class and implements training supported by `seml` and `sacred`.
+* `checkpoint.py`: implements the util class for handling saving and loading checkpoints.
+* `eval/eval.py`: contains the evaluation script used during training by the `Solver` class.
+* `data/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
