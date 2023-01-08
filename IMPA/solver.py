@@ -5,19 +5,22 @@ from os.path import join as ospj
 from re import A
 
 import sys
+from munch import Munch
+from torch.utils.data import WeightedRandomSampler
+
 sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
 sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/dataset')
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from checkpoint import CheckpointIO
-from data_loader import CellDataset
-from eval import *
-from model import build_model
+from .checkpoint import CheckpointIO
+from .dataset.data_loader import CellDataset
+from .eval import evaluate
+from .model import build_model
 from munch import Munch
 from torch.utils.data import WeightedRandomSampler
-from utils import *
+from utils import he_init, print_network, swap_attributes, print_metrics, print_checkpoint, debug_image
 
 
 class Solver(nn.Module):
@@ -92,7 +95,6 @@ class Solver(nn.Module):
         self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=self.args.val_batch_size, shuffle=True, 
                                                     num_workers=self.args.num_workers, drop_last=False)
 
-        # The id of the dmso to exclude from the prediction 
         self.mol2y = self.training_set.couples_mol_y 
         print('Successfully loaded the data')
     
@@ -163,17 +165,18 @@ class Solver(nn.Module):
             z_emb_org = self.embedding_matrix(y_org).to(self.device)
 
             # Pick two random weight vectors 
-            z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device)
+            z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], 
+                                                                                                             self.args.z_dimension).to(self.device)
 
             # Train the discriminator
-            d_loss, d_losses_latent = self.compute_d_loss(
+            d_loss, d_losses_latent = self._compute_d_loss(
                 x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
             self._reset_grad()
             d_loss.backward()
             self.optims.discriminator.step()
             
             # Train the generator
-            g_loss, g_losses_latent = self.compute_g_loss(
+            g_loss, g_losses_latent = self._compute_g_loss(
                 x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
             self._reset_grad()
             g_loss.backward()
@@ -232,12 +235,12 @@ class Solver(nn.Module):
                 print_metrics(rmse_disentanglement_dict, i+1)
                 
 
-        # Format the history results to proper storage for Mongo DB
-        results = self.format_seml_results(self.history)
+        # Format the history results to proper storage into Mongo DB
+        results = self._format_seml_results(self.history)
         return results 
     
     
-    def format_seml_results(self, history):
+    def _format_seml_results(self, history):
         """Format results for seml 
 
         Args:
@@ -251,7 +254,7 @@ class Solver(nn.Module):
         return results
     
 
-    def compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):
+    def _compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):
         """Compute the discriminator loss real batches
 
         Args:
@@ -268,7 +271,7 @@ class Solver(nn.Module):
         # Discriminator assigns a 1 to the real 
         loss_real = self._adv_loss(out, 1)
         # Gradient-based regularization (penalize high gradient on the discriminator)
-        loss_reg = self.r1_reg(out, x_real)
+        loss_reg = self._r1_reg(out, x_real)
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
@@ -290,7 +293,7 @@ class Solver(nn.Module):
                         reg=loss_reg.item())
 
 
-    def compute_g_loss(self, x_real, y_org, y_trg, z_emb_trg, z_emb_org, z_trgs=None):
+    def _compute_g_loss(self, x_real, y_org, y_trg, z_emb_trg, z_emb_org, z_trgs=None):
         """Compute the discriminator loss real batches
 
         Args:
@@ -299,9 +302,6 @@ class Solver(nn.Module):
             y_trg (torch.tensor): labels of fake data batch
             z_emb_trg (torch.tensor): embedding vector for swapped labels
             z_trgs (torch.tensor, optional): pair of randomly drawn noise vectors. Defaults to None.
-
-        Returns:
-            _type_: _description_
         """
         # Couple of random vectors for the difference-sensitivity loss
         z_trg, z_trg2 = z_trgs
@@ -368,7 +368,7 @@ class Solver(nn.Module):
         return loss
 
 
-    def r1_reg(self, logits, x):
+    def _r1_reg(self, logits, x):
         """Gradient penalty loss on discriminator output
 
         Args:

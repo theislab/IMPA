@@ -1,13 +1,11 @@
 # Inspired by https://github.com/clovaai/stargan-v2/blob/master/core/checkpoint.py
 
 import os
-
 import torch
 
 
 class CheckpointIO:
-    """
-    Checkpoint class for saving model snapshots during training. 
+    """Checkpoint class for saving model snapshots during training. 
     """
     def __init__(self, file_template, data_parallel=False, **kwargs):
         """
@@ -21,8 +19,7 @@ class CheckpointIO:
         self.data_parallel = data_parallel
 
     def save(self, step):
-        """
-        Save the module checkpoints.
+        """Save the module checkpoints.
 
         Args:
             step (int): the iteration step at which the model is saved.
@@ -38,8 +35,7 @@ class CheckpointIO:
         torch.save(outdict, fname)
 
     def load(self, step):
-        """
-        Load a checkpoint dictionary. 
+        """Load a checkpoint dictionary. 
 
         Args:
             step (int): the iteration step of the loaded model.

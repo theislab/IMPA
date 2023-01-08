@@ -1,15 +1,11 @@
 import pickle as pkl
-import sys
 
 import numpy as np
 import torch
-
-sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert/eval')
-sys.path.append('/home/icb/alessandro.palma/IMPA/imCPA/compert')
 from os.path import join as ospj
 
 import ot
-from gan_metrics.fid import *
+from .gan_metrics.fid import *
 from tqdm import tqdm
 from utils import swap_attributes
 
