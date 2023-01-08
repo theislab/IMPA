@@ -71,7 +71,7 @@ def denormalize(x):
     Returns:
         torch.Tensor: 
     """
-    out = (x + 1) / 2
+    out = (x + 1.) / 2
     return out.clamp_(0, 1)
 
 
@@ -89,8 +89,7 @@ def save_image(x, ncol, filename):
 
 
 def swap_attributes(y_mol, mol_id, device):
-    """Perform random swapping of the perturbation category in a target
-       dataset
+    """Perform random swapping of the perturbation category in a target dataset
 
     Args:
         y_mol (torch.Tensor): one-hot array representing the identity of each observation 
@@ -155,7 +154,7 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
         id2mol (dict): dictionary mapping identification number to molecule 
         dest_dir (str): destination directory for images 
     """
-    # Gte the images and the pertrubation targets 
+    # Get the images and the pertrubation targets 
     x_real, y_one_hot = inputs['X'].to(device), inputs['mol_one_hot'].to(device)
     y_real = y_one_hot.argmax(1).to(device)
 
@@ -181,7 +180,6 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
 
     # Swap attributes for smaller cross-transformation panel 
     y_swapped_one_hot = swap_attributes(y_mol=y_one_hot, mol_id=y_real, device=device)
-    y_swapped = y_swapped_one_hot.argmax(1)  # y_swapped
 
     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
     translate_using_latent(nets,
@@ -219,7 +217,7 @@ def translate_using_latent(nets,
     N, _, _, _ = x_real.size()
     # Place the validation input in list for concatenation 
     x_concat = [x_real]
-    # For each domain, collect a latent mean vector 
+    
     for _, y_trg in enumerate(y_trg_list):
         for z_trg in z_trg_list:
 
