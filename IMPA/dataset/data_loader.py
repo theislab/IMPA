@@ -1,5 +1,6 @@
 import os
 import pickle as pkl
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -65,11 +66,11 @@ class CellDataset:
 
         # Read images 
         print('Loading images...')
-        self._read_images()
 
         # Initialize the datasets 
-        self.fold_datasets = {'train': CellDatasetFold('train', self.fold_datasets['train'], 
-                                                        self.image_dict, 
+        self.fold_datasets = {'train': CellDatasetFold('train', 
+                                                        self.image_path,
+                                                        self.fold_datasets['train'],
                                                         encoder_mol, 
                                                         self.mol2id, 
                                                         self.y2id, 
@@ -77,8 +78,9 @@ class CellDataset:
                                                         self.normalize),
 
 
-                            'test': CellDatasetFold('test', self.fold_datasets['test'], 
-                                                    self.image_dict, 
+                            'test': CellDatasetFold('test', 
+                                                    self.image_path,
+                                                    self.fold_datasets['test'], 
                                                     encoder_mol, 
                                                     self.mol2id, 
                                                     self.y2id, 
@@ -120,19 +122,12 @@ class CellDataset:
                 
         return dataset_splits
 
-    def _read_images(self):
-        """
-        Load images into memory
-        """
-        with open(self.image_path, 'rb') as file:
-            self.image_dict = pkl.load(file)
-
 
 class CellDatasetFold(Dataset):
-    def __init__(self, 
+    def __init__(self,
                 fold, 
+                image_path,
                 data, 
-                image_dict, 
                 encoder_mol, 
                 mol2id, 
                 y2id, 
@@ -142,6 +137,7 @@ class CellDatasetFold(Dataset):
         super(CellDatasetFold, self).__init__() 
 
         # Train or test sets
+        self.image_path = image_path
         self.fold = fold  
         self.data = data
         
@@ -150,10 +146,6 @@ class CellDatasetFold(Dataset):
         self.mols = data['CPD_NAME']
         self.dose = data['DOSE']
         self.y = data['ANNOT']
-
-        # Keep only fold obs
-        self.image_dict = image_dict
-        self.image_dict = {key:val for key, val in self.image_dict.items() if key in self.file_names}
 
         del data 
 
@@ -195,7 +187,10 @@ class CellDatasetFold(Dataset):
         """
         # Image must be fetched from disk 
         img_file = self.file_names[idx]
-        img = self.image_dict[img_file]
+        file_split = img_file.split('_')
+        path = Path(self.image_path) / file_split[0] / file_split[1] 
+        
+        img = np.load(path / '_'.join(file_split[2:]))
         img = torch.from_numpy(img).to(torch.float)
         img = img.permute(2,0,1)  # Place channel dimension in front of the others 
         img = self.transform(img)
