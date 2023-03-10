@@ -61,12 +61,14 @@ def evaluate(nets,
         y_fake_ds.append(y_trg.to('cpu'))
 
         # Draw random vector for style conditioning
-        z = torch.randn(X.shape[0], args.z_dimension).to(device)
+        if args.stochastic:
+            z = torch.randn(X.shape[0], args.z_dimension).to(device)
 
         with torch.no_grad():
             # Get pertrubation embedding and concatenate with the noise vector 
             z_emb = embedding_matrix(y_trg)
-            z_emb = torch.cat([z_emb, z], dim=1)
+            if args.stochastic:
+                z_emb = torch.cat([z_emb, z], dim=1)
             
             # Map to style
             s = nets.mapping_network(z_emb) 
