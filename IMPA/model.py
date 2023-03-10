@@ -336,7 +336,10 @@ def build_model(args):
     discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains, in_channels=args.n_channels, dim_in=args.dim_in))
     
     # The rdkit embeddings can be collected together with noise 
-    input_dim = args.latent_dim + args.z_dimension
+    if args.stochastic:
+        input_dim = args.latent_dim + args.z_dimension
+    else:
+        input_dim = args.latent_dim 
     
     # Mapping network
     mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))

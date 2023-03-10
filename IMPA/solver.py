@@ -160,9 +160,12 @@ class Solver(nn.Module):
             z_emb_org = self.embedding_matrix(y_org).to(self.device)
 
             # Pick two random weight vectors 
-            z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], 
+            if self.args.stochastic:
+                z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], 
                                                                                                              self.args.z_dimension).to(self.device)
-
+            else:
+                z_trg, z_trg2 = None, None
+            
             # Train the discriminator
             d_loss, d_losses_latent = self._compute_d_loss(
                 x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
@@ -180,7 +183,7 @@ class Solver(nn.Module):
             self.optims.mapping_network.step()
         
             # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
-            if self.args.lambda_ds > 0:
+            if self.args.lambda_ds > 0 and self.args.stochastic:
                 self.args.lambda_ds -= (initial_lambda_ds / self.args.ds_iter)
 
             # Format the losses
@@ -270,7 +273,8 @@ class Solver(nn.Module):
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
-            z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
+            if self.args.stochastic:
+                z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
 
             # Single of the noisy embedding vector to a style vector 
             s_trg = self.nets.mapping_network(z_emb_trg)  
@@ -300,10 +304,12 @@ class Solver(nn.Module):
         """
         # Couple of random vectors for the difference-sensitivity loss
         z_trg, z_trg2 = z_trgs
-
+        
         # Adversarial loss
-        z_emb_trg1 = torch.cat([z_emb_trg, z_trg], dim=1)
-        z_emb_org = torch.cat([z_emb_org, z_trg], dim=1)
+        if z_trg != None:
+            z_emb_trg1 = torch.cat([z_emb_trg, z_trg], dim=1)
+        else: 
+            z_emb_trg1 = z_emb_trg
 
         # Style vector with the first random component 
         s_trg1 = self.nets.mapping_network(z_emb_trg1)  
@@ -324,12 +330,15 @@ class Solver(nn.Module):
         loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  
 
         # Diversity sensitive loss 
-        z_emb_trg2 = torch.cat([z_emb_trg, z_trg2], dim=1)
-        s_trg2 = self.nets.mapping_network(z_emb_trg2) 
-        _, x_fake2 = self.nets.generator(x_real, s_trg2)
-        x_fake2 = x_fake2.detach()
-        loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 
-
+        if self.args.stochastic:
+            z_emb_trg2 = torch.cat([z_emb_trg, z_trg2], dim=1)
+            s_trg2 = self.nets.mapping_network(z_emb_trg2) 
+            _, x_fake2 = self.nets.generator(x_real, s_trg2)
+            x_fake2 = x_fake2.detach()
+            loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 
+        else:
+            loss_ds = 0
+            
         # Cycle-consistency loss
         if not self.args.single_style:
             s_org = self.nets.style_encoder(x_real, y_org)
@@ -344,7 +353,7 @@ class Solver(nn.Module):
 
         return loss, Munch(adv=loss_adv.item(),
                         sty=loss_sty.item(),
-                        ds=loss_ds.item(),
+                        ds=loss_ds.item() if self.args.stochastic else loss_ds,
                         cyc=loss_cyc.item())
 
 

@@ -176,7 +176,10 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
     num_transf_plot = 2 
 
     # Create the noise vector 
-    z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
+    if args.stochastic:
+        z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
+    else:
+        z_trg_list = [None]*num_transf_plot
 
     # Swap attributes for smaller cross-transformation panel 
     y_swapped_one_hot = swap_attributes(y_mol=y_one_hot, mol_id=y_real, device=device)
@@ -223,8 +226,9 @@ def translate_using_latent(nets,
 
             # Perturbation embedding and style embedding 
             z_emb_trg = embedding_matrix(y_trg) 
-            z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
-
+            if args.stochastic:
+                z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)                
+            
             # Perform mapping 
             s_trg = nets.mapping_network(z_emb_trg) 
             _, x_fake = nets.generator(x_real, s_trg)
