@@ -47,4 +47,4 @@ Datasets are available at:
 * BBBC025 https://bbbc.broadinstitute.org/BBBC025
 * RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources  
   
-Pre-processed versions and checkpoints will be made available soon. 
+Pre-processed datasets will be available soon. Model checkpoints are made available [here](https://1drv.ms/f/s!AqLF-jPbzBG0sDkKwm0kjLtXAWi4?e=HdGC4h).
