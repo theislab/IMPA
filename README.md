@@ -42,4 +42,8 @@ We trained the models using the [seml](https://github.com/TUM-DAML/seml) framewo
 
 
 ## Dataset and checkpoints
-Links to datasets and checkpoints will be provided soon.
+Datasets are available at:
+* BBBC021 https://bbbc.broadinstitute.org/BBBC021
+* BBBC025 https://bbbc.broadinstitute.org/BBBC025
+* RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources
+Pre-processed versions and checkpoints will be made available soon. 
