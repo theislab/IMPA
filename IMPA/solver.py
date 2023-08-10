@@ -17,7 +17,6 @@ from munch import Munch
 from torch.utils.data import WeightedRandomSampler
 from IMPA.utils import he_init, print_network, swap_attributes, print_metrics, print_checkpoint, debug_image
 
-
 class Solver(nn.Module):
     """Solver class embedding attributes and methods for training the model. 
     """
@@ -69,7 +68,6 @@ class Solver(nn.Module):
             if name != 'embedding_matrix':
                 network.apply(he_init) 
 
-
     def init_dataset(self):
         """Initialize dataset and data loaders
         """
@@ -92,7 +90,6 @@ class Solver(nn.Module):
 
         self.mol2y = self.training_set.couples_mol_y 
         print('Successfully loaded the data')
-    
     
     def create_torch_datasets(self):
         """Create dataset compatible with the pytorch training loop 
@@ -122,7 +119,6 @@ class Solver(nn.Module):
         # Free cell painting dataset memory
         del dataset
         return training_set, test_set
-
 
     def train(self):     
         """Method for IMPA training across a pre-defined number of iterations. 
@@ -237,7 +233,6 @@ class Solver(nn.Module):
         results = self._format_seml_results(self.history)
         return results 
     
-    
     def _format_seml_results(self, history):
         """Format results for seml 
 
@@ -290,7 +285,6 @@ class Solver(nn.Module):
         return loss, Munch(real=loss_real.item(),
                         fake=loss_fake.item(),
                         reg=loss_reg.item())
-
 
     def _compute_g_loss(self, x_real, y_org, y_trg, z_emb_trg, z_emb_org, z_trgs=None):
         """Compute the discriminator loss real batches
@@ -356,7 +350,6 @@ class Solver(nn.Module):
                         ds=loss_ds.item() if self.args.stochastic else loss_ds,
                         cyc=loss_cyc.item())
 
-
     def _adv_loss(self, logits, target):
         """Adversarial loss as binary cross-entropy
 
@@ -392,7 +385,6 @@ class Solver(nn.Module):
         reg = 0.5 * grad.view(batch_size, -1).sum(1).mean(0)
         return reg
 
-
     def _save_checkpoint(self, step):
         """Save model checkpoints
 
@@ -401,7 +393,6 @@ class Solver(nn.Module):
         """
         for ckptio in self.ckptios:
             ckptio.save(step)
-
 
     def _load_checkpoint(self, step):
         """Load model checkpoints
@@ -412,13 +403,11 @@ class Solver(nn.Module):
         for ckptio in self.ckptios:
             ckptio.load(step)
 
-
     def _reset_grad(self):
         """Reset the gradient of all optimizers
         """
         for optim in self.optims.values():
             optim.zero_grad()
-
 
     def _create_dirs(self):
         """Create the directories and sub-directories for training
@@ -445,7 +434,6 @@ class Solver(nn.Module):
         os.makedirs(ospj(self.dest_dir, self.args.basal_vs_real_folder), exist_ok=True)
         os.makedirs(ospj(self.dest_dir, self.args.embedding_folder), exist_ok=True)
 
-
     def _create_checkpoints(self):
         """Create the checkpoints objects regulating model weight loading and dumping
         """
@@ -454,7 +442,6 @@ class Solver(nn.Module):
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims),
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]
 
-    
     def _save_history(self, epoch, losses, fold):
         """Save partial model results in the history dictionary (model attribute) 
         Args:

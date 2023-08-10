@@ -5,9 +5,9 @@ import torch
 from os.path import join as ospj
 
 import ot
-from .gan_metrics.fid import *
+from IMPA.eval.gan_metrics.fid import *
 from tqdm import tqdm
-from utils import swap_attributes
+from IMPA.utils import swap_attributes
 
 
 def evaluate(nets, 

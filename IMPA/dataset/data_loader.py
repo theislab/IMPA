@@ -40,7 +40,7 @@ class CellDataset:
         
         # Count the number of compounds 
         self.mol_names = np.unique(self.fold_datasets['train']["CPD_NAME"])  # Sorted drug names
-        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names 
+        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
 
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
@@ -66,6 +66,8 @@ class CellDataset:
 
         # Read images 
         print('Loading images...')
+        print(self.mol_names)
+        print(len(self.mol_names))
 
         # Initialize the datasets 
         self.fold_datasets = {'train': CellDatasetFold('train', 
@@ -78,16 +80,14 @@ class CellDataset:
                                                         self.normalize),
 
 
-                            'test': CellDatasetFold('test', 
-                                                    self.image_path,
-                                                    self.fold_datasets['test'], 
-                                                    encoder_mol, 
-                                                    self.mol2id, 
-                                                    self.y2id, 
-                                                    self.augment_train, 
-                                                    self.normalize)}
-        del self.image_dict
-                                                    
+                                'test': CellDatasetFold('test', 
+                                                        self.image_path,
+                                                        self.fold_datasets['test'], 
+                                                        encoder_mol, 
+                                                        self.mol2id, 
+                                                        self.y2id, 
+                                                        self.augment_train, 
+                                                        self.normalize)}                                                    
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -95,10 +95,6 @@ class CellDataset:
         """
         # Read the index csv file
         dataset = pd.read_csv(self.data_index_path, index_col=0)
-
-        # Only embeddable results
-        if not self.trainable_emb and self.dataset_name=='bbbc025':
-            dataset = dataset.loc[dataset.CPD_NAME != '0']
 
         # Subset the perturbations if provided in mol_list
         if self.mol_list != None:
@@ -188,9 +184,16 @@ class CellDatasetFold(Dataset):
         # Image must be fetched from disk 
         img_file = self.file_names[idx]
         file_split = img_file.split('_')
-        path = Path(self.image_path) / file_split[0] / file_split[1] 
         
-        img = np.load(path / '_'.join(file_split[2:]))
+        if len(file_split) > 4:
+            file_split[0] = file_split[0].split("-")[1]
+            path = Path(self.image_path) / "_".join(file_split[:2]) / file_split[2] 
+            file = '_'.join(file_split[3:])+".npy"
+        else:
+            path = Path(self.image_path) / file_split[0] / file_split[1] 
+            file = '_'.join(file_split[2:])+".npy"
+            
+        img = np.load(path / file)
         img = torch.from_numpy(img).to(torch.float)
         img = img.permute(2,0,1)  # Place channel dimension in front of the others 
         img = self.transform(img)
