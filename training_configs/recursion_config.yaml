@@ -1,9 +1,9 @@
 seml:
   executable: ../IMPA/main.py
   name: recursion
-  output_dir: path-to-output-dir
+  output_dir: ../project_dir/results
   conda_environment: IMPA
-  project_root_dir: /home/icb/alessandro.palma/IMPA/imCPA/
+  project_root_dir: /home/icb/alessandro.palma/IMPA/IMPA/
 
 slurm:
   max_simultaneous_jobs: 10
@@ -59,12 +59,12 @@ fixed:
   train.args.seed: 42  
     
   # directory for training
-  train.args.image_path: path-to-output-images
-  train.args.data_index_path: path-to-output-data-index
-  train.args.embedding_path: path-to-output-embeddings 
+  train.args.image_path: ../project_dir/datasets/rxrx1
+  train.args.data_index_path: ../project_dir/datasets/rxrx1/metadata/rxrx1_df.csv
+  train.args.embedding_path: ../embeddings/csv/rxrx1_gene2vec_embeddings.csv
 
   # Directories for results
-  train.args.experiment_directory: path-to-output-experiments
+  train.args.experiment_directory: ../project_dir/experiments/
   train.args.sample_dir: sample   # Name of directory for sampled images 
   train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
   train.args.basal_vs_real_folder: basal_vs_real
