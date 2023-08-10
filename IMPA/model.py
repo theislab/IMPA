@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from munch import Munch
 
+# Inspired by https://github.com/clovaai/stargan-v2/blob/master/core/model.py
 
 class ResBlk(nn.Module):
     """

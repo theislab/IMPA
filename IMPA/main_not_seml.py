@@ -28,8 +28,8 @@ class Trainer:
         return results
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process a file at the given path.')
-    parser.add_argument('path', type=str, help='The path to the file')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', type=str, help='Path to the configuration file')
 
     args = parser.parse_args()
 
@@ -42,3 +42,4 @@ if __name__ == "__main__":
     T = Trainer()
     
     T.train(args)
+    

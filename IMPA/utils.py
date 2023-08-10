@@ -10,23 +10,21 @@ import torchvision.utils as vutils
 
 
 def print_network(network, name):
-    """Print neural network parameters
+    """Prints neural network parameters.
 
     Args:
-        network (torch.nn.module): neural network whose parameters are printed
-        name (str): name of the model
+        network (torch.nn.Module): The neural network whose parameters are printed.
+        name (str): Name of the model.
     """
-    num_params = 0
-    for p in network.parameters():
-        num_params += p.numel()
-    print("Number of parameters of %s: %i" % (name, num_params))
+    num_params = sum(p.numel() for p in network.parameters())
+    print("Number of parameters in %s: %i" % (name, num_params))
 
 
 def he_init(module):
-    """Initialize neural network using the He initialization method 
+    """Initialize neural network using the He initialization method.
 
     Args:
-        module (torch.nn.module): network module to initialize
+        module (torch.nn.Module): The network module to initialize.
     """
     if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
         nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
@@ -35,106 +33,103 @@ def he_init(module):
 
 
 def print_checkpoint(i, start_time, total_iters, all_losses):
-    """Print elapsed time 
+    """Print elapsed time and losses during training.
 
     Args:
-        i (int): iteration number
-        start_time (int): beginning time 
-        total_iters (int): total number of iterations 
-        all_losses (dict): the dictionary with the losses  
-        lambda_ds (float): the value of the diversification loss coefficient at iteration i  
+        i (int): Iteration number.
+        start_time (int): Start time in seconds.
+        total_iters (int): Total number of iterations.
+        all_losses (dict): Dictionary with the loss values.
     """
     elapsed = time.time() - start_time
     elapsed = str(datetime.timedelta(seconds=elapsed))[:-7]
-    log = "Elapsed time [%s], Iteration [%i/%i], " % (elapsed, i+1, total_iters)
-    log += ' '.join(['%s: [%.4f]' % (key, value) for key, value in all_losses.items()])
+    log = f"Elapsed time [{elapsed}], Iteration [{i+1}/{total_iters}], "
+    log += ' '.join([f'{key}: [{value:.4f}]' for key, value in all_losses.items()])
     print(log)
 
 
 def print_metrics(metrics_dict, step):
-    """Print metrics in a metric dictionary
+    """Print metrics from a metric dictionary.
 
     Args:
-        metrics_dict (dict): dictionary with the metrics 
-        step (int): the current step
+        metrics_dict (dict): Dictionary with the metrics.
+        step (int): Current step.
     """
-    for metric in metrics_dict:
-        print('After %i %s is %.4f' % (step, metric, metrics_dict[metric]))
+    for metric, value in metrics_dict.items():
+        print(f'After {step} {metric} is {value:.4f}')
 
 
 def denormalize(x):
-    """Denormalize an image from range (-1,1) to (0,1)
+    """Denormalize an image from the range (-1, 1) to (0, 1).
 
     Args:
-        x (torch.Tensor): input image in range (-1,1) 
+        x (torch.Tensor): Input image in the range (-1, 1).
 
     Returns:
-        torch.Tensor: 
+        torch.Tensor: Denormalized image in the range (0, 1).
     """
     out = (x + 1.) / 2
     return out.clamp_(0, 1)
 
 
 def save_image(x, ncol, filename):
-    """Save a panel of images 
+    """Save a panel of images.
 
     Args:
-        x (torch.Tensor): tensor representing a grid to save
-        ncol (int): number of columns to plot
-        filename (str): name of the file to save
+        x (torch.Tensor): Tensor representing a grid of images.
+        ncol (int): Number of columns for plotting.
+        filename (str): Name of the file to save.
     """
     print(x.shape)
     x = denormalize(x)
-    vutils.save_image(x.cpu(), filename+'.jpg', nrow=ncol, padding=0)
+    vutils.save_image(x.cpu(), filename + '.jpg', nrow=ncol, padding=0)
 
 
 def swap_attributes(y_mol, mol_id, device):
-    """Perform random swapping of the perturbation category in a target dataset
+    """Perform random swapping of perturbation categories in a target dataset.
 
     Args:
-        y_mol (torch.Tensor): one-hot array representing the identity of each observation 
-        mol_id (torch.Tensor): an array of indexes representing the perturbation used for each observation 
-        device (str): `cuda` or `cpu`
+        y_mol (torch.Tensor): One-hot array representing the identity of each observation.
+        mol_id (torch.Tensor): An array of indexes representing the perturbation used for each observation.
+        device (str): 'cuda' or 'cpu'.
 
     Returns:
-        torch.Tensor: the swapped tensor 
+        torch.Tensor: The swapped tensor.
     """
-    # Initialize the swapped indices 
+    # Initialize the swapped indices
     swapped_idx = torch.zeros_like(y_mol)
     # Maximum mol index
-    max_mol = y_mol.shape[1] 
-    # Ranges of possible mols 
+    max_mol = y_mol.shape[1]
+    # Ranges of possible mols
     offsets = torch.randint(1, max_mol, (mol_id.shape[0], 1)).to(device)
     # Permute
-    permutation = mol_id + offsets.squeeze()
-    # Remainder 
-    permutation = torch.remainder(permutation, max_mol)
-    # Add ones 
+    permutation = (mol_id + offsets.squeeze()) % max_mol
+    # Add ones
     swapped_idx[np.arange(y_mol.shape[0]), permutation] = 1
     return swapped_idx
 
 
 def sigmoid(x, w=1):
-    """Sigmoid function
+    """Sigmoid function.
 
     Args:
-        x (torch.Tensor): the input of the sigmoid function 
-        w (int, optional): weight to multiply to the input. Defaults to 1.
+        x (torch.Tensor): Input of the sigmoid function.
+        w (int, optional): Weight to multiply the input. Defaults to 1.
 
     Returns:
-        torch.Tensor: result of the application of the sigmoid function 
+        torch.Tensor: Result of the sigmoid function application.
     """
     return 1. / (1 + np.exp(-w * x))
 
 
 def tensor2ndarray255(images):
-    """Convert tensor to 8-bit numpy array
+    """Convert tensor to an 8-bit numpy array.
 
     Args:
-        images (torch.Tensor): images to convert to array
+        images (torch.Tensor): Images to convert to an array.
 
     Returns:
-        numpy.array: images converted to numpy array
+        numpy.array: Images converted to a numpy array.
     """
     images = torch.clamp(images * 0.5 + 0.5, 0, 1)
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
@@ -142,26 +137,24 @@ def tensor2ndarray255(images):
 
 @torch.no_grad()
 def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest_dir):
-    """Dump a grid of generated images 
+    """Dump a grid of generated images.
 
     Args:
-        nets (dict): the dictionary with the neural network modules
-        embedding_matrix (torch.Tensor): perturbation embeddings 
-        args (dict): the training specification
-        inputs (torch.Tensor): input used to produce the grid image
-        step (int): the step at which the images were produced 
-        device (str): `cuda` or `cpu`
-        id2mol (dict): dictionary mapping identification number to molecule 
-        dest_dir (str): destination directory for images 
+        nets (dict): Dictionary with the neural network modules.
+        embedding_matrix (torch.Tensor): Perturbation embeddings.
+        args (dict): Training specifications.
+        inputs (torch.Tensor): Input used to produce the grid image.
+        step (int): The step at which the images were produced.
+        device (str): 'cuda' or 'cpu'.
+        id2mol (dict): Dictionary mapping identification number to molecule.
+        dest_dir (str): Destination directory for images.
     """
-    # Get the images and the pertrubation targets 
+    # Get the images and the perturbation targets
     x_real, y_one_hot = inputs['X'].to(device), inputs['mol_one_hot'].to(device)
     y_real = y_one_hot.argmax(1).to(device)
 
-    # Setup the device and the batch size 
-    device = x_real.device
+    # Setup the device and the batch size
     N = x_real.size(0)
-
     # Get all the possible output targets
     range_classes = list(range(args.num_domains))
     y_trg_list = [torch.tensor(y).repeat(N).to(device)

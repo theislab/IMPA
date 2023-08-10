@@ -14,12 +14,11 @@ from IMPA.dataset.data_loader import CellDataset
 from IMPA.eval.eval import evaluate
 from IMPA.model import build_model
 from munch import Munch
-from torch.utils.data import WeightedRandomSampler
+from torch.utils.data import DataLoader  # Import DataLoader from torch.utils.data
 from IMPA.utils import he_init, print_network, swap_attributes, print_metrics, print_checkpoint, debug_image
 
 class Solver(nn.Module):
-    """Solver class embedding attributes and methods for training the model. 
-    """
+    """Solver class embedding attributes and methods for training the model."""
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -27,17 +26,17 @@ class Solver(nn.Module):
         
         # Initialize datasets
         self.init_dataset()
-        args['num_domains'] = self.n_mol 
-        
+        args.num_domains = self.n_mol  # Change to 'num_domains'
+
         # Log the parameters 
-        print('Solver loaded with parameters: \n', self.args)
+        print('Solver loaded with parameters:\n', self.args)
 
         # Create directories 
         self._create_dirs()
 
         # Get the nets 
         self.nets = build_model(args)
-        
+
         # Set modules as attributes of the solver class
         for name, module in self.nets.items():
             print_network(module, name)
@@ -46,15 +45,12 @@ class Solver(nn.Module):
         # Initialize optimizers and checkpoint path 
         self.optims = Munch()
         for net in self.nets.keys():
-            # Optimize the embeddings with the mapping network 
+            params = list(self.nets[net].parameters())
             if net == 'mapping_network' and self.args.trainable_emb:
-                params = list(self.nets[net].parameters()) + list(self.embedding_matrix.parameters())
-            else:
-                params = self.nets[net].parameters()
-
+                params += list(self.embedding_matrix.parameters())  # Add embedding_matrix parameters
             self.optims[net] = torch.optim.Adam(
                 params=params,
-                lr=args.f_lr if net == 'mapping_network' else args.lr,  # The mapping network has a different learning rate 
+                lr=args.f_lr if net == 'mapping_network' else args.lr,
                 betas=[args.beta1, args.beta2],
                 weight_decay=args.weight_decay)
 
@@ -157,8 +153,8 @@ class Solver(nn.Module):
 
             # Pick two random weight vectors 
             if self.args.stochastic:
-                z_trg, z_trg2 = torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), torch.randn(x_real.shape[0], 
-                                                                                                             self.args.z_dimension).to(self.device)
+                z_trg, z_trg2 = (torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), 
+                                    torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device))
             else:
                 z_trg, z_trg2 = None, None
             
