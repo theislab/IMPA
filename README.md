@@ -36,7 +36,7 @@ In the `project_folder`, create a `data` and a `results` subfolders.
 
 ```
 cd project_folder
-mkdir data
+mkdir datasets
 mkdir results
 ```
 
