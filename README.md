@@ -45,11 +45,11 @@ In these subfolders, the data and the model checkpoints will be dumped.
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
 
-* `utils.py`: contains helper 
+* `utils.py`: contains helper functions.
 * `solver.py`: contains the `Solver` class implementing the model setup, data loading and training loop. 
 * `model.py`: implements the neural network modules and initialization function.
 * `main.py`: calls the `Solver` class and implements training supported by `seml` and `sacred`.
-* `checkpoint.py`: implements the util class for handling saving and loading checkpoints.
+* `checkpoint.py`: implements the helper class for handling saving and loading checkpoints.
 * `eval/eval.py`: contains the evaluation script used during training by the `Solver` class.
 * `data/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
 
