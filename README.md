@@ -25,6 +25,23 @@ Navigate to the repository and install the Python package.
 pip install -e .
 ```
 
+## Create a project folder
+The data and the experiment files should be contained in a `project_folder` located somewhere with enough storage. The project folder should be connected to the IMPA repository via a symlink through the following command. 
+
+```
+ln -s /path/to/your/folder/ project_folder
+```
+
+In the `project_folder`, create a `data` and a `results` subfolders.  
+
+```
+cd project_folder
+mkdir data
+mkdir results
+```
+
+In these subfolders, the data and the model checkpoints will be dumped.
+
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
 
