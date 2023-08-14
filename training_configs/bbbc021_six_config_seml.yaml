@@ -3,7 +3,7 @@ seml:
   name: bbbc021_six_drugs
   output_dir: ../project_dir/results
   conda_environment: IMPA
-  project_root_dir: /home/icb/alessandro.palma/IMPA/IMPA/
+  project_root_dir: ../IMPA/
 
 slurm:
   max_simultaneous_jobs: 10
@@ -40,7 +40,7 @@ fixed:
   train.args.batch_size: 32
   train.args.val_batch_size: 20
   train.args.lr: 0.0001
-  train.args.f_lr: 0.000001
+  train.args.f_lr: 0.0001
   train.args.beta1: 0
   train.args.beta2: 0.99
   train.args.weight_decay: 0.0001

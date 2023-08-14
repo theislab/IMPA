@@ -3,7 +3,7 @@ seml:
   name: bbbc021_all_drugs
   output_dir: ../project_dir/results
   conda_environment: IMPA
-  project_root_dir: /home/icb/alessandro.palma/IMPA/IMPA/
+  project_root_dir: ../IMPA/
 
 slurm:
   max_simultaneous_jobs: 10

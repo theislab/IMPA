@@ -1,0 +1,26 @@
+Lodading the data...
+Loading images...
+['ALLN' 'AZ138' 'AZ258' 'DMSO' 'MG-132' 'PD-169316' 'PP-2'
+ 'alsterpaullone' 'anisomycin' 'bryostatin' 'camptothecin' 'chlorambucil'
+ 'cisplatin' 'colchicine' 'cytochalasin B' 'demecolcine' 'emetine'
+ 'etoposide' 'floxuridine' 'methotrexate' 'mevinolin/lovastatin'
+ 'mitomycin C' 'mitoxantrone' 'nocodazole' 'proteasome inhibitor I'
+ 'taxol' 'vincristine']
+27
+Training with 27 mols
+Successfully loaded the data
+Solver loaded with parameters:
+ {'img_size': 96, 'latent_dim': 160, 'hidden_dim': 512, 'style_dim': 64, 'stochastic': True, 'z_dimension': 64, 'dim_in': 64, 'lambda_reg': 1, 'lambda_cyc': 1, 'lambda_sty': 1, 'lambda_ds': 1, 'total_iters': 100000, 'ds_iter': 100000, 'resume_iter': 0, 'batch_size': 32, 'val_batch_size': 20, 'lr': 0.0001, 'f_lr': 0.0001, 'beta1': 0, 'beta2': 0.99, 'weight_decay': 0.0001, 'num_outs_per_domain': 10, 'single_style': True, 'ood_set': ['docetaxel', 'AZ841', 'cytochalasin D', 'simvastatin', 'cyclohexamide', 'latrunculin B', 'epothilone B', 'lactacystin'], 'mol_list': None, 'balanced': True, 'trainable_emb': False, 'dataset_name': 'bbbc021', 'n_channels': 3, 'mode': 'train', 'num_workers': 6, 'seed': 42, 'image_path': '../project_folder/datasets/bbbc021_all', 'data_index_path': '../project_folder/datasets/bbbc021_all/metadata/bbbc021_df_all.csv', 'embedding_path': '../embeddings/csv/emb_rdkit.csv', 'experiment_directory': '../project_folder/experiments/', 'sample_dir': 'sample', 'checkpoint_dir': 'checkpoint', 'basal_vs_real_folder': 'basal_vs_real', 'naming_key': 'dataset_name', 'embedding_folder': 'embeddings', 'resume_dir': '', 'augment_train': True, 'normalize': True, 'print_every': 10, 'sample_every': 1000, 'save_every': 500, 'eval_every': 500, 'encode_rdkit': True, 'num_layers_mapping_net': 1, 'num_domains': 27}
+Number of parameters in generator: 24318595
+Number of parameters in style_encoder: 14329472
+Number of parameters in discriminator: 14310491
+Number of parameters in mapping_network: 14400
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+Start training...
+Elapsed time [0:00:49], Iteration [10/100000], D/latent_real: [0.3948] D/latent_fake: [0.3946] D/latent_reg: [0.0060] G/latent_adv: [4.9458] G/latent_sty: [1.1181] G/latent_ds: [0.7312] G/latent_cyc: [0.7262] G/lambda_ds: [0.9999]
+Elapsed time [0:01:34], Iteration [20/100000], D/latent_real: [0.3817] D/latent_fake: [0.1157] D/latent_reg: [0.0097] G/latent_adv: [3.2987] G/latent_sty: [1.1310] G/latent_ds: [0.6647] G/latent_cyc: [0.6295] G/lambda_ds: [0.9998]
+Elapsed time [0:02:18], Iteration [30/100000], D/latent_real: [0.1965] D/latent_fake: [0.1241] D/latent_reg: [0.0117] G/latent_adv: [3.9389] G/latent_sty: [1.0225] G/latent_ds: [0.6097] G/latent_cyc: [0.5233] G/lambda_ds: [0.9997]

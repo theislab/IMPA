@@ -1,0 +1,38 @@
+Lodading the data...
+Loading images...
+['0' 'ATF4' 'ATG5' 'BAD' 'BCL2L1' 'BECN1' 'CDC42' 'CDCA7L' 'CDK2' 'CFLAR'
+ 'CHMP2A' 'E2F1' 'EGFR' 'EIF2AK3' 'GNE' 'GRB10' 'HDAC1' 'HDAC2' 'HDAC3'
+ 'HDAC4' 'HDAC5' 'HDAC6' 'HDAC7' 'HSP90AA1' 'KIF11' 'LMNB2' 'LRPPRC'
+ 'MELK' 'MTOR' 'NDUFAF4' 'PARP2' 'PGK1' 'PTK2' 'PTPN12' 'RAC1' 'RB1'
+ 'RPS6KB1' 'SLIRP' 'TSC2' 'WWTR1' 'XBP1' 'YAP1']
+42
+Training with 42 mols
+['37983_j17_s8_14' '37983_j17_s8_22' '37983_j17_s8_53' ...
+ '38034_j22_s2_8' '38034_j22_s2_11' '38034_j22_s2_12']
+Successfully loaded the data
+Solver loaded with parameters:
+ {'img_size': 96, 'latent_dim': 200, 'hidden_dim': 512, 'style_dim': 64, 'stochastic': True, 'z_dimension': 32, 'dim_in': 64, 'lambda_reg': 1, 'lambda_cyc': 1, 'lambda_sty': 1, 'lambda_ds': 1, 'total_iters': 100000, 'ds_iter': 100000, 'resume_iter': 0, 'batch_size': 32, 'val_batch_size': 3, 'lr': 0.0001, 'f_lr': 0.0001, 'beta1': 0, 'beta2': 0.99, 'weight_decay': 0.0001, 'num_outs_per_domain': 10, 'single_style': True, 'ood_set': [], 'mol_list': None, 'balanced': True, 'trainable_emb': True, 'dataset_name': 'bbbc025', 'n_channels': 5, 'mode': 'train', 'num_workers': 6, 'seed': 42, 'image_path': '../project_folder/datasets/bbbc025', 'data_index_path': '../project_folder/datasets/bbbc025/metadata/bbbc025_df.csv', 'embedding_path': '../embeddings/csv/bbbc025_gene2vec_embeddings.csv', 'experiment_directory': '../project_folder/experiments/', 'sample_dir': 'sample', 'checkpoint_dir': 'checkpoint', 'basal_vs_real_folder': 'basal_vs_real', 'naming_key': 'dataset_name', 'embedding_folder': 'embeddings', 'resume_dir': '', 'augment_train': True, 'normalize': True, 'print_every': 10, 'sample_every': 1000, 'save_every': 500, 'eval_every': 500, 'encode_rdkit': True, 'num_layers_mapping_net': 1, 'num_domains': 42}
+Number of parameters in generator: 24319877
+Number of parameters in style_encoder: 14330624
+Number of parameters in discriminator: 14319338
+Number of parameters in mapping_network: 14912
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+Start training...
+Elapsed time [0:01:03], Iteration [10/100000], D/latent_real: [0.1545] D/latent_fake: [0.3078] D/latent_reg: [0.0034] G/latent_adv: [6.0440] G/latent_sty: [1.1645] G/latent_ds: [0.6523] G/latent_cyc: [0.7849] G/lambda_ds: [0.9999]
+Elapsed time [0:01:50], Iteration [20/100000], D/latent_real: [0.0462] D/latent_fake: [0.0210] D/latent_reg: [0.0050] G/latent_adv: [5.6688] G/latent_sty: [1.1217] G/latent_ds: [0.5277] G/latent_cyc: [0.6260] G/lambda_ds: [0.9998]
+Elapsed time [0:02:35], Iteration [30/100000], D/latent_real: [0.0275] D/latent_fake: [0.0032] D/latent_reg: [0.0076] G/latent_adv: [6.1445] G/latent_sty: [1.1216] G/latent_ds: [0.4199] G/latent_cyc: [0.5401] G/lambda_ds: [0.9997]
+Elapsed time [0:03:21], Iteration [40/100000], D/latent_real: [0.1944] D/latent_fake: [0.0009] D/latent_reg: [0.0226] G/latent_adv: [0.4257] G/latent_sty: [1.0678] G/latent_ds: [0.3259] G/latent_cyc: [0.5078] G/lambda_ds: [0.9996]
+Elapsed time [0:04:06], Iteration [50/100000], D/latent_real: [0.0705] D/latent_fake: [0.1764] D/latent_reg: [0.0056] G/latent_adv: [3.2784] G/latent_sty: [1.0370] G/latent_ds: [0.2396] G/latent_cyc: [0.4676] G/lambda_ds: [0.9995]
+Elapsed time [0:04:51], Iteration [60/100000], D/latent_real: [0.3994] D/latent_fake: [0.1432] D/latent_reg: [0.0297] G/latent_adv: [3.2139] G/latent_sty: [1.0744] G/latent_ds: [0.2085] G/latent_cyc: [0.4424] G/lambda_ds: [0.9994]
+Elapsed time [0:05:35], Iteration [70/100000], D/latent_real: [0.3130] D/latent_fake: [0.0929] D/latent_reg: [0.0270] G/latent_adv: [2.0252] G/latent_sty: [1.0578] G/latent_ds: [0.1806] G/latent_cyc: [0.4172] G/lambda_ds: [0.9993]
+Elapsed time [0:06:18], Iteration [80/100000], D/latent_real: [0.9026] D/latent_fake: [0.1000] D/latent_reg: [0.0226] G/latent_adv: [0.6421] G/latent_sty: [1.0205] G/latent_ds: [0.1647] G/latent_cyc: [0.4036] G/lambda_ds: [0.9992]
+Elapsed time [0:07:01], Iteration [90/100000], D/latent_real: [0.2868] D/latent_fake: [0.7262] D/latent_reg: [0.0043] G/latent_adv: [1.1640] G/latent_sty: [1.0025] G/latent_ds: [0.1449] G/latent_cyc: [0.3714] G/lambda_ds: [0.9991]
+Elapsed time [0:07:44], Iteration [100/100000], D/latent_real: [0.3408] D/latent_fake: [0.6549] D/latent_reg: [0.0043] G/latent_adv: [0.9635] G/latent_sty: [0.9855] G/latent_ds: [0.1358] G/latent_cyc: [0.3520] G/lambda_ds: [0.9990]
+Elapsed time [0:08:25], Iteration [110/100000], D/latent_real: [0.4742] D/latent_fake: [0.5574] D/latent_reg: [0.0035] G/latent_adv: [1.1138] G/latent_sty: [1.0093] G/latent_ds: [0.1290] G/latent_cyc: [0.3410] G/lambda_ds: [0.9989]
+Elapsed time [0:09:07], Iteration [120/100000], D/latent_real: [0.1668] D/latent_fake: [0.8990] D/latent_reg: [0.0077] G/latent_adv: [4.7820] G/latent_sty: [1.0159] G/latent_ds: [0.1232] G/latent_cyc: [0.3654] G/lambda_ds: [0.9988]
+Elapsed time [0:09:47], Iteration [130/100000], D/latent_real: [0.5227] D/latent_fake: [0.4719] D/latent_reg: [0.0089] G/latent_adv: [0.8129] G/latent_sty: [0.9824] G/latent_ds: [0.1169] G/latent_cyc: [0.3142] G/lambda_ds: [0.9987]
+Elapsed time [0:10:28], Iteration [140/100000], D/latent_real: [0.8257] D/latent_fake: [0.3954] D/latent_reg: [0.0074] G/latent_adv: [0.6582] G/latent_sty: [1.0188] G/latent_ds: [0.1105] G/latent_cyc: [0.3113] G/lambda_ds: [0.9986]

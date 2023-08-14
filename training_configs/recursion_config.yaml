@@ -1,88 +1,69 @@
-seml:
-  executable: ../IMPA/main.py
-  name: recursion
-  output_dir: ../project_dir/results
-  conda_environment: IMPA
-  project_root_dir: /home/icb/alessandro.palma/IMPA/IMPA/
-
-slurm:
-  max_simultaneous_jobs: 10
-  experiments_per_job: 1
-  sbatch_options_template: GPU
-  sbatch_options:
-    gres: gpu:1       # num GPUs
-    mem: 90G          # memory
-    cpus-per-task: 6  # num cores
-    time: 2-00:00     # max time, D-HH:MM
-
-########## HUPERPARAMETER TUNING ##########
-
-fixed: 
+args: 
   # General parameters
-  train.args.img_size: 96
-  train.args.latent_dim: 100
-  train.args.hidden_dim: 512
-  train.args.style_dim: 64
-  train.args.stochastic: True
-  train.args.z_dimension: 16
-  train.args.dim_in: 64
+  img_size: 96
+  latent_dim: 200
+  hidden_dim: 512
+  style_dim: 64
+  stochastic: True
+  z_dimension: 16
+  dim_in: 64
 
   # weight for objective functions
-  train.args.lambda_reg: 1
-  train.args.lambda_cyc: 1
-  train.args.lambda_sty: 1
-  train.args.lambda_ds: 1
+  lambda_reg: 1
+  lambda_cyc: 1
+  lambda_sty: 1
+  lambda_ds: 1
 
   # training arguments
-  train.args.total_iters: 100000
-  train.args.ds_iter: 100000  
-  train.args.resume_iter: 0
-  train.args.batch_size: 32
-  train.args.val_batch_size: 3
-  train.args.lr: 0.0001
-  train.args.f_lr: 0.0001
-  train.args.beta1: 0
-  train.args.beta2: 0.99
-  train.args.weight_decay: 0.0001
-  train.args.num_outs_per_domain: 10
-  train.args.single_style: True
-  train.args.ood_set: []
-  train.args.mol_list: Null
-  train.args.balanced: True
-  train.args.trainable_emb: True
-  train.args.dataset_name: 'recursion'
-  train.args.n_channels: 6
+  total_iters: 100000
+  ds_iter: 100000  
+  resume_iter: 0
+  batch_size: 32
+  val_batch_size: 3
+  lr: 0.0001
+  f_lr: 0.0001
+  beta1: 0
+  beta2: 0.99
+  weight_decay: 0.0001
+  num_outs_per_domain: 10
+  single_style: True
+  ood_set: []
+  mol_list: Null
+  balanced: True
+  trainable_emb: True
+  dataset_name: 'recursion'
+  n_channels: 6
 
   # misc
-  train.args.mode: train
-  train.args.num_workers: 6
-  train.args.seed: 42  
+  mode: train
+  num_workers: 6
+  seed: 42  
     
   # directory for training
-  train.args.image_path: ../project_dir/datasets/rxrx1
-  train.args.data_index_path: ../project_dir/datasets/rxrx1/metadata/rxrx1_df.csv
-  train.args.embedding_path: ../embeddings/csv/rxrx1_gene2vec_embeddings.csv
+  image_path: ../project_folder/datasets/rxrx1
+  data_index_path: ../project_folder/datasets/rxrx1/metadata/rxrx1_df.csv
+  embedding_path: ../embeddings/csv/rxrx1_gene2vec_embeddings.csv
 
   # Directories for results
-  train.args.experiment_directory: ../project_dir/experiments/
-  train.args.sample_dir: sample   # Name of directory for sampled images 
-  train.args.checkpoint_dir: checkpoint  # Name of directory for checkpoints
-  train.args.basal_vs_real_folder: basal_vs_real
-  train.args.naming_key: dataset_name
-  train.args.embedding_folder: embeddings 
-  train.args.resume_dir: ''
+  experiment_directory: ../project_folder/experiments/
+  sample_dir: sample   # Name of directory for sampled images 
+  checkpoint_dir: checkpoint  # Name of directory for checkpoints
+  basal_vs_real_folder: basal_vs_real
+  naming_key: dataset_name
+  embedding_folder: embeddings 
+  resume_dir: ''
 
   # face alignment
-  train.args.augment_train: True 
-  train.args.normalize: True
+  augment_train: True 
+  normalize: True
 
   # step size
-  train.args.print_every: 10
-  train.args.sample_every: 1000
-  train.args.save_every: 500
-  train.args.eval_every: 500
+  print_every: 10
+  sample_every: 1000
+  save_every: 500
+  eval_every: 500
 
   # Neural network parameters
-  train.args.encode_rdkit: True
-  train.args.num_layers_mapping_net: 1
+  encode_rdkit: True
+  num_layers_mapping_net: 1
       

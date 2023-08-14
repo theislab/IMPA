@@ -1,0 +1,29 @@
+Lodading the data...
+Loading images...
+['A4GALT' 'A4GNT' 'ABCA7' ... 'ZNRD1' 'ZRANB1' 'ZRANB3']
+1071
+Training with 1071 mols
+['U2OS-01_1_B02_s1_17' 'U2OS-01_1_B02_s1_21' 'U2OS-01_1_B02_s1_35' ...
+ 'U2OS-03_3_O22_s1_81' 'U2OS-03_3_O23_s1_5' 'U2OS-03_3_O23_s2_9']
+Successfully loaded the data
+Solver loaded with parameters:
+ {'img_size': 96, 'latent_dim': 200, 'hidden_dim': 512, 'style_dim': 64, 'stochastic': True, 'z_dimension': 16, 'dim_in': 64, 'lambda_reg': 1, 'lambda_cyc': 1, 'lambda_sty': 1, 'lambda_ds': 1, 'total_iters': 100000, 'ds_iter': 100000, 'resume_iter': 0, 'batch_size': 32, 'val_batch_size': 3, 'lr': 0.0001, 'f_lr': 0.0001, 'beta1': 0, 'beta2': 0.99, 'weight_decay': 0.0001, 'num_outs_per_domain': 10, 'single_style': True, 'ood_set': [], 'mol_list': None, 'balanced': True, 'trainable_emb': True, 'dataset_name': 'recursion', 'n_channels': 6, 'mode': 'train', 'num_workers': 6, 'seed': 42, 'image_path': '../project_folder/datasets/rxrx1', 'data_index_path': '../project_folder/datasets/rxrx1/metadata/rxrx1_df.csv', 'embedding_path': '../embeddings/csv/rxrx1_gene2vec_embeddings.csv', 'experiment_directory': '../project_folder/experiments/', 'sample_dir': 'sample', 'checkpoint_dir': 'checkpoint', 'basal_vs_real_folder': 'basal_vs_real', 'naming_key': 'dataset_name', 'embedding_folder': 'embeddings', 'resume_dir': '', 'augment_train': True, 'normalize': True, 'print_every': 10, 'sample_every': 1000, 'save_every': 500, 'eval_every': 500, 'encode_rdkit': True, 'num_layers_mapping_net': 1, 'num_domains': 1071}
+Number of parameters in generator: 24320518
+Number of parameters in style_encoder: 14331200
+Number of parameters in discriminator: 14847791
+Number of parameters in mapping_network: 13888
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+Start training...
+Elapsed time [0:00:56], Iteration [10/100000], D/latent_real: [0.7569] D/latent_fake: [0.8911] D/latent_reg: [0.0012] G/latent_adv: [1.4025] G/latent_sty: [1.1946] G/latent_ds: [0.5618] G/latent_cyc: [0.7938] G/lambda_ds: [0.9999]
+Elapsed time [0:01:45], Iteration [20/100000], D/latent_real: [0.7449] D/latent_fake: [0.8280] D/latent_reg: [0.0008] G/latent_adv: [1.4033] G/latent_sty: [1.1418] G/latent_ds: [0.5363] G/latent_cyc: [0.6851] G/lambda_ds: [0.9998]
+Elapsed time [0:02:32], Iteration [30/100000], D/latent_real: [0.6661] D/latent_fake: [0.6482] D/latent_reg: [0.0007] G/latent_adv: [1.4606] G/latent_sty: [1.1497] G/latent_ds: [0.5201] G/latent_cyc: [0.5888] G/lambda_ds: [0.9997]
+Elapsed time [0:03:19], Iteration [40/100000], D/latent_real: [0.7234] D/latent_fake: [0.6657] D/latent_reg: [0.0008] G/latent_adv: [1.6152] G/latent_sty: [1.1488] G/latent_ds: [0.4869] G/latent_cyc: [0.5222] G/lambda_ds: [0.9996]
+Elapsed time [0:04:06], Iteration [50/100000], D/latent_real: [0.5863] D/latent_fake: [0.6417] D/latent_reg: [0.0008] G/latent_adv: [1.3376] G/latent_sty: [1.1667] G/latent_ds: [0.4788] G/latent_cyc: [0.4510] G/lambda_ds: [0.9995]
+Elapsed time [0:04:54], Iteration [60/100000], D/latent_real: [0.6469] D/latent_fake: [0.6705] D/latent_reg: [0.0010] G/latent_adv: [1.2430] G/latent_sty: [1.1175] G/latent_ds: [0.4304] G/latent_cyc: [0.3964] G/lambda_ds: [0.9994]
+Elapsed time [0:05:42], Iteration [70/100000], D/latent_real: [0.5781] D/latent_fake: [0.5657] D/latent_reg: [0.0010] G/latent_adv: [1.7385] G/latent_sty: [1.1830] G/latent_ds: [0.3885] G/latent_cyc: [0.3531] G/lambda_ds: [0.9993]
+Elapsed time [0:06:29], Iteration [80/100000], D/latent_real: [0.4411] D/latent_fake: [0.5640] D/latent_reg: [0.0011] G/latent_adv: [1.4379] G/latent_sty: [1.1191] G/latent_ds: [0.3423] G/latent_cyc: [0.3609] G/lambda_ds: [0.9992]
+Elapsed time [0:07:16], Iteration [90/100000], D/latent_real: [0.6131] D/latent_fake: [0.5299] D/latent_reg: [0.0012] G/latent_adv: [2.0313] G/latent_sty: [1.1063] G/latent_ds: [0.2933] G/latent_cyc: [0.3256] G/lambda_ds: [0.9991]

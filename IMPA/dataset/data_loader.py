@@ -183,13 +183,14 @@ class CellDatasetFold(Dataset):
         """
         # Image must be fetched from disk 
         img_file = self.file_names[idx]
-        file_split = img_file.split('_')
+        file_split = img_file.split('-')
         
-        if len(file_split) > 4:
-            file_split[0] = file_split[0].split("-")[1]
+        if len(file_split) > 1:
+            file_split = file_split[1].split("_")
             path = Path(self.image_path) / "_".join(file_split[:2]) / file_split[2] 
             file = '_'.join(file_split[3:])+".npy"
         else:
+            file_split = file_split[0].split("_")
             path = Path(self.image_path) / file_split[0] / file_split[1] 
             file = '_'.join(file_split[2:])+".npy"
             
@@ -197,7 +198,7 @@ class CellDatasetFold(Dataset):
         img = torch.from_numpy(img).to(torch.float)
         img = img.permute(2,0,1)  # Place channel dimension in front of the others 
         img = self.transform(img)
-
+        
         return {'X':img, 
                 'mol_one_hot': self.one_hot_mol[idx], 
                 'y_id': self.y2id[self.y[idx]],
