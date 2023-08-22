@@ -61,10 +61,10 @@ All files related to the model are stored in the  `IMPA` folder.
 We trained the models using the [seml](https://github.com/TUM-DAML/seml) framework. Configurations can be found in the `training_config` folder. For each experiment, one can train the model either with `seml` or without. For both cases, one training script and one configuration are provided. If the `Slurm` scheduler is not implemented on the server, the `main.py` script can be re-written to run independently. To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
 
 
-## Dataset and checkpoints
+## Checkpoints
 Datasets are available at:
 * BBBC021 https://bbbc.broadinstitute.org/BBBC021
 * BBBC025 https://bbbc.broadinstitute.org/BBBC025
 * RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources  
   
-Pre-processed datasets will be available soon. Model checkpoints are made available [here](https://1drv.ms/f/s!AqLF-jPbzBG0sDkKwm0kjLtXAWi4?e=HdGC4h).
+Model checkpoints are made available [here](https://1drv.ms/f/s!AqLF-jPbzBG0sDkKwm0kjLtXAWi4?e=HdGC4h).
