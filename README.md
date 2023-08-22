@@ -9,7 +9,7 @@ The perturbation space can be expressed as:
 If trained on a meaniningful prior perturbation space, IMPA learns to map unseen drugs in proximity of drugs used for training. When proximity also involves functional similarity, IMPA is able to predict the effect of unseen drugs on control cells. Moreover, distances between the style encodings of different perturbations are correlated with distances in the phenotypic space. As a result, IMPA can be used to fastly inspect active compounds based on the comparison of the style vectors learned for different perturbations. 
 
 <p align="center">
-  <img src="https://github.com/theislab/imCPA/blob/add_readme_and_package/docs/IMPA.png" width="700" height="400">
+  <img src="https://github.com/theislab/imCPA/blob/add_readme_and_package/docs/IMPA.png" width="500" height="300">
 </p>
 
 ## Install repository 
@@ -25,6 +25,23 @@ Navigate to the repository and install the Python package.
 pip install -e .
 ```
 
+## Create a project folder
+The data and the experiment files should be contained in a `project_folder` located somewhere with enough storage. The project folder should be connected to the IMPA repository via a symlink through the following command. 
+
+```
+ln -s /path/to/your/folder/ project_folder
+```
+
+In the `project_folder`, create a `data` and a `results` subfolders.  
+
+```
+cd project_folder
+mkdir datasets
+mkdir results
+```
+
+In these subfolders, the data and the model checkpoints will be dumped.
+
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
 
@@ -38,27 +55,10 @@ All files related to the model are stored in the  `IMPA` folder.
 
 ## Train the models
 
-We trained the models using the [seml](https://github.com/TUM-DAML/seml) framework. Configurations can be found in the `training_config` folder. IMPA can be trained both with and without the support of `seml`. This is possible via two independent main files:  
-* `main.py`: train with `seml` on the `slurm` scheduling system 
-* `main_not_seml.py`: train without `seml` on the `slurm` scheduling system via sbatch files
+We trained the models using the [seml](https://github.com/TUM-DAML/seml) framework. Configurations can be found in the `training_config` folder. If the `Slurm` scheduler is not implemented on the server, the `main.py` script can be re-written to run independently. To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
 
-Scripts to run the code without `seml` can be found in the `scripts` folder. In a terminal, enter:
-```
-sbatch training_config.yaml 
-```
-And the script will be submitted automatically. The logs of the run will be saved in the `training_config/logs` folder. 
-
-For other scheduling systems the user may be required to apply minor modifications to the `main.py` file to accept custom configuration files. For training with `seml` we redirect the user to the [official page](https://github.com/TUM-DAML/seml) of the package.
+If the `Slurm` scheduler is not implemented on the server, the `main.py` script can be re-written to run independently. To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
 
 
-
-To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
-
-
-## Dataset and checkpoints
-Datasets are available at:
-* BBBC021 https://bbbc.broadinstitute.org/BBBC021
-* BBBC025 https://bbbc.broadinstitute.org/BBBC025
-* RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources  
-  
-Pre-processed datasets will be available soon. Model checkpoints are made available [here](https://1drv.ms/f/s!AqLF-jPbzBG0sDkKwm0kjLtXAWi4?e=HdGC4h).
+## Checkpoints
+Model checkpoints are made available [here](https://1drv.ms/f/s!AqLF-jPbzBG0sDkKwm0kjLtXAWi4?e=HdGC4h).
