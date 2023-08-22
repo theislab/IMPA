@@ -40,7 +40,10 @@ mkdir datasets
 mkdir results
 ```
 
-In these subfolders, the data and the model checkpoints will be dumped.
+In these subfolders, the data and the model checkpoints will be dumped.  
+
+## The datasets  
+Download the datasets at [link](https://onedrive.live.com/?authkey=%21AArCbSSMu1cBaLg&id=B411CCDB33FAC5A2%216256&cid=B411CCDB33FAC5A2), untar them and place them into `project_folder/datasets`. The datasets are organized into nested subfolders representing the batch, plate and well organization. Each dataset also contains a metadata folder with a `metadata` csv file used to train the model. 
 
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
