@@ -43,7 +43,12 @@ mkdir results
 In these subfolders, the data and the model checkpoints will be dumped.  
 
 ## The datasets  
-Download the datasets at [link](https://onedrive.live.com/?authkey=%21AArCbSSMu1cBaLg&id=B411CCDB33FAC5A2%216256&cid=B411CCDB33FAC5A2), untar them and place them into `project_folder/datasets`. The datasets are organized into nested subfolders representing the batch, plate and well organization. Each dataset also contains a metadata folder with a `metadata` csv file used to train the model. 
+Download the datasets at [link](https://onedrive.live.com/?authkey=%21AArCbSSMu1cBaLg&id=B411CCDB33FAC5A2%216256&cid=B411CCDB33FAC5A2), untar them and place them into `project_folder/datasets`. The datasets are organized into nested subfolders representing the batch, plate and well organization. Each dataset also contains a metadata folder with a `metadata` csv file used to train the model.  
+
+Public datasets are available here:
+* BBBC021 https://bbbc.broadinstitute.org/BBBC021
+* BBBC025 https://bbbc.broadinstitute.org/BBBC025
+* RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources  
 
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
@@ -64,9 +69,4 @@ If the `Slurm` scheduler is not implemented on the server, the `main.py` script 
 
 
 ## Checkpoints
-Datasets are available at:
-* BBBC021 https://bbbc.broadinstitute.org/BBBC021
-* BBBC025 https://bbbc.broadinstitute.org/BBBC025
-* RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources  
-  
 Model checkpoints are made available [here](https://1drv.ms/f/s!AqLF-jPbzBG0sDkKwm0kjLtXAWi4?e=HdGC4h).
