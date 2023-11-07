@@ -1,0 +1,30 @@
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_161841-ys3hlt8x
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run enchanted-sorcery-28
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/ys3hlt8x
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+wandb: Waiting for W&B process to finish... (success).
+wandb: - 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: \ 0.013 MB of 0.023 MB uploaded (0.000 MB deduped)wandb: | 0.023 MB of 0.023 MB uploaded (0.000 MB deduped)wandb: 🚀 View run enchanted-sorcery-28 at: https://wandb.ai/allepalma/bbbc021_try/runs/ys3hlt8x
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_161841-ys3hlt8x/logs

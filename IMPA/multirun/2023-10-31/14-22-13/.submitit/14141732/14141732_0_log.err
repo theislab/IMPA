@@ -1,0 +1,70 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_142502-3b5h9nx4
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run dire-wendigo-27
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/3b5h9nx4
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+
+  0%|          | 0/103 [00:00<?, ?it/s][A
+  1%|          | 1/103 [00:18<32:11, 18.93s/it][A
+  5%|▍         | 5/103 [00:19<04:39,  2.85s/it][A
+  9%|▊         | 9/103 [00:19<02:02,  1.30s/it][A
+ 13%|█▎        | 13/103 [00:19<01:06,  1.34it/s][A
+ 17%|█▋        | 17/103 [00:19<00:40,  2.13it/s][A
+ 20%|██        | 21/103 [00:19<00:27,  3.04it/s][A
+ 23%|██▎       | 24/103 [00:19<00:20,  3.94it/s][A
+ 26%|██▌       | 27/103 [00:20<00:15,  4.90it/s][A
+ 30%|███       | 31/103 [00:20<00:10,  6.96it/s][A
+ 33%|███▎      | 34/103 [00:20<00:10,  6.30it/s][A
+ 37%|███▋      | 38/103 [00:21<00:08,  8.05it/s][A
+ 40%|███▉      | 41/103 [00:21<00:06,  9.49it/s][A
+ 43%|████▎     | 44/103 [00:21<00:05,  9.88it/s][A
+ 46%|████▌     | 47/103 [00:21<00:04, 11.85it/s][A
+ 49%|████▊     | 50/103 [00:21<00:04, 13.21it/s][A
+ 50%|█████     | 52/103 [00:21<00:03, 13.86it/s][A
+ 53%|█████▎    | 55/103 [00:22<00:02, 16.53it/s][A
+ 56%|█████▋    | 58/103 [00:22<00:02, 15.31it/s][A
+ 59%|█████▉    | 61/103 [00:22<00:02, 17.18it/s][A
+ 62%|██████▏   | 64/103 [00:22<00:02, 15.36it/s][A
+ 66%|██████▌   | 68/103 [00:22<00:01, 17.77it/s][A
+ 68%|██████▊   | 70/103 [00:23<00:02, 13.65it/s][A
+ 72%|███████▏  | 74/103 [00:23<00:01, 17.36it/s][A
+ 75%|███████▍  | 77/103 [00:23<00:02, 11.27it/s][A
+ 78%|███████▊  | 80/103 [00:23<00:01, 12.35it/s][A
+ 80%|███████▉  | 82/103 [00:24<00:01, 12.43it/s][A
+ 83%|████████▎ | 86/103 [00:24<00:01, 13.56it/s][A
+ 86%|████████▋ | 89/103 [00:24<00:00, 15.98it/s][A
+ 89%|████████▉ | 92/103 [00:24<00:00, 13.97it/s][A
+ 92%|█████████▏| 95/103 [00:24<00:00, 16.48it/s][A
+ 95%|█████████▌| 98/103 [00:25<00:00, 15.82it/s][A
+ 98%|█████████▊| 101/103 [00:25<00:00, 18.22it/s][A100%|██████████| 103/103 [00:26<00:00,  3.89it/s]
+
+  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+  0%|          | 0/6 [00:03<?, ?it/s]
+wandb: Waiting for W&B process to finish... (success).
+wandb: 🚀 View run dire-wendigo-27 at: https://wandb.ai/allepalma/bbbc021_try/runs/3b5h9nx4
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_142502-3b5h9nx4/logs

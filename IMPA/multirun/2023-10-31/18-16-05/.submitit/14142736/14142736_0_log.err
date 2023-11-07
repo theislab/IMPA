@@ -1,0 +1,59 @@
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_182409-imn4x98w
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run crawly-apparition-32
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/imn4x98w
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:367: `ModelCheckpoint(monitor='fid_transformations')` could not find the monitored key in the returned metrics: ['D/latent_real', 'D/latent_fake', 'D/latent_reg', 'G/latent_adv', 'G/latent_sty', 'G/latent_ds', 'G/latent_cyc', 'G/lambda_ds', 'epoch', 'step']. HINT: Did you call `log('fid_transformations', value)` in the `LightningModule`?
+wandb: ERROR Error while calling W&B API: context deadline exceeded (<Response [500]>)
+submitit WARNING (2023-11-01 18:19:02,257) - Caught signal SIGUSR2 on supergpu02.scidom.de: this job is timed-out.
+submitit WARNING (2023-11-01 18:19:02,421) - Bypassing signal SIGCONT
+wandb: Waiting for W&B process to finish... (success).
+wandb: 
+wandb: Run history:
+wandb:       D/latent_fake ▅▃█▁▃▂▂▁▂▁▁▂▁▁▁▂▂▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▃▁▁▁▁▂▁
+wandb:       D/latent_real ▃▆█▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁
+wandb:        D/latent_reg ▂▂▁▅▆▄▃▅▄▃█▅▃▃▃▂▇▄▂▂▂▂▃▂▂▂▄▃▂▂▂▁▂▂▃▂▂▂▁▁
+wandb:         G/lambda_ds ████▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▂▂▂▂▂▂▁▁▁
+wandb:        G/latent_adv ▅▁▄▆▆▆▆▇▆▆▆█▇▆▆▆▇▆▆▆▆▆▇▆▆▆▆▆▆▆▆▆▆▅▆▆▆▆▆▆
+wandb:        G/latent_cyc █▅▄▅▄▄▃▄▃▃▃▄▃▃▂▂▂▂▁▂▂▂▂▁▁▁▁▂▁▁▁▂▁▁▁▁▁▁▁▁
+wandb:         G/latent_ds ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▇▇▇▇▇▇█████
+wandb:        G/latent_sty █▆▆▅▅▄▃▃▃▃▃▂▃▂▂▂▂▂▂▂▂▂▂▂▁▂▁▂▂▁▁▁▁▁▁▁▁▁▁▁
+wandb:               epoch ▁▁▁▁▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▅▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇▇▇█
+wandb: trainer/global_step ▁▁▁▁▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
+wandb: 
+wandb: Run summary:
+wandb:       D/latent_fake 0.71662
+wandb:       D/latent_real 0.00027
+wandb:        D/latent_reg 0.00099
+wandb:         G/lambda_ds 0.9645
+wandb:        G/latent_adv 0.69919
+wandb:        G/latent_cyc 0.2036
+wandb:         G/latent_ds 23.69508
+wandb:        G/latent_sty 0.10887
+wandb:               epoch 6
+wandb: trainer/global_step 3549
+wandb: 
+wandb: 🚀 View run crawly-apparition-32 at: https://wandb.ai/allepalma/bbbc021_try/runs/imn4x98w
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_182409-imn4x98w/logs

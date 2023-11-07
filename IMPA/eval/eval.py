@@ -102,8 +102,8 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
         wd_transformations += wd
 
         # FID
-        X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to('cuda')))
-        X_swapped_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_swapped_cat.to('cuda')))
+        X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
+        X_swapped_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_swapped_cat.to(device)))
         fid = cal_fid(X_real_dataset, X_swapped_dataset, 2048, True, custom_channels=channels)
         fid_transformations += fid
 

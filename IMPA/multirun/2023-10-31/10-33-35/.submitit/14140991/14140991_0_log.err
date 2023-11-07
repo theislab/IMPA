@@ -1,0 +1,37 @@
+Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/runpy.py", line 197, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/_submit.py", line 11, in <module>
+    submitit_main()
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/submission.py", line 76, in submitit_main
+    process_job(args.folder)
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/submission.py", line 37, in process_job
+    env = job_environment.JobEnvironment()
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/job_environment.py", line 44, in __new__
+    return plugins.get_job_environment()
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/plugins.py", line 71, in get_job_environment
+    envs = get_job_environments()
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/plugins.py", line 88, in get_job_environments
+    return {env.name(): env for env in _get_plugins()[1]}
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/submitit/core/plugins.py", line 24, in _get_plugins
+    import pkg_resources
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 3242, in <module>
+    def _initialize_master_working_set():
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 3216, in _call_aside
+    f(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 3254, in _initialize_master_working_set
+    working_set = WorkingSet._build_master()
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 608, in _build_master
+    ws = cls()
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 601, in __init__
+    self.add_entry(entry)
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 657, in add_entry
+    for dist in find_distributions(entry, True):
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 2087, in find_on_path
+    entries = (os.path.join(path_item, child) for child in safe_listdir(path_item))
+  File "/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/pkg_resources/__init__.py", line 2137, in safe_listdir
+    return os.listdir(path)
+BrokenPipeError: [Errno 108] Cannot send after transport endpoint shutdown: '/lustre/groups/ml01/workspace/alessandro.palma/milVAE/simCLR_phenotypic_screens'
+srun: error: supergpu02: task 0: Exited with exit code 1

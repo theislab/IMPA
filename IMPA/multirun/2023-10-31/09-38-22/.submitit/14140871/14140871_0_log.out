@@ -1,0 +1,6 @@
+submitit INFO (2023-10-31 09:44:12,853) - Starting with JobEnvironment(job_id=14140871, hostname=gpusrv63.scidom.de, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2023-10-31 09:44:12,855) - Loading pickle: /home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/multirun/2023-10-31/09-38-22/.submitit/14140871/14140871_submitted.pkl
+submitit INFO (2023-10-31 09:49:51,729) - Job completed successfully
+[2023-10-31 09:49:51,729][submitit][INFO] - Job completed successfully
+submitit INFO (2023-10-31 09:49:51,778) - Exiting after successful completion
+[2023-10-31 09:49:51,778][submitit][INFO] - Exiting after successful completion

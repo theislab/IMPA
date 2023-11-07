@@ -1,0 +1,73 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_110057-0divf01e
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run fearful-candy-19
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/0divf01e
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+
+  0%|          | 0/103 [00:00<?, ?it/s][A
+  1%|          | 1/103 [00:15<27:00, 15.89s/it][A
+  5%|▍         | 5/103 [00:16<03:54,  2.39s/it][A
+  9%|▊         | 9/103 [00:16<01:43,  1.10s/it][A
+ 13%|█▎        | 13/103 [00:16<00:56,  1.59it/s][A
+ 17%|█▋        | 17/103 [00:16<00:35,  2.40it/s][A
+ 19%|█▉        | 20/103 [00:16<00:27,  3.03it/s][A
+ 22%|██▏       | 23/103 [00:17<00:19,  4.08it/s][A
+ 25%|██▌       | 26/103 [00:17<00:15,  4.83it/s][A
+ 29%|██▉       | 30/103 [00:17<00:10,  6.86it/s][A
+ 31%|███       | 32/103 [00:18<00:11,  6.17it/s][A
+ 35%|███▍      | 36/103 [00:18<00:07,  8.78it/s][A
+ 38%|███▊      | 39/103 [00:18<00:07,  8.29it/s][A
+ 42%|████▏     | 43/103 [00:18<00:05, 10.26it/s][A
+ 44%|████▎     | 45/103 [00:19<00:06,  9.38it/s][A
+ 48%|████▊     | 49/103 [00:19<00:04, 11.14it/s][A
+ 50%|████▉     | 51/103 [00:19<00:04, 10.77it/s][A
+ 51%|█████▏    | 53/103 [00:19<00:04, 11.04it/s][A
+ 53%|█████▎    | 55/103 [00:19<00:04, 11.38it/s][A
+ 55%|█████▌    | 57/103 [00:20<00:04, 10.25it/s][A
+ 59%|█████▉    | 61/103 [00:20<00:03, 13.02it/s][A
+ 61%|██████    | 63/103 [00:20<00:03, 10.37it/s][A
+ 65%|██████▌   | 67/103 [00:20<00:02, 13.34it/s][A
+ 67%|██████▋   | 69/103 [00:21<00:03, 10.25it/s][A
+ 71%|███████   | 73/103 [00:21<00:02, 12.08it/s][A
+ 73%|███████▎  | 75/103 [00:21<00:02, 11.54it/s][A
+ 76%|███████▌  | 78/103 [00:21<00:01, 14.22it/s][A
+ 78%|███████▊  | 80/103 [00:21<00:01, 14.83it/s][A
+ 80%|███████▉  | 82/103 [00:22<00:01, 11.84it/s][A
+ 83%|████████▎ | 85/103 [00:22<00:01, 13.00it/s][A
+ 84%|████████▍ | 87/103 [00:22<00:01, 11.02it/s][A
+ 88%|████████▊ | 91/103 [00:22<00:00, 14.60it/s][A
+ 90%|█████████ | 93/103 [00:22<00:00, 11.49it/s][A
+ 94%|█████████▍| 97/103 [00:23<00:00, 14.63it/s][A
+ 96%|█████████▌| 99/103 [00:23<00:00, 11.60it/s][A
+ 99%|█████████▉| 102/103 [00:23<00:00, 14.12it/s][A100%|██████████| 103/103 [00:25<00:00,  4.10it/s]
+
+  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+  0%|          | 0/6 [00:03<?, ?it/s]
+wandb: Waiting for W&B process to finish... (success).
+wandb: 🚀 View run fearful-candy-19 at: https://wandb.ai/allepalma/bbbc021_try/runs/0divf01e
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_110057-0divf01e/logs

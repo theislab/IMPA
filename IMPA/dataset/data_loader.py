@@ -1,13 +1,15 @@
 import os
-import pickle as pkl
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
+from torch.utils.data import WeightedRandomSampler
+
 from sklearn.preprocessing import OneHotEncoder
 from torch.utils.data import Dataset
 
+from pytorch_lightning import LightningDataModule
 from IMPA.dataset.data_utils import CustomTransform
 from IMPA.utils import *
 
@@ -16,7 +18,7 @@ class CellDataset:
     """Dataset class for image data 
     """
     def __init__(self, args, device):
-
+        
         assert os.path.exists(args.image_path), 'The data path does not exist'
         assert os.path.exists(args.data_index_path), 'The data index path does not exist'
 
@@ -63,11 +65,6 @@ class CellDataset:
         # Encoders for moa and drug 
         encoder_mol = OneHotEncoder(sparse=False, categories=[self.mol_names])
         encoder_mol.fit(np.array(self.mol_names).reshape((-1,1)))
-
-        # Read images 
-        print('Loading images...')
-        print(self.mol_names)
-        print(len(self.mol_names))
 
         # Initialize the datasets 
         self.fold_datasets = {'train': CellDatasetFold('train', 
@@ -212,3 +209,84 @@ class CellDatasetFold(Dataset):
         dict_mol_names_idx_unique = {key:1/val for key,val in zip(mol_names_idx_unique[0], mol_names_idx_unique[1])}
         # Derive weights
         self.weights = [dict_mol_names_idx_unique[obs] for obs in mol_names_idx]
+
+
+class CellDataLoader(LightningDataModule):
+    """General data loader class
+    """
+    def __init__(self, args):
+        """General argument dictionary 
+
+        Args:
+            args (_type_): _description_
+        """
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.args = args
+        self.init_dataset() 
+        
+    def create_torch_datasets(self):
+        """Create dataset compatible with the pytorch training loop 
+        """
+        dataset = CellDataset(self.args, device=self.device) 
+        
+        # Channel dimension
+        self.dim = self.args['n_channels']
+
+        # Integrate embeddings as class attribute
+        self.embedding_matrix = dataset.embedding_matrix  
+
+        # Number of mols and annotations (the latter can be modes of action/genes...)
+        self.n_mol = dataset.n_mol
+        self.num_y = dataset.n_y 
+
+        # Collect training and test set 
+        training_set, test_set = dataset.fold_datasets.values()  
+        
+        # Collect ids 
+        self.mol2id = dataset.mol2id
+        self.y2id = dataset.y2id
+        self.id2mol = {val:key for key,val in self.mol2id.items()}
+        self.id2y = {val:key for key,val in self.y2id.items()}   
+
+        # Free cell painting dataset memory
+        del dataset
+        return training_set, test_set
+        
+        
+    def init_dataset(self):
+        """Initialize dataset and data loaders
+        """
+        self.training_set, self.test_set = self.create_torch_datasets()
+        
+        # Create data loaders 
+        if self.args.balanced:
+            # Balanced sampler
+            sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
+            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
+                                                            batch_size=self.args.batch_size, 
+                                                            sampler=sampler, 
+                                                            num_workers=self.args.num_workers, 
+                                                            drop_last=True)   
+        else:
+            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
+                                                            batch_size=self.args.batch_size, 
+                                                            shuffle=True, 
+                                                            num_workers=self.args.num_workers, 
+                                                            drop_last=True)  
+
+        self.loader_test = torch.utils.data.DataLoader(self.test_set, 
+                                                       batch_size=self.args.val_batch_size, 
+                                                       shuffle=False, 
+                                                       num_workers=self.args.num_workers,
+                                                       drop_last=False)      
+        self.mol2y = self.training_set.couples_mol_y       
+    
+    
+    def train_dataloader(self):
+        return self.loader_train
+    
+    def val_dataloader(self):
+        return self.loader_test
+    
+    def val_dataloader(self):
+        return self.loader_test

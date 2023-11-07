@@ -1,0 +1,18 @@
+submitit INFO (2023-11-07 14:13:25,461) - Starting with JobEnvironment(job_id=14162190, hostname=gpusrv30.scidom.de, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2023-11-07 14:13:25,462) - Loading pickle: /home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/multirun/2023-11-07/14-13-18/.submitit/14162190/14162190_submitted.pkl
+False
+[2023-11-07 14:13:35,473][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmplzjmdvwg
+[2023-11-07 14:13:35,474][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmplzjmdvwg/_remote_module_non_scriptable.py
+Number of parameters in generator: 24318595
+Number of parameters in style_encoder: 14329472
+Number of parameters in discriminator: 14299718
+Number of parameters in mapping_network: 11328
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+submitit INFO (2023-11-07 14:13:36,479) - Job completed successfully
+[2023-11-07 14:13:36,479][submitit][INFO] - Job completed successfully
+submitit INFO (2023-11-07 14:13:36,486) - Exiting after successful completion
+[2023-11-07 14:13:36,486][submitit][INFO] - Exiting after successful completion

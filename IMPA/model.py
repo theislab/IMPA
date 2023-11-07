@@ -326,15 +326,15 @@ class Discriminator(nn.Module):
         return out
     
 
-def build_model(args):
+def build_model(args, num_domains, device):
     # Generator autoencoder
-    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in))
+    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
     
     # Style encoder 
-    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in))
+    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
 
     # Discriminator network 
-    discriminator = nn.DataParallel(Discriminator(args.img_size, args.num_domains, in_channels=args.n_channels, dim_in=args.dim_in))
+    discriminator = nn.DataParallel(Discriminator(args.img_size, num_domains, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
     
     # The rdkit embeddings can be collected together with noise 
     if args.stochastic:
@@ -343,7 +343,7 @@ def build_model(args):
         input_dim = args.latent_dim 
     
     # Mapping network
-    mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net))
+    mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net).to(device))
 
     # Dictionary with the modules 
     nets = Munch(generator=generator,

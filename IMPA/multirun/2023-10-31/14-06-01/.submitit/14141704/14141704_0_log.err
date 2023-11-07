@@ -1,0 +1,74 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_140856-q11js25s
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run abominable-shadow-24
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/q11js25s
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+
+  0%|          | 0/103 [00:00<?, ?it/s][A
+  1%|          | 1/103 [00:17<30:05, 17.71s/it][A
+  4%|▍         | 4/103 [00:17<05:34,  3.38s/it][A
+  7%|▋         | 7/103 [00:17<02:32,  1.58s/it][A
+ 11%|█         | 11/103 [00:18<01:13,  1.25it/s][A
+ 14%|█▎        | 14/103 [00:18<00:47,  1.85it/s][A
+ 17%|█▋        | 18/103 [00:18<00:31,  2.71it/s][A
+ 19%|█▉        | 20/103 [00:18<00:25,  3.22it/s][A
+ 23%|██▎       | 24/103 [00:19<00:16,  4.83it/s][A
+ 25%|██▌       | 26/103 [00:19<00:13,  5.52it/s][A
+ 27%|██▋       | 28/103 [00:19<00:11,  6.51it/s][A
+ 30%|███       | 31/103 [00:19<00:08,  8.81it/s][A
+ 32%|███▏      | 33/103 [00:19<00:08,  8.67it/s][A
+ 34%|███▍      | 35/103 [00:19<00:07,  9.44it/s][A
+ 37%|███▋      | 38/103 [00:20<00:06, 10.60it/s][A
+ 39%|███▉      | 40/103 [00:20<00:06, 10.13it/s][A
+ 42%|████▏     | 43/103 [00:20<00:04, 13.10it/s][A
+ 45%|████▍     | 46/103 [00:20<00:05, 10.66it/s][A
+ 47%|████▋     | 48/103 [00:20<00:04, 11.56it/s][A
+ 50%|█████     | 52/103 [00:21<00:04, 11.43it/s][A
+ 52%|█████▏    | 54/103 [00:21<00:05,  9.07it/s][A
+ 56%|█████▋    | 58/103 [00:21<00:03, 11.27it/s][A
+ 58%|█████▊    | 60/103 [00:22<00:03, 11.45it/s][A
+ 62%|██████▏   | 64/103 [00:22<00:03, 12.87it/s][A
+ 64%|██████▍   | 66/103 [00:22<00:02, 12.89it/s][A
+ 68%|██████▊   | 70/103 [00:22<00:02, 13.98it/s][A
+ 71%|███████   | 73/103 [00:22<00:01, 16.17it/s][A
+ 74%|███████▍  | 76/103 [00:23<00:01, 14.34it/s][A
+ 76%|███████▌  | 78/103 [00:23<00:01, 15.03it/s][A
+ 80%|███████▉  | 82/103 [00:23<00:01, 15.10it/s][A
+ 83%|████████▎ | 85/103 [00:23<00:01, 17.57it/s][A
+ 85%|████████▌ | 88/103 [00:23<00:00, 16.14it/s][A
+ 89%|████████▉ | 92/103 [00:24<00:00, 16.91it/s][A
+ 91%|█████████▏| 94/103 [00:24<00:00, 10.90it/s][A
+ 95%|█████████▌| 98/103 [00:24<00:00, 14.36it/s][A
+ 97%|█████████▋| 100/103 [00:24<00:00, 11.64it/s][A
+100%|██████████| 103/103 [00:26<00:00,  4.78it/s][A100%|██████████| 103/103 [00:26<00:00,  3.91it/s]
+
+  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+  0%|          | 0/6 [00:03<?, ?it/s]
+wandb: Waiting for W&B process to finish... (success).
+wandb: 🚀 View run abominable-shadow-24 at: https://wandb.ai/allepalma/bbbc021_try/runs/q11js25s
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_140856-q11js25s/logs

@@ -1,0 +1,77 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_104830-xrtmukfy
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run trembling-magic-18
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/xrtmukfy
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+
+  0%|          | 0/103 [00:00<?, ?it/s][A
+  1%|          | 1/103 [00:18<30:48, 18.12s/it][A
+  5%|▍         | 5/103 [00:18<04:27,  2.73s/it][A
+  9%|▊         | 9/103 [00:18<01:57,  1.25s/it][A
+ 13%|█▎        | 13/103 [00:18<01:04,  1.40it/s][A
+ 17%|█▋        | 17/103 [00:18<00:40,  2.11it/s][A
+ 19%|█▉        | 20/103 [00:19<00:31,  2.66it/s][A
+ 22%|██▏       | 23/103 [00:19<00:22,  3.60it/s][A
+ 25%|██▌       | 26/103 [00:19<00:17,  4.40it/s][A
+ 27%|██▋       | 28/103 [00:19<00:15,  4.87it/s][A
+ 31%|███       | 32/103 [00:20<00:11,  6.28it/s][A
+ 33%|███▎      | 34/103 [00:20<00:10,  6.88it/s][A
+ 37%|███▋      | 38/103 [00:20<00:08,  7.85it/s][A
+ 39%|███▉      | 40/103 [00:21<00:07,  8.29it/s][A
+ 43%|████▎     | 44/103 [00:21<00:06,  9.67it/s][A
+ 45%|████▍     | 46/103 [00:21<00:05, 10.24it/s][A
+ 47%|████▋     | 48/103 [00:21<00:05, 10.69it/s][A
+ 49%|████▊     | 50/103 [00:21<00:05,  9.69it/s][A
+ 50%|█████     | 52/103 [00:22<00:04, 10.68it/s][A
+ 52%|█████▏    | 54/103 [00:22<00:04, 11.00it/s][A
+ 54%|█████▍    | 56/103 [00:22<00:04,  9.46it/s][A
+ 56%|█████▋    | 58/103 [00:22<00:04, 10.89it/s][A
+ 58%|█████▊    | 60/103 [00:22<00:03, 11.05it/s][A
+ 60%|██████    | 62/103 [00:23<00:04, 10.24it/s][A
+ 62%|██████▏   | 64/103 [00:23<00:03, 10.06it/s][A
+ 66%|██████▌   | 68/103 [00:23<00:02, 12.16it/s][A
+ 68%|██████▊   | 70/103 [00:23<00:02, 11.13it/s][A
+ 71%|███████   | 73/103 [00:23<00:02, 14.00it/s][A
+ 73%|███████▎  | 75/103 [00:24<00:02,  9.94it/s][A
+ 75%|███████▍  | 77/103 [00:24<00:02, 10.39it/s][A
+ 78%|███████▊  | 80/103 [00:24<00:01, 11.92it/s][A
+ 80%|███████▉  | 82/103 [00:24<00:01, 12.29it/s][A
+ 82%|████████▏ | 84/103 [00:24<00:01, 12.40it/s][A
+ 84%|████████▍ | 87/103 [00:25<00:01, 13.97it/s][A
+ 86%|████████▋ | 89/103 [00:25<00:01, 12.48it/s][A
+ 89%|████████▉ | 92/103 [00:25<00:00, 15.58it/s][A
+ 91%|█████████▏| 94/103 [00:25<00:00, 11.04it/s][A
+ 95%|█████████▌| 98/103 [00:25<00:00, 14.30it/s][A
+ 97%|█████████▋| 100/103 [00:26<00:00, 10.12it/s][A
+100%|██████████| 103/103 [00:27<00:00,  4.11it/s][A100%|██████████| 103/103 [00:27<00:00,  3.69it/s]
+
+  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/imgCPA/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+  0%|          | 0/6 [00:02<?, ?it/s]
+wandb: Waiting for W&B process to finish... (success).
+wandb: 🚀 View run trembling-magic-18 at: https://wandb.ai/allepalma/bbbc021_try/runs/xrtmukfy
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231031_bbbc021_try/wandb/run-20231031_104830-xrtmukfy/logs

@@ -1,0 +1,13 @@
+I Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/hydra/_internal/utils.py", line 466, in <lambda>
+    lambda: hydra.multirun(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/hydra/_internal/hydra.py", line 162, in multirun
+    ret = sweeper.sweep(arguments=task_overrides)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/hydra/_internal/core_plugins/basic_sweeper.py", line 181, in sweep
+    _ = r.return_value
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA/lib/python3.9/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+lightning_fabric.utilities.exceptions.MisconfigurationException: No supported gpu backend found!

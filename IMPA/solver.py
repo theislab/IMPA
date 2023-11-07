@@ -1,248 +1,156 @@
-import datetime
-import os
-import time
-from os.path import join as ospj
-
 from munch import Munch
-from torch.utils.data import WeightedRandomSampler
+from os.path import join as ospj
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim import Adam
+from pytorch_lightning import LightningModule
+
 from IMPA.checkpoint import CheckpointIO
-from IMPA.dataset.data_loader import CellDataset
 from IMPA.eval.eval import evaluate
 from IMPA.model import build_model
-from munch import Munch
-from torch.utils.data import DataLoader  # Import DataLoader from torch.utils.data
-from IMPA.utils import he_init, print_network, swap_attributes, print_metrics, print_checkpoint, debug_image
+from IMPA.utils import he_init, print_network, swap_attributes, debug_image
 
-class Solver(nn.Module):
-    """Solver class embedding attributes and methods for training the model."""
-    def __init__(self, args):
+class IMPAmodule(LightningModule):
+    def __init__(self, args, dest_dir, datamodule):
+        """Initialize IMPA module
+
+        Args:
+            args (dict): dictionary with hparams 
+        """
         super().__init__()
         self.args = args
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.dest_dir = dest_dir
+        self.automatic_optimization = False
         
-        # Initialize datasets
-        self.init_dataset()
-        args.num_domains = self.n_mol  # Change to 'num_domains'
-
-        # Log the parameters 
-        print('Solver loaded with parameters:\n', self.args)
-
-        # Create directories 
-        self._create_dirs()
-
-        # Get the nets 
-        self.nets = build_model(args)
-
+        # Save hyperparameters for lightning/hydra
+        self.save_hyperparameters(args)
+        
+        # Get the nets
+        self.nets = build_model(args, datamodule.n_mol, self.device)
+        self.loader_test = datamodule.val_dataloader()
+        self.embedding_matrix = datamodule.embedding_matrix
+        self.id2mol = datamodule.id2mol
+        self.num_domains = datamodule.n_mol
+        
         # Set modules as attributes of the solver class
         for name, module in self.nets.items():
             print_network(module, name)
             setattr(self, name, module)
-        
-        # Initialize optimizers and checkpoint path 
-        self.optims = Munch()
-        for net in self.nets.keys():
-            params = list(self.nets[net].parameters())
-            if net == 'mapping_network' and self.args.trainable_emb:
-                params += list(self.embedding_matrix.parameters())  # Add embedding_matrix parameters
-            self.optims[net] = torch.optim.Adam(
-                params=params,
-                lr=args.f_lr if net == 'mapping_network' else args.lr,
-                betas=[args.beta1, args.beta2],
-                weight_decay=args.weight_decay)
 
         # Initialize checkpoints
         self._create_checkpoints()
 
-        # Perform network initialization 
-        self.to(self.device)
+        # Initialize nets 
         for name, network in self.named_children():
             print('Initializing %s...' % name)
             if name != 'embedding_matrix':
-                network.apply(he_init) 
-
-    def init_dataset(self):
-        """Initialize dataset and data loaders
-        """
-        # Prepare the data
-        print('Lodading the data...') 
-        self.training_set, self.test_set = self.create_torch_datasets()
+                network.apply(he_init)
         
-        # Create data loaders 
-        if self.args.balanced:
-            # Balanced sampler
-            sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
-            self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.args.batch_size, sampler=sampler, 
-                                            num_workers=self.args.num_workers, drop_last=True)   
-        else:
-            self.loader_train = torch.utils.data.DataLoader(self.training_set, batch_size=self.args.batch_size, shuffle=True, 
-                                                        num_workers=self.args.num_workers, drop_last=True)  
-
-        self.loader_test = torch.utils.data.DataLoader(self.test_set, batch_size=self.args.val_batch_size, shuffle=True, 
-                                                    num_workers=self.args.num_workers, drop_last=False)
-
-        self.mol2y = self.training_set.couples_mol_y 
-        print('Successfully loaded the data')
-    
-    def create_torch_datasets(self):
-        """Create dataset compatible with the pytorch training loop 
-        """
-        dataset = CellDataset(self.args, device=self.device) 
-        
-        # Channel dimension
-        self.dim = self.args['n_channels']
-
-        # Integrate embeddings as class attribute
-        self.embedding_matrix = dataset.embedding_matrix  
-
-        # Number of mols and annotations (the latter can be mode of actions/genes...)
-        self.n_mol = dataset.n_mol
-        print(f'Training with {self.n_mol} mols')
-        self.num_y = dataset.n_y
-
-        # Collect ids 
-        self.mol2id = dataset.mol2id
-        self.y2id = dataset.y2id
-        self.id2mol = {val:key for key,val in self.mol2id.items()}
-        self.id2y = {val:key for key,val in self.y2id.items()}        
-
-        # Collect training and test set 
-        training_set, test_set = dataset.fold_datasets.values()  
-
-        # Free cell painting dataset memory
-        del dataset
-        return training_set, test_set
-
-    def train(self):     
-        """Method for IMPA training across a pre-defined number of iterations. 
-        """
-        # The history of the training process
-        self.history = {"train":{'epoch':[]}, "test":{'epoch':[]}}
-
-        # Fixed batch used for the evaluation on the validation set 
-        inputs_val = next(iter(self.loader_test)) 
-        
-        # Remember the initial value of diversity-sensitivity weight and decay it 
-        initial_lambda_ds = self.args.lambda_ds
-
-        # Resume training if necessary
-        if self.args.resume_iter > 0:
-            self._load_checkpoint(self.args.resume_iter)
-            # Initialize decayed lambda
-            self.args.lambda_ds = self.args.lambda_ds - \
-                            (initial_lambda_ds / self.args.ds_iter)*self.args.resume_iter
-
-        print('Start training...')
-        start_time = time.time()
-        for i in range(self.args.resume_iter, self.args.total_iters):
-            
-            # Fetch images and labels as iteration batch
-            inputs = next(iter(self.loader_train))
-
-            # Fetch the real and fake inputs and outputs 
-            x_real, y_one_hot = inputs['X'].to(self.device), inputs['mol_one_hot']
-            y_org = y_one_hot.argmax(1).long().to(self.device)
-            y_trg = swap_attributes(y_one_hot, y_org, self.device).argmax(1).long().to(self.device)
-
-            # Get the perturbation embedding for the target mol
-            z_emb_trg = self.embedding_matrix(y_trg).to(self.device)
-            z_emb_org = self.embedding_matrix(y_org).to(self.device)
-
-            # Pick two random weight vectors 
-            if self.args.stochastic:
-                z_trg, z_trg2 = (torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), 
-                                    torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device))
-            else:
-                z_trg, z_trg2 = None, None
-            
-            # Train the discriminator
-            d_loss, d_losses_latent = self._compute_d_loss(
-                x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
-            self._reset_grad()
-            d_loss.backward()
-            self.optims.discriminator.step()
-            
-            # Train the generator
-            g_loss, g_losses_latent = self._compute_g_loss(
-                x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
-            self._reset_grad()
-            g_loss.backward()
-            self.optims.style_encoder.step()
-            self.optims.generator.step()
-            self.optims.mapping_network.step()
-        
-            # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
-            if self.args.lambda_ds > 0 and self.args.stochastic:
-                self.args.lambda_ds -= (initial_lambda_ds / self.args.ds_iter)
-
-            # Format the losses
-            all_losses = dict()
-            for loss, prefix in zip([d_losses_latent, g_losses_latent],
-                                    ['D/latent_', 'G/latent_']):
-                for key, value in loss.items():
-                    all_losses[prefix + key] = value
-            all_losses['G/lambda_ds'] = self.args.lambda_ds
-            
-            # Log time and losses
-            if (i+1) % self.args.print_every == 0:
-                print_checkpoint(i, start_time, 
-                        self.args.total_iters, 
-                        all_losses)
-
-            # Generate images for debugging
-            if (i+1) % self.args.sample_every == 0:
-                debug_image(self.nets, 
-                            self.embedding_matrix, 
-                            self.args, 
-                            inputs=inputs_val, 
-                            step=i+1, 
-                            device=self.device, 
-                            id2mol=self.id2mol,
-                            dest_dir=self.dest_dir)
-
-            # Save model checkpoints
-            if (i+1) % self.args.save_every == 0:
-                self._save_checkpoint(step=i+1)
-                # Save losses in the history 
-                self._save_history(i, all_losses, 'train')
-
-            # Compute evaluation metrics 
-            if (i+1) % self.args.eval_every == 0:
-                rmse_disentanglement_dict = evaluate(self.nets,
-                                                        self.loader_test,
-                                                        self.device,
-                                                        self.dest_dir,
-                                                        self.args.embedding_folder,
-                                                        args=self.args,
-                                                        embedding_matrix=self.embedding_matrix)
-
-                # Save metrics to history 
-                self._save_history(i, rmse_disentanglement_dict, 'test')
-                # Print metrics 
-                print_metrics(rmse_disentanglement_dict, i+1)
+        # Initial values of diversity loss
+        self.initial_lambda_ds = self.args.lambda_ds
                 
+    def configure_optimizers(self):
+        """Initialize optimizer
 
-        # Format the history results to proper storage into Mongo DB
-        results = self._format_seml_results(self.history)
-        return results 
-    
-    def _format_seml_results(self, history):
-        """Format results for seml 
-
-        Args:
-            history (_dict_): dictionary containing the history of the model's statisistics
+        Returns:
+            dict: dictionary with optimizers for different neural networks
         """
-        results = {}
-        for fold in history:
-            for stat in history[fold]:
-                key = f'{fold}_{stat}'
-                results[key] = history[fold][stat]
-        return results
+        self.optims = {}
+        for net in self.nets.keys():
+            params = list(self.nets[net].parameters())
+            if net == 'mapping_network' and self.args.trainable_emb:
+                params += list(self.embedding_matrix.parameters())  
+                
+            # Define optimizers and LR scheduler here
+            self.optims[net] = Adam(params=params,
+                                lr=self.args.f_lr if net == 'mapping_network' else self.args.lr,
+                                betas=[self.args.beta1, self.args.beta2],
+                                weight_decay=self.args.weight_decay)
+        return list(self.optims.values())
     
+    def training_step(self, batch): 
+        """Method for IMPA training across a pre-defined number of iterations. 
+        """       
+        generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
+        # Fetch the real and fake inputs and outputs 
+        x_real, y_one_hot = batch['X'].to(self.device), batch['mol_one_hot']
+        y_org = y_one_hot.argmax(1).long().to(self.device)
+        y_trg = swap_attributes(y_one_hot, y_org, self.device).argmax(1).long().to(self.device)
 
+        # Get the perturbation embedding for the target mol
+        z_emb_trg = self.embedding_matrix(y_trg).to(self.device)
+        z_emb_org = self.embedding_matrix(y_org).to(self.device)
+
+        # Pick two random weight vectors 
+        if self.args.stochastic:
+            z_trg, z_trg2 = (torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), 
+                                torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device))
+        else:
+            z_trg, z_trg2 = None, None
+        
+        # Train the discriminator
+        d_loss, d_losses_latent = self._compute_d_loss(
+            x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
+        self.manual_backward(d_loss)
+        discriminator_opt.step()
+        discriminator_opt.zero_grad()
+        
+        # Train the generator
+        g_loss, g_losses_latent = self._compute_g_loss(
+            x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
+        self.manual_backward(g_loss)
+        style_encoder_opt.step()
+        generator_opt.step()
+        mapping_network_opt.step()
+        style_encoder_opt.zero_grad()
+        generator_opt.zero_grad()
+        mapping_network_opt.zero_grad()    
+    
+        # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
+        if self.args.lambda_ds > 0 and self.args.stochastic:
+            self.args.lambda_ds -= (self.initial_lambda_ds / self.args.ds_iter)
+
+        # Log the losses 
+        all_losses = dict()
+        for loss, prefix in zip([d_losses_latent, g_losses_latent],
+                                ['D/latent_', 'G/latent_']):
+            for key, value in loss.items():
+                all_losses[prefix + key] = value
+        all_losses['G/lambda_ds'] = self.args.lambda_ds
+        self.log_dict(all_losses)
+    
+    def on_train_start(self):
+        self.ckptios.append(CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims))
+        
+    def on_training_epoch_end(self):
+        # Scores on the validation images 
+        rmse_disentanglement_dict = evaluate(self.nets,
+                                                self.loader_test,
+                                                self.device,
+                                                self.dest_dir,
+                                                self.args.embedding_folder,
+                                                args=self.args,
+                                                embedding_matrix=self.embedding_matrix)
+        self.log_dict(rmse_disentanglement_dict)
+        
+        inputs_val = next(iter(self.loader_test)) 
+        debug_image(self.nets, 
+                    self.embedding_matrix, 
+                    self.args, 
+                    inputs=inputs_val, 
+                    step=self.global_step+1, 
+                    device=self.device, 
+                    id2mol=self.id2mol,
+                    dest_dir=self.dest_dir, 
+                    num_domains=self.num_domains)
+
+        # Save model checkpoints
+        if (self.global_step+1) % self.args.save_every == 0:
+            self._save_checkpoint(step=self.global_step+1)        
+        
+    
     def _compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):
         """Compute the discriminator loss real batches
 
@@ -346,21 +254,6 @@ class Solver(nn.Module):
                         ds=loss_ds.item() if self.args.stochastic else loss_ds,
                         cyc=loss_cyc.item())
 
-    def _adv_loss(self, logits, target):
-        """Adversarial loss as binary cross-entropy
-
-        Args:
-            logits (torch.tensor): discriminator prediction 
-            target (torch.tensor): label (0 or 1 depending on what network is trained)
-
-        Returns:
-            torch.tensor: evaluated binary cross-entropy loss
-        """
-        targets = torch.full_like(logits, fill_value=target)
-        loss = F.binary_cross_entropy_with_logits(logits, targets)
-        return loss
-
-
     def _r1_reg(self, logits, x):
         """Gradient penalty loss on discriminator output
 
@@ -380,15 +273,20 @@ class Solver(nn.Module):
         assert(grad.size() == x.size())
         reg = 0.5 * grad.view(batch_size, -1).sum(1).mean(0)
         return reg
-
-    def _save_checkpoint(self, step):
-        """Save model checkpoints
+    
+    def _adv_loss(self, logits, target):
+        """Adversarial loss as binary cross-entropy
 
         Args:
-            step (int): step at which saving is performed
+            logits (torch.tensor): discriminator prediction 
+            target (torch.tensor): label (0 or 1 depending on what network is trained)
+
+        Returns:
+            torch.tensor: evaluated binary cross-entropy loss
         """
-        for ckptio in self.ckptios:
-            ckptio.save(step)
+        targets = torch.full_like(logits, fill_value=target)
+        loss = F.binary_cross_entropy_with_logits(logits, targets)
+        return loss
 
     def _load_checkpoint(self, step):
         """Load model checkpoints
@@ -398,59 +296,19 @@ class Solver(nn.Module):
         """
         for ckptio in self.ckptios:
             ckptio.load(step)
-
-    def _reset_grad(self):
-        """Reset the gradient of all optimizers
-        """
-        for optim in self.optims.values():
-            optim.zero_grad()
-
-    def _create_dirs(self):
-        """Create the directories and sub-directories for training
-        """
-        # Directory is named based on time stamp
-        timestamp = datetime.datetime.now().strftime("%Y%m%d")
-        # Setup the key(s) naming the folder (passed as hyperparameter)
-        if type(self.args['naming_key']) == list: 
-            keys = [str(self.args[key]) for key in self.args['naming_key']]
-            keys_str = '_'.join(keys)
-        else:
-            keys_str = str(self.args[self.args['naming_key']])
-
-        # Set the directory for the results based on whether training is from begginning or resumed
-        if self.args.resume_iter==0:
-            self.dest_dir = ospj(self.args.experiment_directory, timestamp+'_'+keys_str)
-        else:
-            self.dest_dir = self.args.resume_dir+'_'+keys_str
-
-        # Create sub-directories to save partial and definitive results 
-        os.makedirs(self.dest_dir, exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.sample_dir), exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.checkpoint_dir), exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.basal_vs_real_folder), exist_ok=True)
-        os.makedirs(ospj(self.dest_dir, self.args.embedding_folder), exist_ok=True)
-
+    
     def _create_checkpoints(self):
         """Create the checkpoints objects regulating model weight loading and dumping
         """
         self.ckptios = [
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
-            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims),
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]
+    
+    def _save_checkpoint(self, step):
+        """Save model checkpoints
 
-    def _save_history(self, epoch, losses, fold):
-        """Save partial model results in the history dictionary (model attribute) 
         Args:
-            epoch (int): the current epoch 
-            losses (dict): dictionary containing the partial losses of the model 
-            metrics (dict): dictionary containing the partial metrics of the model 
-            fold (str): train or valid
+            step (int): step at which saving is performed
         """
-        self.history[fold]["epoch"].append(epoch)
-        # Append the losses to the right fold dictionary 
-        for loss in losses:
-            if loss not in self.history[fold]:
-                self.history[fold][loss] = [losses[loss]]
-            else:
-                self.history[fold][loss].append(losses[loss])
-                
+        for ckptio in self.ckptios:
+            ckptio.save(step)

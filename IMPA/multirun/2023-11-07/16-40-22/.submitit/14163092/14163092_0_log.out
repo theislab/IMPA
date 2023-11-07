@@ -1,0 +1,16 @@
+submitit INFO (2023-11-07 16:40:28,484) - Starting with JobEnvironment(job_id=14163092, hostname=supergpu05.scidom.de, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2023-11-07 16:40:28,485) - Loading pickle: /home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/multirun/2023-11-07/16-40-22/.submitit/14163092/14163092_submitted.pkl
+True
+Number of parameters in generator: 24318595
+Number of parameters in style_encoder: 14329472
+Number of parameters in discriminator: 14299718
+Number of parameters in mapping_network: 11328
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+submitit INFO (2023-11-07 16:41:13,186) - Job completed successfully
+[2023-11-07 16:41:13,186][submitit][INFO] - Job completed successfully
+submitit INFO (2023-11-07 16:41:13,193) - Exiting after successful completion
+[2023-11-07 16:41:13,193][submitit][INFO] - Exiting after successful completion
