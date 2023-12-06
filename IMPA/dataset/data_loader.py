@@ -41,7 +41,8 @@ class CellDataset:
         self.fold_datasets = self._read_folds()
         
         # Count the number of compounds 
-        self.mol_names = np.unique(self.fold_datasets['train']["CPD_NAME"])  # Sorted drug names
+        trt_dataset = self.fold_datasets['train'].loc[self.fold_datasets['train']["state"]=="control"]
+        self.mol_names = np.unique(trt_dataset["CPD_NAME"])  # Sorted drug names
         self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
 
         # Count the number of drugs and MOAs 
@@ -135,11 +136,17 @@ class CellDatasetFold(Dataset):
         self.data = data
         
         # Extract variables 
-        self.file_names = data['SAMPLE_KEY']
-        self.mols = data['CPD_NAME']
-        self.dose = data['DOSE']
-        self.y = data['ANNOT']
-
+        self.filenames = {}
+        self.mols = {}
+        self.y = {}
+        
+        for cond in ["control", "trt"]:
+            # subset by condition 
+            data_cond  = data.loc[data.state==cond]
+            self.filenames[cond] = data_cond['SAMPLE_KEY']
+            self.mols[cond] = data_cond['CPD_NAME']
+            self.y[cond] = data_cond['ANNOT']
+        
         del data 
 
         # Whether to perform training augmentation
@@ -158,11 +165,11 @@ class CellDatasetFold(Dataset):
         
         if self.fold ==  'train':
             # Map drugs to moas
-            mol_ids, y_ids = [self.mol2id[mol] for mol in self.mols] , [self.y2id[y] for y in self.y]
+            mol_ids, y_ids = [self.mol2id[mol] for mol in self.mols["trt"]] , [self.y2id[y] for y in self.y["trt"]]
             self.couples_mol_y = {mol:y for mol,y in zip(mol_ids, y_ids)}
 
         # One-hot encode molecules and moas
-        self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols.reshape((-1,1))))    
+        self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols["trt"].reshape((-1,1))))    
 
         # Create sampler weights 
         self._get_sampler_weights()
@@ -172,38 +179,48 @@ class CellDatasetFold(Dataset):
         """
         Total number of samples 
         """
-        return len(self.file_names)
+        return len(self.file_names["control"])
 
     def __getitem__(self, idx):
         """
         Generate one example datapoint 
         """
-        # Image must be fetched from disk 
-        img_file = self.file_names[idx]
-        file_split = img_file.split('-')
+        # Sample control and treated batches 
+        idx_trt = np.random.randint(0, len(self.filenames["trt"]))
+        img_file_ctrl = self.file_names[idx]
+        img_file_trt = self.file_names[idx_trt]
+    
+        # Split files 
+        file_split_ctrl = img_file_ctrl.split('-')
+        file_split_trt = img_file_trt.split('-')
         
-        if len(file_split) > 1:
-            file_split = file_split[1].split("_")
-            path = Path(self.image_path) / "_".join(file_split[:2]) / file_split[2] 
-            file = '_'.join(file_split[3:])+".npy"
+        if len(file_split_ctrl) > 1:
+            file_split_ctrl = file_split_ctrl[1].split("_")
+            file_split_trt = file_split_trt[1].split("_")
+            path_ctrl = Path(self.image_path) / "_".join(file_split_ctrl[:2]) / file_split_ctrl[2] 
+            path_trt = Path(self.image_path) / "_".join(file_split_trt[:2]) / file_split_trt[2] 
+            file_ctrl = '_'.join(file_split_ctrl[3:])+".npy"
+            file_trt = '_'.join(file_split_trt[3:])+".npy"
         else:
-            file_split = file_split[0].split("_")
-            path = Path(self.image_path) / file_split[0] / file_split[1] 
-            file = '_'.join(file_split[2:])+".npy"
+            file_split_ctrl = file_split_ctrl[0].split("_")
+            file_split_trt = file_split_trt[0].split("_")
+            path_ctrl = Path(self.image_path) / file_split_ctrl[0] / file_split_ctrl[1] 
+            path_trt = Path(self.image_path) / file_split_trt[0] / file_split_trt[1] 
+            file_ctrl = '_'.join(file_split_ctrl[2:])+".npy"
+            file_trt = '_'.join(file_split_trt[2:])+".npy"
             
-        img = np.load(path / file)
-        img = torch.from_numpy(img).to(torch.float)
-        img = img.permute(2,0,1)  # Place channel dimension in front of the others 
-        img = self.transform(img)
+        img_ctrl, img_trt = np.load(path_ctrl / file_ctrl), np.load(path_trt / file_trt)
+        img_ctrl, img_trt = torch.from_numpy(img_ctrl).to(torch.float), torch.from_numpy(img_trt).to(torch.float)
+        img_ctrl, img_trt = img_ctrl.permute(2,0,1), img_trt.permute(2,0,1)  # Place channel dimension in front of the others 
+        img_ctrl, img_trt = self.transform(img_ctrl), self.transform(img_trt)
         
-        return {'X':img, 
-                'mol_one_hot': self.one_hot_mol[idx], 
-                'y_id': self.y2id[self.y[idx]],
-                'dose': self.dose[idx],
-                'file_names': img_file}
+        return {'X':(img_ctrl, img_trt), 
+                'mol_one_hot': self.one_hot_mol[idx_trt], 
+                'y_id': self.y2id[self.y[idx_trt]],
+                'file_names': (img_file_ctrl, img_file_ctrl)}
     
     def _get_sampler_weights(self):
-        mol_names_idx = [self.mol2id[mol] for mol in self.mols]
+        mol_names_idx = [self.mol2id[mol] for mol in self.mols["trt"]]
         # Counts and uniqueness 
         mol_names_idx_unique = np.unique(mol_names_idx, return_counts=True)
         dict_mol_names_idx_unique = {key:1/val for key,val in zip(mol_names_idx_unique[0], mol_names_idx_unique[1])}

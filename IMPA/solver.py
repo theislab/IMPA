@@ -131,7 +131,7 @@ class IMPAmodule(LightningModule):
         rmse_disentanglement_dict = evaluate(self.nets,
                                                 self.loader_test,
                                                 self.device,
-                         zz                       self.dest_dir,
+                                                self.dest_dir,
                                                 self.args.embedding_folder,
                                                 args=self.args,
                                                 embedding_matrix=self.embedding_matrix)
@@ -144,7 +144,7 @@ class IMPAmodule(LightningModule):
                     inputs=inputs_val, 
                     step=self.current_epoch+1, 
                     device=self.device, 
-                    id2mol=self.id2mol,expli
+                    id2mol=self.id2mol,
                     dest_dir=self.dest_dir, 
                     num_domains=self.num_domains)
 
