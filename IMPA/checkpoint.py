@@ -1,5 +1,4 @@
 # Inspired by https://github.com/clovaai/stargan-v2/blob/master/core/checkpoint.py
-
 import os
 import torch
 

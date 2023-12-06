@@ -104,7 +104,7 @@ def cal_fid(data1, data2, dims, use_cuda, custom_channels=None):
     model = InceptionV3([block_idx])
     
     # Whether the model acts on CPU or GPU
-    use_cuda = True if torch.cuda.is_available() else False
+    model.to("cuda")
     model.eval()
 
     # Compute mean and standard deviation of the two distributions (real vs fake) 

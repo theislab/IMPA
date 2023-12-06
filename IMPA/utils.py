@@ -8,7 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.utils as vutils
 
-
 def print_network(network, name):
     """Prints neural network parameters.
 
@@ -18,7 +17,6 @@ def print_network(network, name):
     """
     num_params = sum(p.numel() for p in network.parameters())
     print("Number of parameters in %s: %i" % (name, num_params))
-
 
 def he_init(module):
     """Initialize neural network using the He initialization method.
@@ -30,7 +28,6 @@ def he_init(module):
         nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
         if module.bias is not None:
             nn.init.constant_(module.bias, 0)
-
 
 def print_checkpoint(i, start_time, total_iters, all_losses):
     """Print elapsed time and losses during training.
@@ -47,7 +44,6 @@ def print_checkpoint(i, start_time, total_iters, all_losses):
     log += ' '.join([f'{key}: [{value:.4f}]' for key, value in all_losses.items()])
     print(log)
 
-
 def print_metrics(metrics_dict, step):
     """Print metrics from a metric dictionary.
 
@@ -57,7 +53,6 @@ def print_metrics(metrics_dict, step):
     """
     for metric, value in metrics_dict.items():
         print(f'After {step} {metric} is {value:.4f}')
-
 
 def denormalize(x):
     """Denormalize an image from the range (-1, 1) to (0, 1).
@@ -71,7 +66,6 @@ def denormalize(x):
     out = (x + 1.) / 2
     return out.clamp_(0, 1)
 
-
 def save_image(x, ncol, filename):
     """Save a panel of images.
 
@@ -83,7 +77,6 @@ def save_image(x, ncol, filename):
     print(x.shape)
     x = denormalize(x)
     vutils.save_image(x.cpu(), filename + '.jpg', nrow=ncol, padding=0)
-
 
 def swap_attributes(y_mol, mol_id, device):
     """Perform random swapping of perturbation categories in a target dataset.
@@ -108,7 +101,6 @@ def swap_attributes(y_mol, mol_id, device):
     swapped_idx[np.arange(y_mol.shape[0]), permutation] = 1
     return swapped_idx
 
-
 def sigmoid(x, w=1):
     """Sigmoid function.
 
@@ -120,7 +112,6 @@ def sigmoid(x, w=1):
         torch.Tensor: Result of the sigmoid function application.
     """
     return 1. / (1 + np.exp(-w * x))
-
 
 def tensor2ndarray255(images):
     """Convert tensor to an 8-bit numpy array.
@@ -134,9 +125,8 @@ def tensor2ndarray255(images):
     images = torch.clamp(images * 0.5 + 0.5, 0, 1)
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
 
-
 @torch.no_grad()
-def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest_dir):
+def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest_dir, num_domains):
     """Dump a grid of generated images.
 
     Args:
@@ -156,7 +146,7 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
     # Setup the device and the batch size
     N = x_real.size(0)
     # Get all the possible output targets
-    range_classes = list(range(args.num_domains))
+    range_classes = list(range(num_domains))
     y_trg_list = [torch.tensor(y).repeat(N).to(device)
                   for y in range_classes] 
     

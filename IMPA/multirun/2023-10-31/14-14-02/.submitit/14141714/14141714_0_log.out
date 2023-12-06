@@ -1,18 +1,0 @@
-submitit INFO (2023-10-31 14:14:22,306) - Starting with JobEnvironment(job_id=14141714, hostname=supergpu02.scidom.de, local_rank=0(1), node=0(1), global_rank=0(1))
-submitit INFO (2023-10-31 14:14:22,307) - Loading pickle: /home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/multirun/2023-10-31/14-14-02/.submitit/14141714/14141714_submitted.pkl
-[2023-10-31 14:14:27,343][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmpvvm0uede
-[2023-10-31 14:14:27,344][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmpvvm0uede/_remote_module_non_scriptable.py
-Number of parameters in generator: 24318595
-Number of parameters in style_encoder: 14329472
-Number of parameters in discriminator: 14299718
-Number of parameters in mapping_network: 11328
-Initializing embedding_matrix...
-Initializing generator...
-Initializing style_encoder...
-Initializing discriminator...
-Initializing mapping_network...
-Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]submitit INFO (2023-10-31 14:18:55,123) - Job completed successfully
-[2023-10-31 14:18:55,123][submitit][INFO] - Job completed successfully
-submitit INFO (2023-10-31 14:18:55,131) - Exiting after successful completion
-[2023-10-31 14:18:55,131][submitit][INFO] - Exiting after successful completion
-                                                                   

@@ -1,4 +1,0 @@
-srun: error: CPU binding outside of job step allocation, allocated CPUs are: 0x01C0000000000001C00000000000.
-srun: error: Task launch for StepId=14141701.0 failed on node supergpu02: Unable to satisfy cpu bind request
-srun: error: Application launch failed: Unable to satisfy cpu bind request
-srun: Job step aborted

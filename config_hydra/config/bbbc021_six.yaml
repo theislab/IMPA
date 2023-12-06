@@ -17,7 +17,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_iters: 100000
+total_epochs: 100000
 ds_iter: 100000  
 resume_iter: 0
 batch_size: 32

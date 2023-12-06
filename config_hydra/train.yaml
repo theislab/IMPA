@@ -3,5 +3,6 @@
 # Default configurations
 defaults:
   - _self_
+  - hydra: default
   - config: bbbc021_six
   - launcher: slurm_cluster

@@ -1,4 +1,5 @@
-import sys 
+import sys
+import traceback
 import os
 from os.path import join as ospj
 import warnings
@@ -48,7 +49,6 @@ def create_dirs(args):
 def main(config: DictConfig):
     # Extract config dict 
     args = config.config
-    print("True" if torch.cuda.is_available() else "False")
     
     # Initialize folders
     dest_dir = create_dirs(args)
@@ -76,7 +76,7 @@ def main(config: DictConfig):
     trainer = Trainer(callbacks=model_ckpt_callbacks, 
                         default_root_dir=dest_dir,
                         logger=logger, 
-                        max_steps=args.total_iters,
+                        max_epochs=args.total_epochs,
                         accelerator=args.accelerator,
                         log_every_n_steps=args.log_every_n_steps)
             
@@ -86,5 +86,9 @@ def main(config: DictConfig):
                 val_dataloaders=datamodule.val_dataloader())
 
 if __name__=="__main__":
-    main()
+    try:
+        main()
+    except:
+        traceback.print_exc(file=sys.stderr)
+        raise
     

@@ -1,2 +1,10 @@
-[2023-11-07 14:13:19,013][HYDRA] Submitit 'slurm' sweep output dir : multirun/2023-11-07/14-13-18
-[2023-11-07 14:13:19,015][HYDRA] 	#0 : 
+Number of parameters in generator: 24318595
+Number of parameters in style_encoder: 14329472
+Number of parameters in discriminator: 14299718
+Number of parameters in mapping_network: 11328
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/571 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/571 [00:00<?, ?it/s] Epoch 0:   0%|          | 0/571 [00:36<?, ?it/s]

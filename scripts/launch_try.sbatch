@@ -6,9 +6,11 @@
 
 #SBATCH -J bbbc021_try
 
-#SBATCH -p cpu_p
+#SBATCH -p gpu_p
 
-#SBATCH --qos=cpu_normal
+#SBATCH --qos=gpu_normal
+
+#SBATCH --gres=gpu:1
 
 #SBATCH -c 4
 
@@ -19,7 +21,7 @@
 #SBATCH --nice=10000
 
 source $HOME/.bashrc
-conda activate IMPA
+conda activate IMPA_try
 
-python ../IMPA/main_hydra.py --multirun
+python ../IMPA/main_hydra.py 
  

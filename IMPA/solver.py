@@ -18,6 +18,8 @@ class IMPAmodule(LightningModule):
 
         Args:
             args (dict): dictionary with hparams 
+            dest_dir (pathlib.Path): directory where to save results 
+            datamodule (CellDataLoader): data module class
         """
         super().__init__()
         self.args = args
@@ -72,7 +74,7 @@ class IMPAmodule(LightningModule):
     
     def training_step(self, batch): 
         """Method for IMPA training across a pre-defined number of iterations. 
-        """       
+        """   
         generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
         # Fetch the real and fake inputs and outputs 
         x_real, y_one_hot = batch['X'].to(self.device), batch['mol_one_hot']
@@ -93,20 +95,20 @@ class IMPAmodule(LightningModule):
         # Train the discriminator
         d_loss, d_losses_latent = self._compute_d_loss(
             x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
+        discriminator_opt.zero_grad()
         self.manual_backward(d_loss)
         discriminator_opt.step()
-        discriminator_opt.zero_grad()
         
         # Train the generator
         g_loss, g_losses_latent = self._compute_g_loss(
             x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
+        style_encoder_opt.zero_grad()
+        generator_opt.zero_grad()
+        mapping_network_opt.zero_grad()   
         self.manual_backward(g_loss)
         style_encoder_opt.step()
         generator_opt.step()
-        mapping_network_opt.step()
-        style_encoder_opt.zero_grad()
-        generator_opt.zero_grad()
-        mapping_network_opt.zero_grad()    
+        mapping_network_opt.step() 
     
         # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
         if self.args.lambda_ds > 0 and self.args.stochastic:
@@ -124,12 +126,12 @@ class IMPAmodule(LightningModule):
     def on_train_start(self):
         self.ckptios.append(CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims))
         
-    def on_training_epoch_end(self):
+    def on_train_epoch_end(self):
         # Scores on the validation images 
         rmse_disentanglement_dict = evaluate(self.nets,
                                                 self.loader_test,
                                                 self.device,
-                                                self.dest_dir,
+                         zz                       self.dest_dir,
                                                 self.args.embedding_folder,
                                                 args=self.args,
                                                 embedding_matrix=self.embedding_matrix)
@@ -140,15 +142,14 @@ class IMPAmodule(LightningModule):
                     self.embedding_matrix, 
                     self.args, 
                     inputs=inputs_val, 
-                    step=self.global_step+1, 
+                    step=self.current_epoch+1, 
                     device=self.device, 
-                    id2mol=self.id2mol,
+                    id2mol=self.id2mol,expli
                     dest_dir=self.dest_dir, 
                     num_domains=self.num_domains)
 
         # Save model checkpoints
-        if (self.global_step+1) % self.args.save_every == 0:
-            self._save_checkpoint(step=self.global_step+1)        
+        self._save_checkpoint(step=self.current_epoch+1)        
         
     
     def _compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):

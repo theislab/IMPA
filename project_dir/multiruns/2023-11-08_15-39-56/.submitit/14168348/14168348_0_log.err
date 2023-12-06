@@ -1,0 +1,98 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231108_bbbc021_try/wandb/run-20231108_154127-h34b692k
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run serene-glade-54
+wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
+wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/h34b692k
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 960   
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.3 M
+4 | mapping_network  | DataParallel | 11.3 K
+--------------------------------------------------
+53.0 M    Trainable params
+960       Non-trainable params
+53.0 M    Total params
+211.840   Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+
+  0%|          | 0/103 [00:00<?, ?it/s][A
+  1%|          | 1/103 [00:02<04:49,  2.84s/it][A
+  4%|▍         | 4/103 [00:02<00:56,  1.76it/s][A
+  7%|▋         | 7/103 [00:03<00:26,  3.56it/s][A
+ 11%|█         | 11/103 [00:03<00:14,  6.43it/s][A
+ 14%|█▎        | 14/103 [00:03<00:11,  8.00it/s][A
+ 17%|█▋        | 17/103 [00:03<00:08,  9.63it/s][A
+ 19%|█▉        | 20/103 [00:03<00:09,  8.76it/s][A
+ 23%|██▎       | 24/103 [00:04<00:06, 12.03it/s][A
+ 26%|██▌       | 27/103 [00:04<00:07, 10.58it/s][A
+ 29%|██▉       | 30/103 [00:04<00:05, 13.00it/s][A
+ 32%|███▏      | 33/103 [00:05<00:07,  9.54it/s][A
+ 36%|███▌      | 37/103 [00:05<00:05, 11.76it/s][A
+ 38%|███▊      | 39/103 [00:05<00:06,  9.98it/s][A
+ 42%|████▏     | 43/103 [00:05<00:05, 11.20it/s][A
+ 44%|████▎     | 45/103 [00:06<00:05, 10.05it/s][A
+ 48%|████▊     | 49/103 [00:06<00:04, 12.11it/s][A
+ 50%|████▉     | 51/103 [00:06<00:05,  9.39it/s][A
+ 53%|█████▎    | 55/103 [00:06<00:04, 11.60it/s][A
+ 55%|█████▌    | 57/103 [00:07<00:04,  9.39it/s][A
+ 59%|█████▉    | 61/103 [00:07<00:03, 12.52it/s][A
+ 61%|██████    | 63/103 [00:07<00:03, 10.43it/s][A
+ 65%|██████▌   | 67/103 [00:08<00:02, 12.80it/s][A
+ 67%|██████▋   | 69/103 [00:08<00:03, 10.82it/s][A
+ 71%|███████   | 73/103 [00:08<00:02, 12.67it/s][A
+ 73%|███████▎  | 75/103 [00:08<00:02,  9.99it/s][A
+ 76%|███████▌  | 78/103 [00:08<00:01, 12.61it/s][A
+ 78%|███████▊  | 80/103 [00:09<00:02, 10.12it/s][A
+ 81%|████████  | 83/103 [00:09<00:01, 12.30it/s][A
+ 83%|████████▎ | 86/103 [00:09<00:01, 10.32it/s][A
+ 86%|████████▋ | 89/103 [00:10<00:01, 11.69it/s][A
+ 89%|████████▉ | 92/103 [00:10<00:01, 10.31it/s][A
+ 93%|█████████▎| 96/103 [00:10<00:00, 13.68it/s][A
+ 95%|█████████▌| 98/103 [00:11<00:00,  8.88it/s][A
+ 99%|█████████▉| 102/103 [00:11<00:00, 12.19it/s][A100%|██████████| 103/103 [00:12<00:00,  8.27it/s]
+
+  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+  0%|          | 0/6 [00:03<?, ?it/s]
+wandb: Waiting for W&B process to finish... (success).
+wandb: - 0.008 MB of 0.008 MB uploaded (0.000 MB deduped)wandb: \ 0.008 MB of 0.019 MB uploaded (0.000 MB deduped)wandb: | 0.013 MB of 0.019 MB uploaded (0.000 MB deduped)wandb: / 0.019 MB of 0.019 MB uploaded (0.000 MB deduped)wandb: 
+wandb: Run history:
+wandb:       D/latent_fake ▁▃▁▂▂▄▆▄▃▅▂▄▃▄▅█▄▄▃▃▄▃▃▂▂▂▂▃▄▃▂▅▂▂▃▄▂▃▄▂
+wandb:       D/latent_real ▁▁▁▁▁▃▁▂▂▃▃▃▃▂▂▁▃▂▃▂▃▂▂▆▅█▄▂▂▂▂▂▃▃▂▂▅▂▁▃
+wandb:        D/latent_reg ▁▃▃▂▃▂▂▁▁▁▃▁▂▂▂▂▁▃▄▄▃▃▃█▆▆▆▄▅▅▆▅▇▅▄▄▃▃▄▄
+wandb:         G/lambda_ds ███▇▇▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▃▃▃▃▃▃▂▂▂▂▂▁▁▁
+wandb:        G/latent_adv ▃█▃▃▂▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▂▂▁▂▂▁▂▂▂▁▂▂▂
+wandb:        G/latent_cyc ██▇▅▅▃▃▂▃▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▁▂▂▂▁▂▁▂▂▁▁▁▁▁
+wandb:         G/latent_ds █▆▅▃▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:        G/latent_sty █▆▄▅▅▆▅▇█▆▅▄▄▅▃▄▆▃▃▄▃▃▃▂▃▃▂▂▂▂▂▂▂▂▁▂▂▁▂▁
+wandb:               epoch ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: trainer/global_step ▁▁▁▁▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
+wandb: 
+wandb: Run summary:
+wandb:       D/latent_fake 0.29186
+wandb:       D/latent_real 0.38483
+wandb:        D/latent_reg 0.01507
+wandb:         G/lambda_ds 0.9943
+wandb:        G/latent_adv 2.48418
+wandb:        G/latent_cyc 0.31035
+wandb:         G/latent_ds 0.07879
+wandb:        G/latent_sty 0.35126
+wandb:               epoch 0
+wandb: trainer/global_step 569
+wandb: 
+wandb: 🚀 View run serene-glade-54 at: https://wandb.ai/allepalma/bbbc021_try/runs/h34b692k
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231108_bbbc021_try/wandb/run-20231108_154127-h34b692k/logs

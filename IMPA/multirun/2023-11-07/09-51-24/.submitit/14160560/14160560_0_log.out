@@ -1,18 +1,0 @@
-submitit INFO (2023-11-07 09:51:20,623) - Starting with JobEnvironment(job_id=14160560, hostname=supergpu02.scidom.de, local_rank=0(1), node=0(1), global_rank=0(1))
-submitit INFO (2023-11-07 09:51:20,623) - Loading pickle: /home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/multirun/2023-11-07/09-51-24/.submitit/14160560/14160560_submitted.pkl
-[2023-11-07 09:51:24,817][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmppyyjpw6k
-[2023-11-07 09:51:24,818][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmppyyjpw6k/_remote_module_non_scriptable.py
-Number of parameters in generator: 24318595
-Number of parameters in style_encoder: 14329472
-Number of parameters in discriminator: 14299718
-Number of parameters in mapping_network: 11328
-Initializing embedding_matrix...
-Initializing generator...
-Initializing style_encoder...
-Initializing discriminator...
-Initializing mapping_network...
-Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/571 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/571 [00:00<?, ?it/s] submitit WARNING (2023-11-07 09:52:38,654) - Bypassing signal SIGTERM
-[2023-11-07 09:52:38,654][submitit][WARNING] - Bypassing signal SIGTERM
-submitit WARNING (2023-11-07 09:52:38,655) - Bypassing signal SIGCONT
-[2023-11-07 09:52:38,655][submitit][WARNING] - Bypassing signal SIGCONT
-Epoch 0:   0%|          | 1/571 [00:29<4:43:44,  0.03it/s]Epoch 0:   0%|          | 1/571 [00:29<4:43:45,  0.03it/s, v_num=i534]Epoch 0:   0%|          | 1/571 [00:37<5:54:46,  0.03it/s, v_num=i534]
