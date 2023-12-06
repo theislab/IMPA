@@ -1,96 +1,0 @@
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
-wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
-wandb: Tracking run with wandb version 0.15.12
-wandb: Run data is saved locally in ../project_folder/experiments/20231108_bbbc021_try/wandb/run-20231108_161757-r1vzlhwz
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run comfy-microwave-55
-wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
-wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/r1vzlhwz
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-
-  | Name             | Type         | Params
---------------------------------------------------
-0 | embedding_matrix | Embedding    | 960   
-1 | generator        | DataParallel | 24.3 M
-2 | style_encoder    | DataParallel | 14.3 M
-3 | discriminator    | DataParallel | 14.3 M
-4 | mapping_network  | DataParallel | 11.3 K
---------------------------------------------------
-53.0 M    Trainable params
-960       Non-trainable params
-53.0 M    Total params
-211.840   Total estimated model params size (MB)
-SLURM auto-requeueing enabled. Setting signal handlers.
-
-  0%|          | 0/103 [00:00<?, ?it/s][A
-  1%|          | 1/103 [00:01<03:07,  1.84s/it][A
-  4%|▍         | 4/103 [00:01<00:37,  2.67it/s][A
-  7%|▋         | 7/103 [00:02<00:18,  5.20it/s][A
- 10%|▉         | 10/103 [00:02<00:11,  8.09it/s][A
- 13%|█▎        | 13/103 [00:02<00:08, 11.17it/s][A
- 16%|█▌        | 16/103 [00:02<00:06, 14.32it/s][A
- 18%|█▊        | 19/103 [00:02<00:04, 17.23it/s][A
- 21%|██▏       | 22/103 [00:02<00:04, 18.57it/s][A
- 24%|██▍       | 25/103 [00:02<00:03, 21.04it/s][A
- 27%|██▋       | 28/103 [00:02<00:03, 19.54it/s][A
- 31%|███       | 32/103 [00:03<00:03, 22.46it/s][A
- 34%|███▍      | 35/103 [00:03<00:03, 17.96it/s][A
- 37%|███▋      | 38/103 [00:03<00:03, 20.24it/s][A
- 40%|███▉      | 41/103 [00:03<00:03, 16.50it/s][A
- 44%|████▎     | 45/103 [00:03<00:02, 19.68it/s][A
- 47%|████▋     | 48/103 [00:04<00:03, 15.76it/s][A
- 50%|█████     | 52/103 [00:04<00:03, 15.60it/s][A
- 54%|█████▍    | 56/103 [00:04<00:02, 18.62it/s][A
- 57%|█████▋    | 59/103 [00:04<00:02, 15.74it/s][A
- 61%|██████    | 63/103 [00:04<00:02, 18.80it/s][A
- 64%|██████▍   | 66/103 [00:05<00:02, 17.75it/s][A
- 68%|██████▊   | 70/103 [00:05<00:02, 15.70it/s][A
- 72%|███████▏  | 74/103 [00:05<00:01, 18.69it/s][A
- 75%|███████▍  | 77/103 [00:05<00:01, 17.37it/s][A
- 79%|███████▊  | 81/103 [00:05<00:01, 20.17it/s][A
- 82%|████████▏ | 84/103 [00:05<00:00, 19.26it/s][A
- 85%|████████▌ | 88/103 [00:06<00:00, 20.22it/s][A
- 88%|████████▊ | 91/103 [00:06<00:00, 21.08it/s][A
- 91%|█████████▏| 94/103 [00:06<00:00, 21.91it/s][A
- 94%|█████████▍| 97/103 [00:06<00:00, 21.91it/s][A
- 97%|█████████▋| 100/103 [00:06<00:00, 18.98it/s][A
-100%|██████████| 103/103 [00:08<00:00,  6.09it/s][A100%|██████████| 103/103 [00:08<00:00, 11.91it/s]
-
-  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
-  warnings.warn(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
-  warnings.warn(msg)
-  0%|          | 0/6 [00:03<?, ?it/s]
-wandb: Waiting for W&B process to finish... (success).
-wandb: - 0.008 MB of 0.008 MB uploaded (0.000 MB deduped)wandb: \ 0.008 MB of 0.018 MB uploaded (0.000 MB deduped)wandb: | 0.018 MB of 0.018 MB uploaded (0.000 MB deduped)wandb: / 0.018 MB of 0.018 MB uploaded (0.000 MB deduped)wandb: 
-wandb: Run history:
-wandb:       D/latent_fake ▁▁▄▁▅▄▃▂▃▃▂▃█▂▂▂▃▃▂▃▃▂▃▃▄▄▂▂▂▂▂▄▂▁▂▁▂▂▁▁
-wandb:       D/latent_real ▃▁▃▇▁█▅▅▄▃▅▄▂▆▅▅▃▃▅▄▂▄▄▂▂▃▆▆▄▆▂▂▅▆▄▆▃▄▅▅
-wandb:        D/latent_reg ▂▃▂▅▄▂▁▂▂▂▂▁▃▂▂▂▁▂▂▂▃▄▂▃▂▂▄▃▂▄▄▃▄▅▃█▅▃▅▆
-wandb:         G/lambda_ds ███▇▇▇▇▇▇▇▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▃▃▃▃▃▃▂▂▂▂▂▁▁▁
-wandb:        G/latent_adv ▆██▂▂▃▁▂▂▂▂▂▃▂▂▂▂▂▂▂▃▄▂▃▂▂▄▂▂▂▆▂▂▁▃▁▄▂▂▄
-wandb:        G/latent_cyc █▇▇▅▄▃▃▃▃▂▂▂▂▂▂▂▂▂▁▁▂▂▂▁▁▂▂▁▁▁▁▁▁▁▁▂▂▁▁▁
-wandb:         G/latent_ds █▇▅▄▃▂▂▂▂▂▂▂▂▁▁▁▁▂▁▁▂▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
-wandb:        G/latent_sty █▇▇▅▅▇▆▆▄▃▃▂▃▅▃▂▄▂▁▁▂▂▁▂▂▂▁▁▁▁▁▂▁▁▁▂▂▁▁▁
-wandb:               epoch ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
-wandb: trainer/global_step ▁▁▁▁▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
-wandb: 
-wandb: Run summary:
-wandb:       D/latent_fake 0.1055
-wandb:       D/latent_real 0.46815
-wandb:        D/latent_reg 0.0265
-wandb:         G/lambda_ds 0.9943
-wandb:        G/latent_adv 2.84849
-wandb:        G/latent_cyc 0.28256
-wandb:         G/latent_ds 0.0667
-wandb:        G/latent_sty 0.33914
-wandb:               epoch 0
-wandb: trainer/global_step 569
-wandb: 
-wandb: 🚀 View run comfy-microwave-55 at: https://wandb.ai/allepalma/bbbc021_try/runs/r1vzlhwz
-wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ../project_folder/experiments/20231108_bbbc021_try/wandb/run-20231108_161757-r1vzlhwz/logs
