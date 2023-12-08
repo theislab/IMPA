@@ -140,11 +140,10 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
         dest_dir (str): Destination directory for images.
     """
     # Get the images and the perturbation targets
-    x_real, y_one_hot = inputs['X'].to(device), inputs['mol_one_hot'].to(device)
-    y_real = y_one_hot.argmax(1).to(device)
+    x_real_ctrl, x_real_trt = inputs['X'].to(device)
 
     # Setup the device and the batch size
-    N = x_real.size(0)
+    N = x_real_ctrl.size(0)
     # Get all the possible output targets
     range_classes = list(range(num_domains))
     y_trg_list = [torch.tensor(y).repeat(N).to(device)
@@ -163,15 +162,12 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
         z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
     else:
         z_trg_list = [None]*num_transf_plot
-
-    # Swap attributes for smaller cross-transformation panel 
-    y_swapped_one_hot = swap_attributes(y_mol=y_one_hot, mol_id=y_real, device=device)
-
+        
     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
     translate_using_latent(nets,
                             embedding_matrix, 
                             args, 
-                            x_real,
+                            x_real_ctrl,
                             y_trg_list, 
                             z_trg_list,
                             filename)

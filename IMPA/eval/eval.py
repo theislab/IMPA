@@ -32,30 +32,27 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     fid_transformations = 0
 
     # Lists containing the true labels of the batch
-    y_true_ds = []
-    y_fake_ds = []
+    Y_trg = []
     X_real = []
-    X_swapped = []
+    X_pred = []
 
     # Store points for the style and content encoding
-    z_basal_ds = []
-    z_style_ds = []
+    Z_basal = []
+    Z_style = []
 
     # Loop over single observations
     for observation in tqdm(loader):
         # Get the data and swap the labels
-        X = observation['X'].to(device)
-        y_one_hot_org = observation['mol_one_hot'].to(device)
-        y_org = y_one_hot_org.argmax(1).long()
-        y_trg = swap_attributes(y_one_hot_org, y_org, device).long().argmax(1)  # random swap
+        x_real_ctrl, x_real_trt = observation['X'].to(device)
+        y_one_hot_trg = observation['mol_one_hot'].to(device)
+        y_trg = y_one_hot_trg.argmax(1).long()
 
         # Store perturbation labels
-        y_true_ds.append(y_org.to('cpu'))
-        y_fake_ds.append(y_trg.to('cpu'))
+        Y_trg.append(Y_trg.to('cpu'))
 
         # Draw random vector for style conditioning
         if args.stochastic:
-            z = torch.randn(X.shape[0], args.z_dimension).to(device)
+            z = torch.randn(x_real_ctrl.shape[0], args.z_dimension).to(device)
 
         with torch.no_grad():
             # Get perturbation embedding and concatenate with the noise vector
@@ -67,24 +64,23 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
             s = nets.mapping_network(z_emb)
 
             # Generate
-            z_basal, X_fake = nets.generator(X, s)
+            z_basal, x_fake = nets.generator(x_real_ctrl, s)
 
             # Save real and swapped images
-            X_swapped.append(X_fake.cpu())
-            X_real.append(X.cpu())
+            X_pred.append(x_fake.cpu())
+            X_real.append(x_real_trt.cpu())
 
             # Save the basal state and style for later visualization
-            z_basal_ds.append(z_basal.detach().to('cpu'))
-            z_style_ds.append(s.detach().to('cpu'))
+            Z_basal.append(z_basal.detach().to('cpu'))
+            Z_style.append(s.detach().to('cpu'))
 
     # Perform list concatenation on all of the results
-    y_true_ds = torch.cat(y_true_ds).to('cpu').numpy()
-    y_fake_ds = torch.cat(y_fake_ds).to('cpu').numpy()
+    Y_trg = torch.cat(Y_trg).to('cpu').numpy()
 
     # Concatenate and get the flattened versions of the images
-    X_swapped = torch.cat(X_swapped, dim=0)
+    X_pred = torch.cat(X_pred, dim=0)
     X_real = torch.cat(X_real, dim=0)
-    categories = np.unique(y_true_ds)
+    categories = np.unique(Y_trg)
 
     if len(categories) > 100:
         categories = np.random.choice(categories, 100)
@@ -92,24 +88,24 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     # Update the metrics scores (FID, WD)
     for cat in tqdm(categories):
         # Compute FID/WD for a class at a time
-        X_real_cat = X_real[y_true_ds == cat]
-        X_swapped_cat = X_swapped[y_fake_ds == cat]
+        X_real_cat = X_real[Y_trg == cat]
+        X_pred_cat = X_pred[Y_trg == cat]
 
         # Wasserstein distance
         wd = ot.emd2(torch.tensor([]), torch.tensor([]),
                      ot.dist(X_real_cat.view(len(X_real_cat), -1),
-                             X_swapped_cat.view(len(X_swapped_cat), -1), 'euclidean'), 1)
+                             X_pred_cat.view(len(X_pred_cat), -1), 'euclidean'), 1)
         wd_transformations += wd
 
         # FID
         X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
-        X_swapped_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_swapped_cat.to(device)))
-        fid = cal_fid(X_real_dataset, X_swapped_dataset, 2048, True, custom_channels=channels)
+        X_pred_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_pred_cat.to(device)))
+        fid = cal_fid(X_real_dataset, X_pred_dataset, 2048, True, custom_channels=channels)
         fid_transformations += fid
 
     # Concatenate style and content vectors
-    z_basal_ds = torch.cat(z_basal_ds, dim=0).detach().cpu().numpy()
-    z_style_ds = torch.cat(z_style_ds, dim=0).detach().cpu().numpy()
+    Z_basal = torch.cat(Z_basal, dim=0).detach().cpu().numpy()
+    Z_style = torch.cat(Z_style, dim=0).detach().cpu().numpy()
 
     # Save metrics
     dict_metrics = {'wd_transformations': wd_transformations / len(categories),
@@ -119,6 +115,6 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
     print(f"Save embeddings at {emb_path}")
     with open(emb_path, 'wb') as file:
-        pkl.dump([z_basal_ds, z_style_ds, y_fake_ds], file)
+        pkl.dump([Z_basal, Z_style, Y_trg], file)
 
     return dict_metrics

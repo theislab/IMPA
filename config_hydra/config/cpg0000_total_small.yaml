@@ -1,5 +1,5 @@
 # TASK NAME 
-task_name: cpg0000_total
+task_name: cpg0000_total_small
 
 # IMAGE
 img_size: 96  
@@ -31,17 +31,17 @@ num_outs_per_domain: 10
 single_style: True
 ood_set: Null
 mol_list: Null
-balanced: True
+balanced: False 
 trainable_emb: False
-dataset_name: 'bbbc021'
-n_channels: 3
+dataset_name: cpg0000_small
+n_channels: 5
 num_workers: 6
 seed: 42  
 
 # DIRECTORIES FOR DATA
-image_path: ../project_folder/datasets/bbbc021_six
-data_index_path: ../project_folder/datasets/bbbc021_six/metadata/bbbc021_df_six.csv
-embedding_path: ../embeddings/csv/emb_rdkit.csv
+image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_small
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata.csv
+embedding_path: Null
 
 # DIRECTORIES FOR RESULTS 
 experiment_directory: ../project_folder/experiments/
@@ -72,7 +72,7 @@ monitor: fid_transformations
 mode: min
 save_last: True
 offline: False
-project: bbbc021_try
+project: cpg0000_total_small
 log_model: False
 accelerator: gpu 
 log_every_n_steps: 10

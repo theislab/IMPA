@@ -1,0 +1,166 @@
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/lightning_fabric/plugins/environments/slurm.py:191: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python ../IMPA/main_hydra.py config=cpg0000_total_large.yam ...
+GPU available: True (cuda), used: False
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/setup.py:187: GPU available but not used. You can set it by doing `Trainer(accelerator='gpu')`.
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
+wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.1 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.12
+wandb: Run data is saved locally in ../project_folder/experiments/20231208_cpg0000_total_large/wandb/run-20231208_160415-4783739x
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run fragrant-durian-5
+wandb: ⭐️ View project at https://wandb.ai/allepalma/cpg0000_total_large
+wandb: 🚀 View run at https://wandb.ai/allepalma/cpg0000_total_large/runs/4783739x
+
+  | Name             | Type         | Params
+--------------------------------------------------
+0 | embedding_matrix | Embedding    | 46.2 K
+1 | generator        | DataParallel | 24.3 M
+2 | style_encoder    | DataParallel | 14.3 M
+3 | discriminator    | DataParallel | 14.5 M
+4 | mapping_network  | DataParallel | 7.5 K 
+--------------------------------------------------
+53.2 M    Trainable params
+0         Non-trainable params
+53.2 M    Total params
+212.956   Total estimated model params size (MB)
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+Error executing job with overrides: ['config=cpg0000_total_large.yaml']
+Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/../IMPA/main_hydra.py", line 84, in main
+    trainer.fit(model=solver,
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 545, in fit
+    call._call_and_handle_interrupt(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 44, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 581, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 990, in _run
+    results = self._run_stage()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1036, in _run_stage
+    self.fit_loop.run()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
+    self.advance()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 359, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 136, in run
+    self.advance(data_fetcher)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 202, in advance
+    batch, _, __ = next(data_fetcher)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fetchers.py", line 127, in __next__
+    batch = super().__next__()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fetchers.py", line 56, in __next__
+    batch = next(self.iterator)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/utilities/combined_loader.py", line 326, in __next__
+    out = next(self._iterator)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/utilities/combined_loader.py", line 74, in __next__
+    out[i] = next(self.iterators[i])
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 630, in __next__
+    data = self._next_data()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 1345, in _next_data
+    return self._process_data(data)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 1371, in _process_data
+    data.reraise()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/_utils.py", line 694, in reraise
+    raise exception
+KeyError: Caught KeyError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
+    data = fetcher.fetch(index)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 189, in __getitem__
+    img_file_ctrl = self.file_names["control"][idx]
+KeyError: 'control'
+
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/../IMPA/main_hydra.py", line 84, in main
+    trainer.fit(model=solver,
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 545, in fit
+    call._call_and_handle_interrupt(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 44, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 581, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 990, in _run
+    results = self._run_stage()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1036, in _run_stage
+    self.fit_loop.run()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
+    self.advance()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 359, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 136, in run
+    self.advance(data_fetcher)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 202, in advance
+    batch, _, __ = next(data_fetcher)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fetchers.py", line 127, in __next__
+    batch = super().__next__()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fetchers.py", line 56, in __next__
+    batch = next(self.iterator)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/utilities/combined_loader.py", line 326, in __next__
+    out = next(self._iterator)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/utilities/combined_loader.py", line 74, in __next__
+    out[i] = next(self.iterators[i])
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 630, in __next__
+    data = self._next_data()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 1345, in _next_data
+    return self._process_data(data)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 1371, in _process_data
+    data.reraise()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/_utils.py", line 694, in reraise
+    raise exception
+KeyError: Caught KeyError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
+    data = fetcher.fetch(index)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 189, in __getitem__
+    img_file_ctrl = self.file_names["control"][idx]
+KeyError: 'control'
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/../IMPA/main_hydra.py", line 90, in <module>
+    main()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 303, in run_and_report
+    sys.exit(1)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/wandb/sdk/lib/exit_hooks.py", line 36, in exit
+    self._orig_exit(orig_code)  # type: ignore
+SystemExit: 1
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: \ 0.014 MB of 0.037 MB uploaded (0.000 MB deduped)wandb: | 0.017 MB of 0.037 MB uploaded (0.000 MB deduped)wandb: 🚀 View run fragrant-durian-5 at: https://wandb.ai/allepalma/cpg0000_total_large/runs/4783739x
+wandb: ️⚡ View job at https://wandb.ai/allepalma/cpg0000_total_large/jobs/QXJ0aWZhY3RDb2xsZWN0aW9uOjEyMTkyNjczMg==/version_details/v2
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ../project_folder/experiments/20231208_cpg0000_total_large/wandb/run-20231208_160415-4783739x/logs

@@ -1,5 +1,5 @@
 # TASK NAME 
-task_name: cpg0000_total
+task_name: cpg0000_total_large
 
 # IMAGE
 img_size: 96  
@@ -31,16 +31,16 @@ num_outs_per_domain: 10
 single_style: True
 ood_set: Null
 mol_list: Null
-balanced: True
+balanced: False
 trainable_emb: True
-dataset_name: 'cpg0000_large'
-n_channels: 3
+dataset_name: cpg0000_large
+n_channels: 5
 num_workers: 6
 seed: 42  
 
 # DIRECTORIES FOR DATA
-image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large2
-data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata
+image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata.csv
 embedding_path: Null
 
 # DIRECTORIES FOR RESULTS 
@@ -71,8 +71,8 @@ filename: epoch_{epoch:04d}
 monitor: fid_transformations
 mode: min
 save_last: True
-offline: False
-project: cpg0000_total
+offline: True
+project: cpg0000_total_large
 log_model: False
-accelerator: gpu 
+accelerator: cpu 
 log_every_n_steps: 10

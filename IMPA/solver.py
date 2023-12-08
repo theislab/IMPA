@@ -67,9 +67,9 @@ class IMPAmodule(LightningModule):
                 
             # Define optimizers and LR scheduler here
             self.optims[net] = Adam(params=params,
-                                lr=self.args.f_lr if net == 'mapping_network' else self.args.lr,
-                                betas=[self.args.beta1, self.args.beta2],
-                                weight_decay=self.args.weight_decay)
+                                    lr=self.args.f_lr if net=='mapping_network' else self.args.lr,
+                                    betas=[self.args.beta1, self.args.beta2],
+                                    weight_decay=self.args.weight_decay)
         return list(self.optims.values())
     
     def training_step(self, batch): 
@@ -78,11 +78,11 @@ class IMPAmodule(LightningModule):
         generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
         # Fetch the real and fake inputs and outputs 
         x_real, y_one_hot = batch['X'].to(self.device), batch['mol_one_hot']
+        x_real_ctrl, x_real_trt = x_real
+        # The original label for the treatment
         y_org = y_one_hot.argmax(1).long().to(self.device)
-        y_trg = swap_attributes(y_one_hot, y_org, self.device).argmax(1).long().to(self.device)
 
         # Get the perturbation embedding for the target mol
-        z_emb_trg = self.embedding_matrix(y_trg).to(self.device)
         z_emb_org = self.embedding_matrix(y_org).to(self.device)
 
         # Pick two random weight vectors 
@@ -94,14 +94,14 @@ class IMPAmodule(LightningModule):
         
         # Train the discriminator
         d_loss, d_losses_latent = self._compute_d_loss(
-            x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_trg=z_trg)
+            x_real_ctrl, x_real_trt, y_org, z_emb_org=z_emb_org, z_trg=z_trg)
         discriminator_opt.zero_grad()
         self.manual_backward(d_loss)
         discriminator_opt.step()
         
         # Train the generator
         g_loss, g_losses_latent = self._compute_g_loss(
-            x_real, y_org, y_trg, z_emb_trg=z_emb_trg, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
+            x_real_ctrl, y_org, z_emb_trg=z_emb_org, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
         style_encoder_opt.zero_grad()
         generator_opt.zero_grad()
         mapping_network_opt.zero_grad()   
@@ -152,7 +152,7 @@ class IMPAmodule(LightningModule):
         self._save_checkpoint(step=self.current_epoch+1)        
         
     
-    def _compute_d_loss(self, x_real, y_org, y_trg, z_emb_trg, z_trg):
+    def _compute_d_loss(self, x_real_ctrl, x_real_trt, y_org, z_emb_org, z_trg):
         """Compute the discriminator loss real batches
 
         Args:
@@ -164,26 +164,26 @@ class IMPAmodule(LightningModule):
         """
 
         # Gradient requirement for gradient penalty loss
-        x_real.requires_grad_()
-        out = self.nets.discriminator(x_real, y_org)
+        x_real_trt.requires_grad_()
+        out = self.nets.discriminator(x_real_trt, y_org)
         # Discriminator assigns a 1 to the real 
         loss_real = self._adv_loss(out, 1)
         # Gradient-based regularization (penalize high gradient on the discriminator)
-        loss_reg = self._r1_reg(out, x_real)
+        loss_reg = self._r1_reg(out, x_real_trt)
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
             if self.args.stochastic:
-                z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)
+                z_emb_org = torch.cat([z_emb_org, z_trg], dim=1)
 
             # Single of the noisy embedding vector to a style vector 
-            s_trg = self.nets.mapping_network(z_emb_trg)  
+            s_trg = self.nets.mapping_network(z_emb_org)  
             
             # Generate the fake image
-            _, x_fake = self.nets.generator(x_real, s_trg)
+            _, x_fake = self.nets.generator(x_real_ctrl, s_trg)
 
         # Discriminator trained to predict transformed image as fake in its domain 
-        out = self.nets.discriminator(x_fake, y_trg)
+        out = self.nets.discriminator(x_fake, y_org)
         loss_fake = self._adv_loss(out, 0)
         loss = loss_real + loss_fake + self.args.lambda_reg * loss_reg 
 
@@ -191,7 +191,7 @@ class IMPAmodule(LightningModule):
                         fake=loss_fake.item(),
                         reg=loss_reg.item())
 
-    def _compute_g_loss(self, x_real, y_org, y_trg, z_emb_trg, z_emb_org, z_trgs=None):
+    def _compute_g_loss(self, x_real_ctrl, y_org, z_emb_org, z_trgs=None):
         """Compute the discriminator loss real batches
 
         Args:
@@ -206,33 +206,33 @@ class IMPAmodule(LightningModule):
         
         # Adversarial loss
         if z_trg != None:
-            z_emb_trg1 = torch.cat([z_emb_trg, z_trg], dim=1)
+            z_emb_org1 = torch.cat([z_emb_org, z_trg], dim=1)
         else: 
-            z_emb_trg1 = z_emb_trg
+            z_emb_org1 = z_emb_org
 
         # Style vector with the first random component 
-        s_trg1 = self.nets.mapping_network(z_emb_trg1)  
+        s_org1 = self.nets.mapping_network(z_emb_org1)  
 
         # Generation of fake images 
-        _, x_fake = self.nets.generator(x_real, s_trg1)
+        _, x_fake = self.nets.generator(x_real_ctrl, s_org1)
         # Try to deceive the discriminator 
-        out = self.nets.discriminator(x_fake, y_trg)
+        out = self.nets.discriminator(x_fake, y_org)
         loss_adv = self._adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
         if not self.args.single_style:
-            s_pred = self.nets.style_encoder(x_fake, y_trg)
+            s_pred = self.nets.style_encoder(x_fake, y_org)
         else:
             s_pred = self.nets.style_encoder(x_fake)
 
         # Predict style back from image 
-        loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  
+        loss_sty = torch.mean(torch.abs(s_pred - s_org1))  
 
         # Diversity sensitive loss 
         if self.args.stochastic:
-            z_emb_trg2 = torch.cat([z_emb_trg, z_trg2], dim=1)
+            z_emb_trg2 = torch.cat([z_emb_org, z_trg2], dim=1)
             s_trg2 = self.nets.mapping_network(z_emb_trg2) 
-            _, x_fake2 = self.nets.generator(x_real, s_trg2)
+            _, x_fake2 = self.nets.generator(x_real_ctrl, s_trg2)
             x_fake2 = x_fake2.detach()
             loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 
         else:
@@ -240,12 +240,12 @@ class IMPAmodule(LightningModule):
             
         # Cycle-consistency loss
         if not self.args.single_style:
-            s_org = self.nets.style_encoder(x_real, y_org)
+            s_org = self.nets.style_encoder(x_real_ctrl, y_org)
         else:
-            s_org = self.nets.style_encoder(x_real)
+            s_org = self.nets.style_encoder(x_real_ctrl)
 
         _, x_rec = self.nets.generator(x_fake, s_org)
-        loss_cyc = torch.mean(torch.abs(x_rec - x_real))  # Mean absolute error reconstructed versus real 
+        loss_cyc = torch.mean(torch.abs(x_rec - x_real_ctrl))  # Mean absolute error reconstructed versus real 
 
         loss = loss_adv + self.args.lambda_sty * loss_sty \
             - self.args.lambda_ds * loss_ds + self.args.lambda_cyc * loss_cyc
@@ -313,3 +313,4 @@ class IMPAmodule(LightningModule):
         """
         for ckptio in self.ckptios:
             ckptio.save(step)
+            

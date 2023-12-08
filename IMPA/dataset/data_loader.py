@@ -40,16 +40,15 @@ class CellDataset:
         # Read the datasets
         self.fold_datasets = self._read_folds()
         
-        # Count the number of compounds 
-        trt_dataset = self.fold_datasets['train'].loc[self.fold_datasets['train']["state"]=="control"]
-        self.mol_names = np.unique(trt_dataset["CPD_NAME"])  # Sorted drug names
+        # Count the number of compounds
+        self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"][self.fold_datasets["train"]["trt_idx"]])  # Sorted drug names
         self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
 
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
         self.n_y = len(self.y_names)
 
-        # Create the embeddings
+        # Create th e embeddings
         if self.trainable_emb:
             self.embedding_matrix = torch.nn.Embedding(self.n_mol, self.latent_dim).to(self.device).to(torch.float32)  # Embedding 
         else:
@@ -110,9 +109,10 @@ class CellDataset:
 
             # Subset of dataframe corresponding to the split 
             subset = dataset.loc[dataset.SPLIT == fold_name]
-
             for key in subset.columns:
                 dataset_splits[fold_name][key] = np.array(subset[key])
+            dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"]=="trt")
+            dataset_splits[fold_name]["ctrl_idx"] = (dataset_splits[fold_name]["STATE"]=="control")
                 
         return dataset_splits
 
@@ -136,16 +136,15 @@ class CellDatasetFold(Dataset):
         self.data = data
         
         # Extract variables 
-        self.filenames = {}
+        self.file_names = {}
         self.mols = {}
         self.y = {}
         
-        for cond in ["control", "trt"]:
+        for cond in ["ctrl", "trt"]:
             # subset by condition 
-            data_cond  = data.loc[data.state==cond]
-            self.filenames[cond] = data_cond['SAMPLE_KEY']
-            self.mols[cond] = data_cond['CPD_NAME']
-            self.y[cond] = data_cond['ANNOT']
+            self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
+            self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
+            self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
         
         del data 
 
@@ -169,7 +168,7 @@ class CellDatasetFold(Dataset):
             self.couples_mol_y = {mol:y for mol,y in zip(mol_ids, y_ids)}
 
         # One-hot encode molecules and moas
-        self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols["trt"].reshape((-1,1))))    
+        self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols["trt"].reshape((-1,1))))  
 
         # Create sampler weights 
         self._get_sampler_weights()
@@ -179,16 +178,16 @@ class CellDatasetFold(Dataset):
         """
         Total number of samples 
         """
-        return len(self.file_names["control"])
+        return len(self.file_names["ctrl"])
 
     def __getitem__(self, idx):
         """
         Generate one example datapoint 
         """
         # Sample control and treated batches 
-        idx_trt = np.random.randint(0, len(self.filenames["trt"]))
-        img_file_ctrl = self.file_names[idx]
-        img_file_trt = self.file_names[idx_trt]
+        idx_trt = np.random.randint(0, len(self.file_names["trt"]))
+        img_file_ctrl = self.file_names["ctrl"][idx]
+        img_file_trt = self.file_names["trt"][idx_trt]
     
         # Split files 
         file_split_ctrl = img_file_ctrl.split('-')
@@ -204,10 +203,10 @@ class CellDatasetFold(Dataset):
         else:
             file_split_ctrl = file_split_ctrl[0].split("_")
             file_split_trt = file_split_trt[0].split("_")
-            path_ctrl = Path(self.image_path) / file_split_ctrl[0] / file_split_ctrl[1] 
-            path_trt = Path(self.image_path) / file_split_trt[0] / file_split_trt[1] 
-            file_ctrl = '_'.join(file_split_ctrl[2:])+".npy"
-            file_trt = '_'.join(file_split_trt[2:])+".npy"
+            path_ctrl = Path(self.image_path) / file_split_ctrl[0] / f"{file_split_ctrl[1]}_{file_split_ctrl[2]}"
+            path_trt = Path(self.image_path) / file_split_trt[0] / f"{file_split_trt[1]}_{file_split_trt[2]}"
+            file_ctrl = '_'.join(file_split_ctrl[1:])+".npy"
+            file_trt = '_'.join(file_split_trt[1:])+".npy"
             
         img_ctrl, img_trt = np.load(path_ctrl / file_ctrl), np.load(path_trt / file_trt)
         img_ctrl, img_trt = torch.from_numpy(img_ctrl).to(torch.float), torch.from_numpy(img_trt).to(torch.float)
@@ -216,7 +215,7 @@ class CellDatasetFold(Dataset):
         
         return {'X':(img_ctrl, img_trt), 
                 'mol_one_hot': self.one_hot_mol[idx_trt], 
-                'y_id': self.y2id[self.y[idx_trt]],
+                'y_id': self.y2id[self.y["trt"][idx_trt]],
                 'file_names': (img_file_ctrl, img_file_ctrl)}
     
     def _get_sampler_weights(self):
