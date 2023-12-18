@@ -32,7 +32,7 @@ single_style: True
 ood_set: Null
 mol_list: Null
 balanced: False 
-trainable_emb: False
+trainable_emb: True
 dataset_name: cpg0000_small
 n_channels: 5
 num_workers: 6
@@ -40,7 +40,7 @@ seed: 42
 
 # DIRECTORIES FOR DATA
 image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_small
-data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata.csv
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_small.csv
 embedding_path: Null
 
 # DIRECTORIES FOR RESULTS 

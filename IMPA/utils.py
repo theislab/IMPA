@@ -140,7 +140,8 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
         dest_dir (str): Destination directory for images.
     """
     # Get the images and the perturbation targets
-    x_real_ctrl, x_real_trt = inputs['X'].to(device)
+    x_real_ctrl, x_real_trt = inputs['X']
+    x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
 
     # Setup the device and the batch size
     N = x_real_ctrl.size(0)
@@ -217,7 +218,7 @@ def translate_using_latent(nets,
     x_concat = torch.cat(x_concat, dim=0)
     if args.dataset_name == 'bbbc021':
         save_image(x_concat, N, filename) 
-    elif args.dataset_name == 'bbbc025':
+    elif args.dataset_name == 'bbbc025' or ('cpg0000'in args.dataset_name):
         save_image(x_concat[:,[1,3,4],:,:], N, filename)
     else :
         save_image(x_concat[:,[5,1,0],:,:], N, filename)

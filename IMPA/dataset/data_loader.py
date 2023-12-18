@@ -47,7 +47,7 @@ class CellDataset:
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
         self.n_y = len(self.y_names)
-
+        
         # Create th e embeddings
         if self.trainable_emb:
             self.embedding_matrix = torch.nn.Embedding(self.n_mol, self.latent_dim).to(self.device).to(torch.float32)  # Embedding 
@@ -97,7 +97,7 @@ class CellDataset:
         if self.mol_list != None:
             dataset = dataset.loc[dataset.CPD_NAME.isin(self.mol_list)]
         # Remove the leave-out drugs if provided in ood_set
-        if self.ood_set!=None:
+        if self.ood_set != None:
             dataset = dataset.loc[~dataset.CPD_NAME.isin(self.ood_set)]
         
         # Collect in a dictionary the folds
@@ -109,11 +109,11 @@ class CellDataset:
 
             # Subset of dataframe corresponding to the split 
             subset = dataset.loc[dataset.SPLIT == fold_name]
+            # Save the fold name 
             for key in subset.columns:
                 dataset_splits[fold_name][key] = np.array(subset[key])
             dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"]=="trt")
             dataset_splits[fold_name]["ctrl_idx"] = (dataset_splits[fold_name]["STATE"]=="control")
-                
         return dataset_splits
 
 
@@ -172,7 +172,6 @@ class CellDatasetFold(Dataset):
 
         # Create sampler weights 
         self._get_sampler_weights()
-
         
     def __len__(self):
         """

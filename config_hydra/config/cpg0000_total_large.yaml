@@ -17,7 +17,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 200000
+total_steps: 200000
 ds_iter: 200000  
 resume_iter: 0
 batch_size: 32
@@ -40,7 +40,7 @@ seed: 42
 
 # DIRECTORIES FOR DATA
 image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large
-data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata.csv
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_large.csv
 embedding_path: Null
 
 # DIRECTORIES FOR RESULTS 
@@ -71,8 +71,8 @@ filename: epoch_{epoch:04d}
 monitor: fid_transformations
 mode: min
 save_last: True
-offline: True
+offline: False
 project: cpg0000_total_large
 log_model: False
-accelerator: cpu 
+accelerator: gpu 
 log_every_n_steps: 10

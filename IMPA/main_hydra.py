@@ -9,7 +9,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
-import torch
+import uuid
 from IMPA.dataset.data_loader import CellDataLoader
 from IMPA.solver import IMPAmodule
 
@@ -76,7 +76,7 @@ def main(config: DictConfig):
     trainer = Trainer(callbacks=model_ckpt_callbacks, 
                         default_root_dir=dest_dir,
                         logger=logger, 
-                        max_epochs=args.total_epochs,
+                        max_steps=args.total_steps,
                         accelerator=args.accelerator,
                         log_every_n_steps=args.log_every_n_steps)
             

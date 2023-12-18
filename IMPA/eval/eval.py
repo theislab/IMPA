@@ -43,12 +43,13 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     # Loop over single observations
     for observation in tqdm(loader):
         # Get the data and swap the labels
-        x_real_ctrl, x_real_trt = observation['X'].to(device)
+        x_real_ctrl, x_real_trt = observation['X']
+        x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
         y_one_hot_trg = observation['mol_one_hot'].to(device)
         y_trg = y_one_hot_trg.argmax(1).long()
 
         # Store perturbation labels
-        Y_trg.append(Y_trg.to('cpu'))
+        Y_trg.append(y_trg.to('cpu'))
 
         # Draw random vector for style conditioning
         if args.stochastic:

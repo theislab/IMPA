@@ -24,7 +24,7 @@ class IMPAmodule(LightningModule):
         super().__init__()
         self.args = args
         self.dest_dir = dest_dir
-        self.automatic_optimization = False
+        self.automatic_optimization = False  # to compute the gradient maually
         
         # Save hyperparameters for lightning/hydra
         self.save_hyperparameters(args)
@@ -77,18 +77,20 @@ class IMPAmodule(LightningModule):
         """   
         generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
         # Fetch the real and fake inputs and outputs 
-        x_real, y_one_hot = batch['X'].to(self.device), batch['mol_one_hot']
+        x_real, y_one_hot = batch['X'], batch['mol_one_hot']
         x_real_ctrl, x_real_trt = x_real
+        x_real_ctrl, x_real_trt = x_real_ctrl.to(self.device), x_real_trt.to(self.device)
+
         # The original label for the treatment
         y_org = y_one_hot.argmax(1).long().to(self.device)
-
+        
         # Get the perturbation embedding for the target mol
         z_emb_org = self.embedding_matrix(y_org).to(self.device)
 
         # Pick two random weight vectors 
         if self.args.stochastic:
-            z_trg, z_trg2 = (torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device), 
-                                torch.randn(x_real.shape[0], self.args.z_dimension).to(self.device))
+            z_trg, z_trg2 = (torch.randn(x_real_ctrl.shape[0], self.args.z_dimension).to(self.device), 
+                                torch.randn(x_real_ctrl.shape[0], self.args.z_dimension).to(self.device))
         else:
             z_trg, z_trg2 = None, None
         
@@ -101,7 +103,7 @@ class IMPAmodule(LightningModule):
         
         # Train the generator
         g_loss, g_losses_latent = self._compute_g_loss(
-            x_real_ctrl, y_org, z_emb_trg=z_emb_org, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
+            x_real_ctrl, y_org, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
         style_encoder_opt.zero_grad()
         generator_opt.zero_grad()
         mapping_network_opt.zero_grad()   
@@ -151,7 +153,6 @@ class IMPAmodule(LightningModule):
         # Save model checkpoints
         self._save_checkpoint(step=self.current_epoch+1)        
         
-    
     def _compute_d_loss(self, x_real_ctrl, x_real_trt, y_org, z_emb_org, z_trg):
         """Compute the discriminator loss real batches
 
