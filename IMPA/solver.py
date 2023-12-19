@@ -22,6 +22,8 @@ class IMPAmodule(LightningModule):
             datamodule (CellDataLoader): data module class
         """
         super().__init__()
+        self.save_hyperparameters()
+        
         self.args = args
         self.dest_dir = dest_dir
         self.automatic_optimization = False  # to compute the gradient maually

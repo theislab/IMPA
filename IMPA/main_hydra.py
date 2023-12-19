@@ -27,6 +27,9 @@ warnings.filterwarnings(
 def create_dirs(args):
     """Create the directories and sub-directories for training
     """
+    # date and time to name run 
+    unique_id = str(uuid.uuid4())
+    
     # Directory is named based on time stamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d")
     # Setup the key(s) naming the folder (passed as hyperparameter)
@@ -34,7 +37,7 @@ def create_dirs(args):
 
     # Set the directory for the results based on whether training is from begginning or resumed
     if args.resume_iter==0:
-        dest_dir = ospj(args.experiment_directory, timestamp+'_'+task_name)
+        dest_dir = ospj(args.experiment_directory, timestamp+'_'+unique_id+'_'+task_name)
     else:
         dest_dir = args.resume_dir+'_'+task_name
 
@@ -43,7 +46,7 @@ def create_dirs(args):
     os.makedirs(ospj(dest_dir, args.sample_dir), exist_ok=True)
     os.makedirs(ospj(dest_dir, args.checkpoint_dir), exist_ok=True)
     os.makedirs(ospj(dest_dir, args.embedding_folder), exist_ok=True)   
-    return dest_dir
+    return dest_dir, unique_id
 
 @hydra.main(config_path="../config_hydra", config_name="train", version_base=None)
 def main(config: DictConfig):
@@ -51,7 +54,7 @@ def main(config: DictConfig):
     args = config.config
     
     # Initialize folders
-    dest_dir = create_dirs(args)
+    dest_dir, unique_id = create_dirs(args)
         
     # Initialize datamodule
     datamodule = CellDataLoader(args)
@@ -70,13 +73,14 @@ def main(config: DictConfig):
     logger = WandbLogger(save_dir=dest_dir, 
                             offline=args.offline,
                             project=args.project,
-                            log_model=args.log_model) 
+                            log_model=args.log_model, 
+                            name=unique_id) 
                 
     # Initialize the lightning trainer 
     trainer = Trainer(callbacks=model_ckpt_callbacks, 
                         default_root_dir=dest_dir,
                         logger=logger, 
-                        max_steps=args.total_steps,
+                        max_epochs=args.total_epochs,
                         accelerator=args.accelerator,
                         log_every_n_steps=args.log_every_n_steps)
             

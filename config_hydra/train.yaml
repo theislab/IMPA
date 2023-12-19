@@ -6,3 +6,4 @@ defaults:
   - hydra: default
   - config: bbbc021_six
   - launcher: slurm_cluster
+  - hparam_search: null

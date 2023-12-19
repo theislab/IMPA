@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - override /hydra/sweeper/sampler: random 
+  - override /hydra/sweeper: optuna 
+  
+optimized_metric: fid_transformations
+
+hydra:
+
+  sweeper:
+    _target_: hydra_plugins.hydra_optuna_sweeper.optuna_sweeper.OptunaSweeper
+
+    direction: minimize
+
+    n_jobs: 5
+    
+    n_trials: 5
+
+    sampler: 
+      _target_: optuna.samplers.RandomSampler
+
+    # define hyperparameter search space
+    params:
+      config.style_dim: choice(32, 64, 128)
+      config.z_dimension: choice(5, 15, 20)

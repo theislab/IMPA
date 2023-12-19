@@ -99,8 +99,8 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
         wd_transformations += wd
 
         # FID
-        X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
-        X_pred_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_pred_cat.to(device)))
+        X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)), batch_size=64)
+        X_pred_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_pred_cat.to(device)), batch_size=64)
         fid = cal_fid(X_real_dataset, X_pred_dataset, 2048, True, custom_channels=channels)
         fid_transformations += fid
 
@@ -110,7 +110,7 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
 
     # Save metrics
     dict_metrics = {'wd_transformations': wd_transformations / len(categories),
-                    'fid_transformations': fid_transformations / len(categories)}
+                    'fid_transformations': wd_transformations / len(categories)}
 
     # Dump latent embeddings
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
