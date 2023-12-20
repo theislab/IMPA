@@ -133,5 +133,6 @@ checkpoints/
 project_folder
 
 # Script outputs 
+scripts/
 *.out
 *.err
