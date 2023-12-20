@@ -131,3 +131,7 @@ dmypy.json
 # Directories 
 checkpoints/
 project_folder
+
+# Script outputs 
+*.out
+*.err
