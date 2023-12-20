@@ -41,9 +41,12 @@ class CellDataset:
         self.fold_datasets = self._read_folds()
         
         # Count the number of compounds 
-        self.mol_names = np.unique(self.fold_datasets['train']["CPD_NAME"])  # Sorted drug names
-        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
+        if args.pert_modelling:
+            self.mol_names = np.unique(self.fold_datasets['train']["CPD_NAME"])  # Sorted drug names
+        else:
+            self.mol_names = np.unique(self.fold_datasets['train']["BATCH"])  # Sorted batch name
 
+        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
         self.n_y = len(self.y_names)
@@ -57,7 +60,7 @@ class CellDataset:
             embedding_matrix = torch.tensor(embedding_matrix.values, 
                                                     dtype=torch.float32, device=self.device)
             self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
-
+            
         # Keep track of the indices and numbers 
         self.mol2id = {mol: id for id, mol in enumerate(self.mol_names)}
         self.y2id = {y: id for id, y in enumerate(self.y_names)}
@@ -74,8 +77,8 @@ class CellDataset:
                                                         self.mol2id, 
                                                         self.y2id, 
                                                         self.augment_train, 
-                                                        self.normalize),
-
+                                                        self.normalize, 
+                                                        args.pert_modelling),
 
                                 'test': CellDatasetFold('test', 
                                                         self.image_path,
@@ -84,7 +87,8 @@ class CellDataset:
                                                         self.mol2id, 
                                                         self.y2id, 
                                                         self.augment_train, 
-                                                        self.normalize)}                                                    
+                                                        self.normalize,
+                                                        args.pert_modelling)}                                                    
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -125,7 +129,8 @@ class CellDatasetFold(Dataset):
                 mol2id, 
                 y2id, 
                 augment_train=True, 
-                normalize=False):
+                normalize=False, 
+                pert_modelling=True):
 
         super(CellDatasetFold, self).__init__() 
 
@@ -133,10 +138,14 @@ class CellDatasetFold(Dataset):
         self.image_path = image_path
         self.fold = fold  
         self.data = data
+        self.pert_modelling = pert_modelling
         
         # Extract variables 
         self.file_names = data['SAMPLE_KEY']
-        self.mols = data['CPD_NAME']
+        if pert_modelling:
+            self.mols = data['CPD_NAME']
+        else:
+            self.mols = data["BATCH"]
         self.dose = data['DOSE']
         self.y = data['ANNOT']
 
@@ -156,17 +165,18 @@ class CellDatasetFold(Dataset):
         else:
             self.transform = CustomTransform(augment=False, normalize=normalize)
         
-        if self.fold ==  'train':
+        if self.fold ==  'train' and pert_modelling:
             # Map drugs to moas
             mol_ids, y_ids = [self.mol2id[mol] for mol in self.mols] , [self.y2id[y] for y in self.y]
             self.couples_mol_y = {mol:y for mol,y in zip(mol_ids, y_ids)}
+        else:
+            self.couples_mol_y =  None
 
         # One-hot encode molecules and moas
         self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols.reshape((-1,1))))    
 
         # Create sampler weights 
         self._get_sampler_weights()
-
         
     def __len__(self):
         """
