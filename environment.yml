@@ -8,6 +8,7 @@ dependencies:
     - pandas
     - numpy
     - scipy
+    - scanpy
     - matplotlib==3.5.2
     - munch==2.5.0
     - pillow==9.1.1
