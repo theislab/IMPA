@@ -1,5 +1,6 @@
 import pickle as pkl
 
+import random
 import numpy as np
 import torch
 from os.path import join as ospj
@@ -10,7 +11,7 @@ from tqdm import tqdm
 from IMPA.utils import swap_attributes
 
 
-def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_matrix, channels=[0,1,2]):
+def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_matrix, channels=[0,1,2], subsample_frac=1):
     """Evaluate the model during training.
 
     Args:
@@ -36,10 +37,6 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     y_fake_ds = []
     X_real = []
     X_swapped = []
-
-    # Store points for the style and content encoding
-    z_basal_ds = []
-    z_style_ds = []
 
     # Loop over single observations
     for observation in tqdm(loader):
@@ -67,15 +64,11 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
             s = nets.mapping_network(z_emb)
 
             # Generate
-            z_basal, X_fake = nets.generator(X, s)
+            _, X_fake = nets.generator(X, s)
 
             # Save real and swapped images
             X_swapped.append(X_fake.cpu())
             X_real.append(X.cpu())
-
-            # Save the basal state and style for later visualization
-            z_basal_ds.append(z_basal.detach().to('cpu'))
-            z_style_ds.append(s.detach().to('cpu'))
 
     # Perform list concatenation on all of the results
     y_true_ds = torch.cat(y_true_ds).to('cpu').numpy()
@@ -94,23 +87,38 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
         # Compute FID/WD for a class at a time
         X_real_cat = X_real[y_true_ds == cat]
         X_swapped_cat = X_swapped[y_fake_ds == cat]
+        
+        # Randomly subsample data
+        # num_samples_to_keep_real = int(len(X_real_cat) * subsample_frac
+        num_samples_to_keep_real =  100
+        indices_to_keep_real = random.sample(range(len(X_real_cat)), num_samples_to_keep_real)
+        # num_samples_to_keep_generated = int(len(X_swapped_cat) * subsample_frac)
+        num_samples_to_keep_generated = 100
+        indices_to_keep_generated = random.sample(range(len(X_swapped_cat)), num_samples_to_keep_generated)
 
+        X_real_cat = X_real_cat[indices_to_keep_real]
+        X_swapped_cat = X_swapped_cat[indices_to_keep_generated]
+        
         # Wasserstein distance
+        print("Wasserstein")
         wd = ot.emd2(torch.tensor([]), torch.tensor([]),
                      ot.dist(X_real_cat.view(len(X_real_cat), -1),
                              X_swapped_cat.view(len(X_swapped_cat), -1), 'euclidean'), 1)
         wd_transformations += wd
 
         # FID
+        print("FID")
         X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
         X_swapped_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_swapped_cat.to(device)))
         fid = cal_fid(X_real_dataset, X_swapped_dataset, 2048, True, custom_channels=channels)
         fid_transformations += fid
+        
+        del X_real_cat
+        del X_swapped_cat
 
-    # Concatenate style and content vectors
-    z_basal_ds = torch.cat(z_basal_ds, dim=0).detach().cpu().numpy()
-    z_style_ds = torch.cat(z_style_ds, dim=0).detach().cpu().numpy()
-
+    del X_swapped
+    del X_real
+    
     # Save metrics
     dict_metrics = {'wd_transformations': wd_transformations / len(categories),
                     'fid_transformations': fid_transformations / len(categories)}
@@ -119,6 +127,6 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
     print(f"Save embeddings at {emb_path}")
     with open(emb_path, 'wb') as file:
-        pkl.dump([z_basal_ds, z_style_ds, y_fake_ds], file)
+        pkl.dump([y_fake_ds], file)
 
     return dict_metrics

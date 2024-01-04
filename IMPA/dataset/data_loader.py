@@ -44,7 +44,7 @@ class CellDataset:
         if args.pert_modelling:
             self.mol_names = np.unique(self.fold_datasets['train']["CPD_NAME"])  # Sorted drug names
         else:
-            self.mol_names = np.unique(self.fold_datasets['train']["BATCH"])  # Sorted batch name
+            self.mol_names = np.unique(self.fold_datasets['train'][args.batch_key])  # Sorted batch name
 
         self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
         # Count the number of drugs and MOAs 
@@ -78,7 +78,9 @@ class CellDataset:
                                                         self.y2id, 
                                                         self.augment_train, 
                                                         self.normalize, 
-                                                        args.pert_modelling),
+                                                        args.pert_modelling,
+                                                        args.dataset_name,
+                                                        args.batch_key),
 
                                 'test': CellDatasetFold('test', 
                                                         self.image_path,
@@ -88,7 +90,9 @@ class CellDataset:
                                                         self.y2id, 
                                                         self.augment_train, 
                                                         self.normalize,
-                                                        args.pert_modelling)}                                                    
+                                                        args.pert_modelling,
+                                                        args.dataset_name,
+                                                        args.batch_key)}                                                    
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -130,7 +134,9 @@ class CellDatasetFold(Dataset):
                 y2id, 
                 augment_train=True, 
                 normalize=False, 
-                pert_modelling=True):
+                pert_modelling=True, 
+                dataset_name="bbbc021",
+                batch_key=None):
 
         super(CellDatasetFold, self).__init__() 
 
@@ -139,14 +145,14 @@ class CellDatasetFold(Dataset):
         self.fold = fold  
         self.data = data
         self.pert_modelling = pert_modelling
+        self.dataset_name = dataset_name
         
         # Extract variables 
         self.file_names = data['SAMPLE_KEY']
         if pert_modelling:
             self.mols = data['CPD_NAME']
         else:
-            self.mols = data["BATCH"]
-        self.dose = data['DOSE']
+            self.mols = data[batch_key]
         self.y = data['ANNOT']
 
         del data 
@@ -192,14 +198,18 @@ class CellDatasetFold(Dataset):
         img_file = self.file_names[idx]
         file_split = img_file.split('-')
         
-        if len(file_split) > 1:
+        if self.dataset_name=="bbbc021":
             file_split = file_split[1].split("_")
             path = Path(self.image_path) / "_".join(file_split[:2]) / file_split[2] 
             file = '_'.join(file_split[3:])+".npy"
-        else:
+        elif self.dataset_name in ["rxrx1", "bbbc025"]:
             file_split = file_split[0].split("_")
             path = Path(self.image_path) / file_split[0] / file_split[1] 
             file = '_'.join(file_split[2:])+".npy"
+        else:
+            file_split = file_split[0].split("_")
+            path = Path(self.image_path) / file_split[0] / f"{file_split[1]}_{file_split[2]}" 
+            file = '_'.join(file_split[1:])+".npy"
             
         img = np.load(path / file)
         img = torch.from_numpy(img).to(torch.float)
@@ -209,7 +219,6 @@ class CellDatasetFold(Dataset):
         return {'X':img, 
                 'mol_one_hot': self.one_hot_mol[idx], 
                 'y_id': self.y2id[self.y[idx]],
-                'dose': self.dose[idx],
                 'file_names': img_file}
     
     def _get_sampler_weights(self):
@@ -219,7 +228,6 @@ class CellDatasetFold(Dataset):
         dict_mol_names_idx_unique = {key:1/val for key,val in zip(mol_names_idx_unique[0], mol_names_idx_unique[1])}
         # Derive weights
         self.weights = [dict_mol_names_idx_unique[obs] for obs in mol_names_idx]
-
 
 class CellDataLoader(LightningDataModule):
     """General data loader class
@@ -240,7 +248,7 @@ class CellDataLoader(LightningDataModule):
         dataset = CellDataset(self.args, device=self.device) 
         
         # Channel dimension
-        self.dim = self.args['n_channels']
+        self.dim = self.args.n_channels
 
         # Integrate embeddings as class attribute
         self.embedding_matrix = dataset.embedding_matrix  
@@ -261,7 +269,6 @@ class CellDataLoader(LightningDataModule):
         # Free cell painting dataset memory
         del dataset
         return training_set, test_set
-        
         
     def init_dataset(self):
         """Initialize dataset and data loaders

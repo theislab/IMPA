@@ -1,5 +1,5 @@
 # TASK NAME 
-task_name: rxrx1_batch
+task_name: cpg0000_batch
 
 # IMAGE
 img_size: 96  
@@ -10,8 +10,8 @@ stochastic: True
 z_dimension: 10 
 dim_in: 64 
 pert_modelling: False
-batch_key: BATCH
-subsample_frac: 1.0
+batch_key: PLATE
+subsample_frac: 0.05
 
 # LOSS
 lambda_reg: 1 
@@ -20,7 +20,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 100
+total_epochs: 20
 ds_iter: 100000  
 resume_iter: 0
 batch_size: 32
@@ -36,14 +36,14 @@ ood_set: Null
 mol_list: Null
 balanced: False 
 trainable_emb: True
-dataset_name: rxrx1_batch
-n_channels: 6
+dataset_name: cpg0000
+n_channels: 5
 num_workers: 6
 seed: 42  
 
 # DIRECTORIES FOR DATA
-image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/rxrx1
-data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/rxrx1/metadata/rxrx1_df.csv
+image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_large.csv
 embedding_path: Null
 
 # DIRECTORIES FOR RESULTS 
@@ -75,7 +75,7 @@ monitor: fid_transformations
 mode: min
 save_last: True
 offline: False
-project: rxrx1_batch
+project: cpg0000_batch
 log_model: False
 accelerator: gpu 
 log_every_n_steps: 10 

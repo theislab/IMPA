@@ -12,4 +12,3 @@ hydra:
     gres: gpu:1
     timeout_min: 2880
     array_parallelism: 4
-    exclude: supergpu03,supergpu02

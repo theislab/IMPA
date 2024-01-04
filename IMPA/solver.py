@@ -74,7 +74,7 @@ class IMPAmodule(LightningModule):
     
     def training_step(self, batch): 
         """Method for IMPA training across a pre-defined number of iterations. 
-        """   
+        """  
         generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
         # Fetch the real and fake inputs and outputs 
         x_real, y_one_hot = batch['X'].to(self.device), batch['mol_one_hot']
@@ -313,3 +313,4 @@ class IMPAmodule(LightningModule):
         """
         for ckptio in self.ckptios:
             ckptio.save(step)
+            
