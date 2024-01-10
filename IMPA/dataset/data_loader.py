@@ -198,11 +198,11 @@ class CellDatasetFold(Dataset):
         img_file = self.file_names[idx]
         file_split = img_file.split('-')
         
-        if self.dataset_name=="bbbc021":
+        if self.dataset_name=="rxrx1":
             file_split = file_split[1].split("_")
             path = Path(self.image_path) / "_".join(file_split[:2]) / file_split[2] 
             file = '_'.join(file_split[3:])+".npy"
-        elif self.dataset_name in ["rxrx1", "bbbc025"]:
+        elif self.dataset_name in ["bbbc021", "bbbc025"]:
             file_split = file_split[0].split("_")
             path = Path(self.image_path) / file_split[0] / file_split[1] 
             file = '_'.join(file_split[2:])+".npy"
