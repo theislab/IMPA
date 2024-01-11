@@ -1,131 +1,0 @@
-An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
-  warnings.warn(_create_warning_msg(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/lightning_fabric/plugins/environments/slurm.py:191: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python ../IMPA/main_hydra.py config=bbbc021_all ...
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
-You are using a CUDA device ('NVIDIA A100-PCIE-40GB MIG 3g.20gb') that has Tensor Cores. To properly utilize them, you should set `torch.set_float32_matmul_precision('medium' | 'high')` which will trade-off precision for performance. For more details, read https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
-wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.2 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.15.12
-wandb: Run data is saved locally in ../project_folder/experiments/20240111_989aa802-893b-4ef0-8373-449aeebab2f7_bbbc021_all/wandb/run-20240111_160149-hwuk3ja0
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run 989aa802-893b-4ef0-8373-449aeebab2f7
-wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021
-wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021/runs/hwuk3ja0
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [MIG-8969795b-1b3b-5f56-96e0-0a6e292dd4f0]
-
-  | Name             | Type         | Params
---------------------------------------------------
-0 | embedding_matrix | Embedding    | 5.4 K 
-1 | generator        | DataParallel | 24.3 M
-2 | style_encoder    | DataParallel | 14.3 M
-3 | discriminator    | DataParallel | 14.3 M
-4 | mapping_network  | DataParallel | 11.3 K
---------------------------------------------------
-53.0 M    Trainable params
-5.4 K     Non-trainable params
-53.0 M    Total params
-211.916   Total estimated model params size (MB)
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
-  warnings.warn(_create_warning_msg(
-
-  0%|          | 0/35 [00:00<?, ?it/s][A
-  3%|▎         | 1/35 [00:02<01:25,  2.51s/it][A
- 11%|█▏        | 4/35 [00:02<00:15,  1.96it/s][A
- 20%|██        | 7/35 [00:03<00:08,  3.13it/s][A
- 26%|██▌       | 9/35 [00:03<00:06,  4.13it/s][A
- 31%|███▏      | 11/35 [00:03<00:04,  5.33it/s][A
- 37%|███▋      | 13/35 [00:03<00:04,  5.14it/s][A
- 40%|████      | 14/35 [00:04<00:04,  5.14it/s][A
- 46%|████▌     | 16/35 [00:04<00:02,  6.67it/s][A
- 51%|█████▏    | 18/35 [00:04<00:02,  7.78it/s][A
- 57%|█████▋    | 20/35 [00:04<00:02,  6.14it/s][A
- 63%|██████▎   | 22/35 [00:05<00:01,  6.91it/s][A
- 71%|███████▏  | 25/35 [00:05<00:01,  6.88it/s][A
- 77%|███████▋  | 27/35 [00:05<00:01,  7.87it/s][A
- 80%|████████  | 28/35 [00:05<00:00,  7.69it/s][A
- 86%|████████▌ | 30/35 [00:05<00:00,  8.78it/s][A
- 89%|████████▊ | 31/35 [00:06<00:00,  7.67it/s][A
- 94%|█████████▍| 33/35 [00:06<00:00,  8.70it/s][A
- 97%|█████████▋| 34/35 [00:06<00:00,  7.72it/s][A
-100%|██████████| 35/35 [00:06<00:00,  6.63it/s][A100%|██████████| 35/35 [00:06<00:00,  5.16it/s]
-
-  0%|          | 0/34 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
-  warnings.warn(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
-  warnings.warn(msg)
-
-  3%|▎         | 1/34 [00:13<07:26, 13.52s/it][A
-  6%|▌         | 2/34 [00:20<05:18,  9.96s/it][A
-  9%|▉         | 3/34 [00:28<04:30,  8.74s/it][A
- 12%|█▏        | 4/34 [00:35<04:07,  8.26s/it][A
- 15%|█▍        | 5/34 [00:43<03:49,  7.92s/it][A
- 18%|█▊        | 6/34 [00:50<03:34,  7.65s/it][A
- 21%|██        | 7/34 [00:57<03:23,  7.52s/it][A
- 24%|██▎       | 8/34 [01:04<03:12,  7.41s/it][A
- 26%|██▋       | 9/34 [01:11<03:02,  7.31s/it][A
- 29%|██▉       | 10/34 [01:18<02:54,  7.27s/it][A
- 32%|███▏      | 11/34 [01:26<02:46,  7.24s/it][A
- 35%|███▌      | 12/34 [01:33<02:39,  7.25s/it][A
- 38%|███▊      | 13/34 [01:40<02:31,  7.21s/it][A
- 41%|████      | 14/34 [01:47<02:23,  7.19s/it][A
- 44%|████▍     | 15/34 [01:54<02:15,  7.13s/it][A
- 47%|████▋     | 16/34 [02:01<02:08,  7.12s/it][A
- 50%|█████     | 17/34 [02:02<01:27,  5.17s/it][A
- 53%|█████▎    | 18/34 [02:09<01:33,  5.82s/it][A
- 56%|█████▌    | 19/34 [02:16<01:33,  6.23s/it][A
- 59%|█████▉    | 20/34 [02:23<01:30,  6.47s/it][A
- 62%|██████▏   | 21/34 [02:31<01:26,  6.68s/it][A
- 65%|██████▍   | 22/34 [02:38<01:21,  6.83s/it][A
- 68%|██████▊   | 23/34 [02:45<01:17,  7.00s/it][A
- 71%|███████   | 24/34 [02:52<01:10,  7.03s/it][A
- 74%|███████▎  | 25/34 [03:00<01:03,  7.11s/it][A
- 76%|███████▋  | 26/34 [03:07<00:58,  7.26s/it][A
- 79%|███████▉  | 27/34 [03:15<00:51,  7.29s/it][A
- 82%|████████▏ | 28/34 [03:22<00:43,  7.26s/it][A
- 85%|████████▌ | 29/34 [03:29<00:36,  7.27s/it][A
- 88%|████████▊ | 30/34 [03:36<00:28,  7.23s/it][A
- 91%|█████████ | 31/34 [03:43<00:21,  7.24s/it][A
- 94%|█████████▍| 32/34 [03:50<00:14,  7.15s/it][A
- 97%|█████████▋| 33/34 [03:58<00:07,  7.19s/it][A
-100%|██████████| 34/34 [04:05<00:00,  7.21s/it][A100%|██████████| 34/34 [04:05<00:00,  7.22s/it]
-
-  0%|          | 0/35 [00:00<?, ?it/s][A
-  3%|▎         | 1/35 [00:01<01:03,  1.87s/it][A
-  6%|▌         | 2/35 [00:02<00:29,  1.12it/s][A
- 14%|█▍        | 5/35 [00:02<00:08,  3.57it/s][A
- 23%|██▎       | 8/35 [00:02<00:04,  5.48it/s][A
- 34%|███▍      | 12/35 [00:02<00:02,  9.31it/s][A
- 43%|████▎     | 15/35 [00:02<00:02,  8.56it/s][A
- 54%|█████▍    | 19/35 [00:03<00:01, 12.10it/s][A
- 63%|██████▎   | 22/35 [00:03<00:01, 10.60it/s][A
- 74%|███████▍  | 26/35 [00:03<00:00, 11.06it/s][A
- 86%|████████▌ | 30/35 [00:03<00:00, 14.63it/s][A
- 94%|█████████▍| 33/35 [00:04<00:00, 12.51it/s][A100%|██████████| 35/35 [00:04<00:00,  8.02it/s]
-
-  0%|          | 0/34 [00:00<?, ?it/s][A
-  3%|▎         | 1/34 [00:07<04:19,  7.87s/it][A
-  6%|▌         | 2/34 [00:15<03:59,  7.48s/it][A
-  9%|▉         | 3/34 [00:22<03:50,  7.43s/it][A
- 12%|█▏        | 4/34 [00:29<03:39,  7.32s/it][A
- 15%|█▍        | 5/34 [00:36<03:30,  7.26s/it][A
- 18%|█▊        | 6/34 [00:44<03:23,  7.28s/it][A
- 21%|██        | 7/34 [00:51<03:17,  7.32s/it][A
- 24%|██▎       | 8/34 [00:58<03:08,  7.26s/it][A
- 26%|██▋       | 9/34 [01:05<02:59,  7.20s/it][A
- 29%|██▉       | 10/34 [01:14<03:04,  7.71s/it][A
- 32%|███▏      | 11/34 [01:21<02:54,  7.58s/it][A
- 35%|███▌      | 12/34 [01:28<02:43,  7.44s/it][A
- 38%|███▊      | 13/34 [01:36<02:36,  7.44s/it][A
- 41%|████      | 14/34 [01:43<02:29,  7.47s/it][A
- 44%|████▍     | 15/34 [01:51<02:20,  7.37s/it][A
- 47%|████▋     | 16/34 [01:58<02:11,  7.28s/it][A
- 50%|█████     | 17/34 [02:05<02:03,  7.24s/it][A
- 53%|█████▎    | 18/34 [02:12<01:55,  7.23s/it][A
- 56%|█████▌    | 19/34 [02:19<01:49,  7.28s/it][A
- 59%|█████▉    | 20/34 [02:27<01:41,  7.28s/it][A
