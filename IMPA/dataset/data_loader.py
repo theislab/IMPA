@@ -74,7 +74,8 @@ class CellDataset:
                                                         self.mol2id, 
                                                         self.y2id, 
                                                         self.augment_train, 
-                                                        self.normalize),
+                                                        self.normalize, 
+                                                        dataset_name=self.dataset_name),
 
 
                                 'test': CellDatasetFold('test', 
@@ -84,7 +85,8 @@ class CellDataset:
                                                         self.mol2id, 
                                                         self.y2id, 
                                                         self.augment_train, 
-                                                        self.normalize)}                                                    
+                                                        self.normalize, 
+                                                        dataset_name=self.dataset_name)}                                    
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -126,7 +128,8 @@ class CellDatasetFold(Dataset):
                 mol2id, 
                 y2id, 
                 augment_train=True, 
-                normalize=False):
+                normalize=False, 
+                dataset_name="bbbc021"):
 
         super(CellDatasetFold, self).__init__() 
 
@@ -134,6 +137,7 @@ class CellDatasetFold(Dataset):
         self.image_path = image_path
         self.fold = fold  
         self.data = data
+        self.dataset_name = dataset_name
         
         # Extract variables 
         self.file_names = {}
@@ -145,7 +149,7 @@ class CellDatasetFold(Dataset):
             self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
             self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
             self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
-        
+         
         del data 
 
         # Whether to perform training augmentation
@@ -179,13 +183,13 @@ class CellDatasetFold(Dataset):
         """
         return len(self.file_names["ctrl"])
 
-    def __getitem__(self, idx):
+    def __getitem__(self, i):
         """
         Generate one example datapoint 
         """
         # Sample control and treated batches 
+        img_file_ctrl = self.file_names["ctrl"][i]
         idx_trt = np.random.randint(0, len(self.file_names["trt"]))
-        img_file_ctrl = self.file_names["ctrl"][idx]
         img_file_trt = self.file_names["trt"][idx_trt]
     
         # Split files 
@@ -202,10 +206,16 @@ class CellDatasetFold(Dataset):
         else:
             file_split_ctrl = file_split_ctrl[0].split("_")
             file_split_trt = file_split_trt[0].split("_")
-            path_ctrl = Path(self.image_path) / file_split_ctrl[0] / f"{file_split_ctrl[1]}_{file_split_ctrl[2]}"
-            path_trt = Path(self.image_path) / file_split_trt[0] / f"{file_split_trt[1]}_{file_split_trt[2]}"
-            file_ctrl = '_'.join(file_split_ctrl[1:])+".npy"
-            file_trt = '_'.join(file_split_trt[1:])+".npy"
+            if self.dataset_name=="cpg0000":
+                path_ctrl = Path(self.image_path) / file_split_ctrl[0] / f"{file_split_ctrl[1]}_{file_split_ctrl[2]}"
+                path_trt = Path(self.image_path) / file_split_trt[0] / f"{file_split_trt[1]}_{file_split_trt[2]}"
+                file_ctrl = '_'.join(file_split_ctrl[1:])+".npy"
+                file_trt = '_'.join(file_split_trt[1:])+".npy"
+            elif self.dataset_name=="bbbc021":
+                path_ctrl = Path(self.image_path) / file_split_ctrl[0] / f"{file_split_ctrl[1]}"
+                path_trt = Path(self.image_path) / file_split_trt[0] / f"{file_split_trt[1]}"
+                file_ctrl = '_'.join(file_split_ctrl[2:])+".npy"
+                file_trt = '_'.join(file_split_trt[2:])+".npy"
             
         img_ctrl, img_trt = np.load(path_ctrl / file_ctrl), np.load(path_trt / file_trt)
         img_ctrl, img_trt = torch.from_numpy(img_ctrl).to(torch.float), torch.from_numpy(img_trt).to(torch.float)
@@ -215,7 +225,7 @@ class CellDatasetFold(Dataset):
         return {'X':(img_ctrl, img_trt), 
                 'mol_one_hot': self.one_hot_mol[idx_trt], 
                 'y_id': self.y2id[self.y["trt"][idx_trt]],
-                'file_names': (img_file_ctrl, img_file_ctrl)}
+                'file_names': (img_file_ctrl, img_file_trt)}
     
     def _get_sampler_weights(self):
         mol_names_idx = [self.mol2id[mol] for mol in self.mols["trt"]]
@@ -255,7 +265,7 @@ class CellDataLoader(LightningDataModule):
         self.num_y = dataset.n_y 
 
         # Collect training and test set 
-        training_set, test_set = dataset.fold_datasets.values()  
+        training_set, test_set = dataset.fold_datasets.values() 
         
         # Collect ids 
         self.mol2id = dataset.mol2id
@@ -295,8 +305,7 @@ class CellDataLoader(LightningDataModule):
                                                        num_workers=self.args.num_workers,
                                                        drop_last=False)      
         self.mol2y = self.training_set.couples_mol_y       
-    
-    
+        
     def train_dataloader(self):
         return self.loader_train
     
