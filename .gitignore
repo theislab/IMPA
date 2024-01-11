@@ -130,4 +130,5 @@ dmypy.json
 
 # Directories 
 checkpoints/
+scripts/logs/
 project_folder
