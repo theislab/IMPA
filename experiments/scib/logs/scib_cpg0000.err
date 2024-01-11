@@ -1,0 +1,68 @@
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scanpy/preprocessing/_pca.py:229: ImplicitModificationWarning: Setting element `.obsm['X_pca']` of view, initializing view as actual.
+  adata.obsm['X_pca'] = X_pca
+Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]Computing neighbors:  50%|█████     | 1/2 [01:12<01:12, 72.16s/it]Computing neighbors: 100%|██████████| 2/2 [02:07<00:00, 62.16s/it]Computing neighbors: 100%|██████████| 2/2 [02:07<00:00, 63.66s/it]
+Embeddings:   0%|[32m          [0m| 0/2 [00:00<?, ?it/s]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [16:58<2:32:44, 1018.28s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [16:58<2:32:44, 1018.28s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [43:32<3:00:55, 1356.97s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [43:32<3:00:55, 1356.97s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [1:00:26<2:20:04, 1200.61s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [1:00:26<2:20:04, 1200.61s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:00:29<1:12:45, 727.65s/it, Bio conservation: clisi_knn] [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:00:29<1:12:45, 727.65s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:02:47<42:54, 514.91s/it, Batch correction: silhouette_batch]  [A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:02:47<42:54, 514.91s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:02:48<22:41, 340.46s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:02:48<22:41, 340.46s/it, Batch correction: kbet_per_label][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+
+Metrics:  70%|[34m███████   [0m| 7/10 [1:03:29<12:07, 242.35s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [1:03:29<12:07, 242.35s/it, Batch correction: graph_connectivity][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_graph_connectivity.py:30: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  tab = pd.value_counts(comps)
+
+Metrics:  80%|[34m████████  [0m| 8/10 [1:03:33<05:32, 166.47s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [1:03:33<05:32, 166.47s/it, Batch correction: pcr_comparison]    [A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_pcr_comparison.py:49: UserWarning: PCR comparison score is negative, meaning variance contribution increased after integration. Setting to 0.
+  warnings.warn(
+
+Metrics:  90%|[34m█████████ [0m| 9/10 [1:03:35<01:55, 115.10s/it, Batch correction: pcr_comparison][AEmbeddings:  50%|[32m█████     [0m| 1/2 [1:03:35<1:03:35, 3815.50s/it]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+                                                                                            [A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [16:56<2:32:32, 1016.94s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [16:56<2:32:32, 1016.94s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [43:40<3:01:37, 1362.13s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [43:40<3:01:37, 1362.13s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [1:00:33<2:20:16, 1202.38s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [1:00:33<2:20:16, 1202.38s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:00:38<1:12:59, 729.86s/it, Bio conservation: clisi_knn] [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:00:38<1:12:59, 729.86s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:02:23<42:02, 504.53s/it, Batch correction: silhouette_batch]  [A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:02:23<42:02, 504.53s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:02:25<22:14, 333.61s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:02:25<22:14, 333.61s/it, Batch correction: kbet_per_label][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+
+Metrics:  70%|[34m███████   [0m| 7/10 [1:02:46<11:34, 231.49s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [1:02:46<11:34, 231.49s/it, Batch correction: graph_connectivity][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_graph_connectivity.py:30: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  tab = pd.value_counts(comps)
+
+Metrics:  80%|[34m████████  [0m| 8/10 [1:02:50<05:18, 159.05s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [1:02:50<05:18, 159.05s/it, Batch correction: pcr_comparison]    [A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_pcr_comparison.py:49: UserWarning: PCR comparison score is negative, meaning variance contribution increased after integration. Setting to 0.
+  warnings.warn(
+
+Metrics:  90%|[34m█████████ [0m| 9/10 [1:02:52<01:49, 109.94s/it, Batch correction: pcr_comparison][AEmbeddings: 100%|[32m██████████[0m| 2/2 [2:06:27<00:00, 3790.15s/it]  Embeddings: 100%|[32m██████████[0m| 2/2 [2:06:27<00:00, 3793.96s/it]
+
+                                                                                            [A

@@ -10,7 +10,7 @@
 
 #SBATCH --gres=gpu:1
 
-#SBATCH --qos=gpu
+#SBATCH --qos=gpu_normal
 
 #SBATCH -c 4
 
@@ -21,9 +21,7 @@
 #SBATCH --nice=10000
 
 source $HOME/.bashrc
-conda activate IMPA
+conda activate IMPA_try
 
-cd /path/to/IMPA/folder
-
-python main_not_seml.py training_configs/bbbc021_all_config.yaml
+python ../IMPA/main_hydra.py config=bbbc021_all
  

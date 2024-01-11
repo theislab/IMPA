@@ -1,0 +1,31 @@
+Number of parameters in generator: 24319877
+Number of parameters in style_encoder: 14330624
+Number of parameters in discriminator: 14302922
+Number of parameters in mapping_network: 7104
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/10879 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/10879 [00:00<?, ?it/s] Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Wasserstein
+FID
+Save embeddings at ../project_folder/experiments/20240101_62ba678d-2d38-435f-8074-6f013d73a8cd_cpg0000_batch/embeddings/embeddings.pkl
+Epoch 0:   0%|          | 1/10879 [05:56<1078:35:58,  0.00it/s]Epoch 0:   0%|          | 1/10879 [05:56<1078:36:13,  0.00it/s, v_num=y7lp]

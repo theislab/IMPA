@@ -1,0 +1,54 @@
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
+Computing neighbors:   0%|          | 0/2 [00:00<?, ?it/s]Computing neighbors:  50%|█████     | 1/2 [01:09<01:09, 69.83s/it]Computing neighbors: 100%|██████████| 2/2 [01:59<00:00, 57.97s/it]Computing neighbors: 100%|██████████| 2/2 [01:59<00:00, 59.75s/it]
+Embeddings:   0%|[32m          [0m| 0/2 [00:00<?, ?it/s]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [12:57<1:56:37, 777.51s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [12:57<1:56:37, 777.51s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [1:04:34<4:45:37, 2142.13s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [1:04:34<4:45:37, 2142.13s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [1:17:22<2:56:41, 1514.55s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [1:17:22<2:56:41, 1514.55s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:17:25<1:31:46, 917.67s/it, Bio conservation: clisi_knn] [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:17:25<1:31:46, 917.67s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:17:54<49:46, 597.22s/it, Batch correction: silhouette_batch]  [A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:17:54<49:46, 597.22s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:17:55<26:17, 394.49s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:17:55<26:17, 394.49s/it, Batch correction: kbet_per_label][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+
+Metrics:  70%|[34m███████   [0m| 7/10 [1:18:18<13:39, 273.28s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [1:18:18<13:39, 273.28s/it, Batch correction: graph_connectivity][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_graph_connectivity.py:30: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  tab = pd.value_counts(comps)
+
+Metrics:  80%|[34m████████  [0m| 8/10 [1:18:26<06:17, 188.75s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [1:18:26<06:17, 188.75s/it, Batch correction: pcr_comparison]    [A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_pcr_comparison.py:49: UserWarning: PCR comparison score is negative, meaning variance contribution increased after integration. Setting to 0.
+  warnings.warn(
+
+Metrics:  90%|[34m█████████ [0m| 9/10 [1:18:28<02:10, 130.38s/it, Batch correction: pcr_comparison][AEmbeddings:  50%|[32m█████     [0m| 1/2 [1:18:28<1:18:28, 4708.76s/it]
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s][A
+                                                                                            [A
+Metrics:   0%|[34m          [0m| 0/10 [00:00<?, ?it/s, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [13:04<1:57:39, 784.40s/it, Bio conservation: isolated_labels][A
+Metrics:  10%|[34m█         [0m| 1/10 [13:04<1:57:39, 784.40s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [1:04:34<4:45:27, 2140.91s/it, Bio conservation: nmi_ari_cluster_labels_kmeans][A
+Metrics:  20%|[34m██        [0m| 2/10 [1:04:34<4:45:27, 2140.91s/it, Bio conservation: silhouette_label]             [A
+Metrics:  30%|[34m███       [0m| 3/10 [1:17:32<2:57:07, 1518.19s/it, Bio conservation: silhouette_label][A
+Metrics:  30%|[34m███       [0m| 3/10 [1:17:32<2:57:07, 1518.19s/it, Bio conservation: clisi_knn]       [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:17:33<1:31:56, 919.40s/it, Bio conservation: clisi_knn] [A
+Metrics:  40%|[34m████      [0m| 4/10 [1:17:33<1:31:56, 919.40s/it, Batch correction: silhouette_batch][A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:17:44<49:18, 591.66s/it, Batch correction: silhouette_batch]  [A
+Metrics:  50%|[34m█████     [0m| 5/10 [1:17:44<49:18, 591.66s/it, Batch correction: ilisi_knn]       [A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:17:44<26:02, 390.74s/it, Batch correction: ilisi_knn][A
+Metrics:  60%|[34m██████    [0m| 6/10 [1:17:44<26:02, 390.74s/it, Batch correction: kbet_per_label][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_kbet.py:181: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  comp_size = pd.value_counts(labs)
+
+Metrics:  70%|[34m███████   [0m| 7/10 [1:17:50<13:14, 264.86s/it, Batch correction: kbet_per_label][A
+Metrics:  70%|[34m███████   [0m| 7/10 [1:17:50<13:14, 264.86s/it, Batch correction: graph_connectivity][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/scib_metrics/_graph_connectivity.py:30: FutureWarning: pandas.value_counts is deprecated and will be removed in a future version. Use pd.Series(obj).value_counts() instead.
+  tab = pd.value_counts(comps)
+
+Metrics:  80%|[34m████████  [0m| 8/10 [1:17:58<06:05, 182.98s/it, Batch correction: graph_connectivity][A
+Metrics:  80%|[34m████████  [0m| 8/10 [1:17:58<06:05, 182.98s/it, Batch correction: pcr_comparison]    [A
+Metrics:  90%|[34m█████████ [0m| 9/10 [1:17:59<02:06, 126.30s/it, Batch correction: pcr_comparison][AEmbeddings: 100%|[32m██████████[0m| 2/2 [2:36:28<00:00, 4691.70s/it]  Embeddings: 100%|[32m██████████[0m| 2/2 [2:36:28<00:00, 4694.26s/it]
+
+                                                                                            [A
