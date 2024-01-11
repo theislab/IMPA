@@ -132,3 +132,4 @@ dmypy.json
 checkpoints/
 scripts/logs/*
 project_folder
+scripts/logs/cpg0000_batch.err
