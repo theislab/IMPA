@@ -23,5 +23,4 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=bbbc021_all
- 
+python ../IMPA/main_hydra.py config=bbbc021_large_all config.project=bbbc021_large_all

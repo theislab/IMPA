@@ -54,6 +54,7 @@ class IMPAmodule(LightningModule):
         
         # Initial values of diversity loss
         self.initial_lambda_ds = self.args.lambda_ds
+        print(self)
                 
     def configure_optimizers(self):
         """Initialize optimizer

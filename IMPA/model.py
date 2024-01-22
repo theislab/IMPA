@@ -273,6 +273,8 @@ class StyleEncoder(nn.Module):
 
         # For 96x96 image this downsamples till 3x3 spatial dimension 
         repeat_num = math.ceil(np.log2(img_size)) - 2
+        final_conv_dim = img_size // (2**repeat_num)
+        
         for _ in range(repeat_num):
             dim_out = min(dim_in*2, max_conv_dim)
             blocks += [ResBlk(dim_in, dim_out, downsample=True)]
@@ -280,7 +282,7 @@ class StyleEncoder(nn.Module):
 
         blocks += [nn.LeakyReLU(0.2)]
         # Downsamples to spatial dimensionality of 1 
-        blocks += [nn.Conv2d(dim_out, dim_out, 3, 1, 0)]
+        blocks += [nn.Conv2d(dim_out, dim_out, final_conv_dim, 1, 0)]
         blocks += [nn.LeakyReLU(0.2)]
         self.conv = torch.nn.Sequential(*blocks)
 

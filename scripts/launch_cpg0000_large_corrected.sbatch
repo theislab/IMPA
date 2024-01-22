@@ -23,4 +23,5 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=cpg0000_total_large_transported.yaml hparam_search=optuna --multirun
+# python ../IMPA/main_hydra.py config=cpg0000_total_large_transported.yaml hparam_search=optuna --multirun
+python ../IMPA/main_hydra.py config=cpg0000_total_large_transported.yaml config.stochastic=False config.project=cpg0000_total_large_transported_deterministic hparam_search=optuna --multirun
