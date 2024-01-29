@@ -12,6 +12,7 @@ dim_in: 64
 pert_modelling: False
 batch_key: BATCH
 subsample_frac: 1.0
+latent_dim: 160
 
 # LOSS
 lambda_reg: 1 
