@@ -1,0 +1,42 @@
+# TASK NAME 
+task_name: cpg0000_batch
+
+# IMAGE
+img_size: 96  
+batch_key: PLATE
+pert_modelling: False
+subsample_frac: 0.05
+
+# DIRECTORIES FOR DATA
+image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_large.csv
+embedding_path: Null
+num_workers: 4
+
+ood_set: Null
+mol_list: Null
+balanced: False 
+trainable_emb: True
+latent_dim: 100 
+dataset_name: cpg0000
+n_channels: 5
+batch_size: 64
+val_batch_size: 64
+
+# DATA HANDLEMENT 
+augment_train: True 
+normalize: True
+
+# PARAMETERS FOR CONDITION ENCODING 
+encode_rdkit: True
+num_layers_mapping_net: 1
+
+# Lightning 
+dest_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/batch_classifier_results/cpg0000
+
+sample_dir: sample   # Name of directory for sampled images 
+checkpoint_dir: checkpoint  # Name of directory for checkpoints
+basal_vs_real_folder: basal_vs_real
+naming_key: dataset_name
+embedding_folder: embeddings 
+resume_dir: ''
