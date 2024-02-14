@@ -216,7 +216,7 @@ class CellDatasetFold(Dataset):
         img = img.permute(2,0,1)  # Place channel dimension in front of the others 
         img = self.transform(img)
         
-        return {'X':img, 
+        return {'X': img, 
                 'mol_one_hot': self.one_hot_mol[idx], 
                 'y_id': self.y2id[self.y[idx]],
                 'file_names': img_file}
@@ -241,6 +241,34 @@ class CellDataLoader(LightningDataModule):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.args = args
         self.init_dataset() 
+        
+    def init_dataset(self):
+        """Initialize dataset and data loaders
+        """
+        self.training_set, self.test_set = self.create_torch_datasets()
+        
+        # Create data loaders 
+        if self.args.balanced:
+            # Balanced sampler
+            sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
+            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
+                                                            batch_size=self.args.batch_size, 
+                                                            sampler=sampler, 
+                                                            num_workers=self.args.num_workers, 
+                                                            drop_last=False)   
+        else:
+            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
+                                                            batch_size=self.args.batch_size, 
+                                                            shuffle=True, 
+                                                            num_workers=self.args.num_workers, 
+                                                            drop_last=False)  
+
+        self.loader_test = torch.utils.data.DataLoader(self.test_set, 
+                                                       batch_size=self.args.val_batch_size, 
+                                                       shuffle=False, 
+                                                       num_workers=self.args.num_workers,
+                                                       drop_last=False)      
+        self.mol2y = self.training_set.couples_mol_y  
         
     def create_torch_datasets(self):
         """Create dataset compatible with the pytorch training loop 
@@ -268,43 +296,13 @@ class CellDataLoader(LightningDataModule):
 
         # Free cell painting dataset memory
         del dataset
-        return training_set, test_set
+        return training_set, test_set     
         
-    def init_dataset(self):
-        """Initialize dataset and data loaders
-        """
-        self.training_set, self.test_set = self.create_torch_datasets()
-        
-        # Create data loaders 
-        if self.args.balanced:
-            # Balanced sampler
-            sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
-            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
-                                                            batch_size=self.args.batch_size, 
-                                                            sampler=sampler, 
-                                                            num_workers=self.args.num_workers, 
-                                                            drop_last=True)   
-        else:
-            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
-                                                            batch_size=self.args.batch_size, 
-                                                            shuffle=True, 
-                                                            num_workers=self.args.num_workers, 
-                                                            drop_last=True)  
-
-        self.loader_test = torch.utils.data.DataLoader(self.test_set, 
-                                                       batch_size=self.args.val_batch_size, 
-                                                       shuffle=False, 
-                                                       num_workers=self.args.num_workers,
-                                                       drop_last=False)      
-        self.mol2y = self.training_set.couples_mol_y       
-    
-    
     def train_dataloader(self):
         return self.loader_train
     
     def val_dataloader(self):
         return self.loader_test
     
-    def val_dataloader(self):
+    def test_dataloader(self):
         return self.loader_test
-    

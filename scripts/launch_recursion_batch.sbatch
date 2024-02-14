@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/recursion_batch.out
+#SBATCH -o ./logs/det_cpg0000_batch.out
 
-#SBATCH -e ./logs/recursion_batch.err
+#SBATCH -e ./logs/det_cpg0000_batch.err
 
-#SBATCH -J recursion_batch
+#SBATCH -J det_cpg0000_batch
 
 #SBATCH -p gpu_p
 
@@ -12,9 +12,9 @@
 
 #SBATCH --gres=gpu:1
 
-#SBATCH -c 4
+#SBATCH --mem 150G
 
-#SBATCH --mem=90G
+#SBATCH -c 4
 
 #SBATCH -t 2-00:00
 
@@ -23,4 +23,6 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=rxrx1_batch.yaml 
+# python ../IMPA/main_hydra.py config=rxrx1_batch.yaml 
+python ../IMPA/main_hydra.py config=cpg0000_batch.yaml 
+# python ../IMPA/main_hydra.py config=cpg0000_batch.yaml config.stochastic=False

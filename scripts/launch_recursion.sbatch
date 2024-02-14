@@ -14,7 +14,7 @@
 
 #SBATCH -c 4
 
-#SBATCH --mem=90G
+#SBATCH --mem=150G
 
 #SBATCH -t 2-00:00
 

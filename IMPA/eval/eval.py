@@ -29,7 +29,6 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     """
 
     # Accumulated distance between true and generated images
-    wd_transformations = 0
     fid_transformations = 0
 
     # Lists containing the true labels of the batch
@@ -98,13 +97,6 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
 
         X_real_cat = X_real_cat[indices_to_keep_real]
         X_swapped_cat = X_swapped_cat[indices_to_keep_generated]
-        
-        # Wasserstein distance
-        print("Wasserstein")
-        wd = ot.emd2(torch.tensor([]), torch.tensor([]),
-                     ot.dist(X_real_cat.view(len(X_real_cat), -1),
-                             X_swapped_cat.view(len(X_swapped_cat), -1), 'euclidean'), 1)
-        wd_transformations += wd
 
         # FID
         print("FID")
@@ -120,13 +112,6 @@ def evaluate(nets, loader, device, dest_dir, embedding_path, args, embedding_mat
     del X_real
     
     # Save metrics
-    dict_metrics = {'wd_transformations': wd_transformations / len(categories),
-                    'fid_transformations': fid_transformations / len(categories)}
-
-    # Dump latent embeddings
-    emb_path = ospj(dest_dir, embedding_path, 'embeddings.pkl')
-    print(f"Save embeddings at {emb_path}")
-    with open(emb_path, 'wb') as file:
-        pkl.dump([y_fake_ds], file)
-
+    dict_metrics = {'fid_transformations': fid_transformations / len(categories)}
+    
     return dict_metrics

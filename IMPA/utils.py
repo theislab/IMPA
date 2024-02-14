@@ -164,9 +164,6 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
     else:
         z_trg_list = [None]*num_transf_plot
 
-    # Swap attributes for smaller cross-transformation panel 
-    y_swapped_one_hot = swap_attributes(y_mol=y_one_hot, mol_id=y_real, device=device)
-
     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
     translate_using_latent(nets,
                             embedding_matrix, 

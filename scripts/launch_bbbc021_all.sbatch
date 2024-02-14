@@ -26,4 +26,3 @@ conda activate IMPA
 cd /path/to/IMPA/folder
 
 python main_not_seml.py training_configs/bbbc021_all_config.yaml
- 

@@ -20,7 +20,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 20
+total_epochs: 150
 ds_iter: 100000  
 resume_iter: 0
 batch_size: 32
@@ -54,7 +54,6 @@ basal_vs_real_folder: basal_vs_real
 naming_key: dataset_name
 embedding_folder: embeddings 
 resume_dir: ''
-
 
 # DATA HANDLEMENT 
 augment_train: True 
