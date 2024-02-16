@@ -55,7 +55,7 @@ naming_key: dataset_name
 embedding_folder: embeddings 
 resume_dir: ''
 
-# DATA HANDLEMENT 
+# DATA HANDLING 
 augment_train: True 
 normalize: True
 
