@@ -17,7 +17,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 100
+total_epochs: 120
 ds_iter: 200000  
 resume_iter: 0
 batch_size: 32
@@ -33,7 +33,7 @@ ood_set: Null
 mol_list: Null
 balanced: False
 trainable_emb: True
-dataset_name: cpg0000_large
+dataset_name: cpg0000
 n_channels: 5
 num_workers: 6
 seed: 42  

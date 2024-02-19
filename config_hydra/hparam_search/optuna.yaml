@@ -23,4 +23,4 @@ hydra:
     # define hyperparameter search space
     params:
       config.style_dim: choice(32, 64, 128)
-      config.z_dimension: choice(5, 15, 20)
+      config.z_dimension: choice(8, 16, 32)

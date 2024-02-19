@@ -23,4 +23,4 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=cpg0000_total_large.yaml 
+python ../IMPA/main_hydra.py config=cpg0000_total_large.yaml hparam_search=optuna --multirun
