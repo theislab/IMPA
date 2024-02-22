@@ -143,12 +143,16 @@ class CellDatasetFold(Dataset):
         self.file_names = {}
         self.mols = {}
         self.y = {}
+        if dataset_name=="bbbc021":
+            self.dose = {}
         
         for cond in ["ctrl", "trt"]:
             # subset by condition 
             self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
             self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
             self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
+            if dataset_name=="bbbc021":
+                self.dose[cond] = self.data['DOSE'][self.data[f"{cond}_idx"]]
          
         del data 
 
@@ -222,10 +226,17 @@ class CellDatasetFold(Dataset):
         img_ctrl, img_trt = img_ctrl.permute(2,0,1), img_trt.permute(2,0,1)  # Place channel dimension in front of the others 
         img_ctrl, img_trt = self.transform(img_ctrl), self.transform(img_trt)
         
-        return {'X':(img_ctrl, img_trt), 
-                'mol_one_hot': self.one_hot_mol[idx_trt], 
-                'y_id': self.y2id[self.y["trt"][idx_trt]],
-                'file_names': (img_file_ctrl, img_file_trt)}
+        if self.dataset_name == "bbbc021":
+            return {'X':(img_ctrl, img_trt), 
+                    'mol_one_hot': self.one_hot_mol[idx_trt], 
+                    'y_id': self.y2id[self.y["trt"][idx_trt]],
+                    "dose": self.dose["trt"][idx_trt],
+                    'file_names': (img_file_ctrl, img_file_trt)}
+        else:
+            return {'X':(img_ctrl, img_trt), 
+                    'mol_one_hot': self.one_hot_mol[idx_trt], 
+                    'y_id': self.y2id[self.y["trt"][idx_trt]],
+                    'file_names': (img_file_ctrl, img_file_trt)}
     
     def _get_sampler_weights(self):
         mol_names_idx = [self.mol2id[mol] for mol in self.mols["trt"]]

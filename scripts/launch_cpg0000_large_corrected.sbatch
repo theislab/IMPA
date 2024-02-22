@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/cpg0000_large_transported.out
+#SBATCH -o ./logs/cpg0000_separate_ORF_and_CRISPR.out
 
-#SBATCH -e ./logs/cpg0000_large_transported.err
+#SBATCH -e ./logs/cpg0000_separate_ORF_and_CRISPR.err
 
-#SBATCH -J cpg0000_large_transported
+#SBATCH -J cpg0000_separate_ORF_and_CRISPR
 
 #SBATCH -p gpu_p
 
@@ -23,5 +23,6 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=cpg0000_total_large_transported.yaml hparam_search=optuna --multirun
+python ../IMPA/main_hydra.py config=cpg0000_total_large_transported_separate_ORF_and_CRISPR.yaml 
+# python ../IMPA/main_hydra.py config=cpg0000_total_large_transported.yaml hparam_search=optuna --multirun
 # python ../IMPA/main_hydra.py config=cpg0000_total_large_transported.yaml config.stochastic=False config.project=cpg0000_total_large_transported_deterministic hparam_search=optuna --multirun

@@ -133,14 +133,14 @@ class IMPAmodule(LightningModule):
         
     def on_train_epoch_end(self):
         # Scores on the validation images 
-        rmse_disentanglement_dict = evaluate(self.nets,
-                                                self.loader_test,
-                                                self.device,
-                                                self.dest_dir,
-                                                self.args.embedding_folder,
-                                                args=self.args,
-                                                embedding_matrix=self.embedding_matrix)
-        self.log_dict(rmse_disentanglement_dict)
+        # rmse_disentanglement_dict = evaluate(self.nets,
+        #                                         self.loader_test,
+        #                                         self.device,
+        #                                         self.dest_dir,
+        #                                         self.args.embedding_folder,
+        #                                         args=self.args,
+        #                                         embedding_matrix=self.embedding_matrix)
+        # self.log_dict(rmse_disentanglement_dict)
         
         inputs_val = next(iter(self.loader_test)) 
         debug_image(self.nets, 
