@@ -86,7 +86,7 @@ class CellDataset:
                                                         self.y2id, 
                                                         self.augment_train, 
                                                         self.normalize, 
-                                                        dataset_name=self.dataset_name)}                                    
+                                                        dataset_name=self.dataset_name)}  
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -191,6 +191,7 @@ class CellDatasetFold(Dataset):
         """
         Generate one example datapoint 
         """
+        print(i)
         # Sample control and treated batches 
         img_file_ctrl = self.file_names["ctrl"][i]
         idx_trt = np.random.randint(0, len(self.file_names["trt"]))

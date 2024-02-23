@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/cpg0000_small.out
+#SBATCH -o ./logs/fp.out
 
-#SBATCH -e ./logs/cpg0000_small.err
+#SBATCH -e ./logs/fp.err
 
-#SBATCH -J cpg0000_small
+#SBATCH -J fp
 
 #SBATCH -p gpu_p
 
@@ -23,4 +23,5 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=cpg0000_total_small.yaml 
+python ../IMPA/main_hydra.py config=bbbc021_six_morgan_fp.yaml
+
