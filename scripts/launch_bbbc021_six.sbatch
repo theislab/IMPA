@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/output_bbbc025.txt
+#SBATCH -o ./logs/bbbc021_six.out
 
-#SBATCH -e ./logs/error_bbbc025.txt
+#SBATCH -e ./logs/bbbc021_six.err
 
-#SBATCH -J bbbc025
+#SBATCH -J bbbc021_six
 
 #SBATCH -p gpu_p
 
@@ -21,9 +21,7 @@
 #SBATCH --nice=10000
 
 source $HOME/.bashrc
-conda activate IMPA
+conda activate IMPA_try
 
-cd /path/to/IMPA/folder
 
-python main_not_seml.py training_configs/bbbc021_six_config.yaml
- 
+python ../IMPA/main_hydra.py config=bbbc021_six.yaml

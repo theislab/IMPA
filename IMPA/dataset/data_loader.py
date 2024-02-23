@@ -41,9 +41,13 @@ class CellDataset:
         self.fold_datasets = self._read_folds()
         
         # Count the number of compounds
-        self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"][self.fold_datasets["train"]["trt_idx"]])  # Sorted drug names
-        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # Sorted MOA names (or other annotation) 
-
+        if args.add_controls:
+            self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"])  # Sorted drug names
+            self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])
+        else:
+            self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"][self.fold_datasets["train"]["trt_idx"]])  # Sorted drug names
+            self.y_names = np.unique(self.fold_datasets['train']["ANNOT"][self.fold_datasets["train"]["trt_idx"]]) 
+            
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
         self.n_y = len(self.y_names)
@@ -75,7 +79,8 @@ class CellDataset:
                                                         self.y2id, 
                                                         self.augment_train, 
                                                         self.normalize, 
-                                                        dataset_name=self.dataset_name),
+                                                        dataset_name=self.dataset_name, 
+                                                        add_controls=args.add_controls),
 
 
                                 'test': CellDatasetFold('test', 
@@ -86,7 +91,8 @@ class CellDataset:
                                                         self.y2id, 
                                                         self.augment_train, 
                                                         self.normalize, 
-                                                        dataset_name=self.dataset_name)}  
+                                                        dataset_name=self.dataset_name,
+                                                        add_controls=args.add_controls)}  
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -114,7 +120,10 @@ class CellDataset:
             # Save the fold name 
             for key in subset.columns:
                 dataset_splits[fold_name][key] = np.array(subset[key])
-            dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"]=="trt")
+            if self.args.add_controls:
+                dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"]=="trt")
+            else:
+                dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"])
             dataset_splits[fold_name]["ctrl_idx"] = (dataset_splits[fold_name]["STATE"]=="control")
         return dataset_splits
 
@@ -129,7 +138,8 @@ class CellDatasetFold(Dataset):
                 y2id, 
                 augment_train=True, 
                 normalize=False, 
-                dataset_name="bbbc021"):
+                dataset_name="bbbc021", 
+                add_controls=False):
 
         super(CellDatasetFold, self).__init__() 
 
@@ -148,11 +158,19 @@ class CellDatasetFold(Dataset):
         
         for cond in ["ctrl", "trt"]:
             # subset by condition 
-            self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
-            self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
-            self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
-            if dataset_name=="bbbc021":
-                self.dose[cond] = self.data['DOSE'][self.data[f"{cond}_idx"]]
+            if cond == "trt" and add_controls:
+                self.file_names[cond] = self.data['SAMPLE_KEY']
+                self.mols[cond] = self.data['CPD_NAME']
+                self.y[cond] = self.data['ANNOT']
+                if dataset_name=="bbbc021":
+                    self.dose[cond] = self.data['DOSE']
+                    
+            else:
+                self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
+                self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
+                self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
+                if dataset_name=="bbbc021":
+                    self.dose[cond] = self.data['DOSE'][self.data[f"{cond}_idx"]]
          
         del data 
 
@@ -191,7 +209,6 @@ class CellDatasetFold(Dataset):
         """
         Generate one example datapoint 
         """
-        print(i)
         # Sample control and treated batches 
         img_file_ctrl = self.file_names["ctrl"][i]
         idx_trt = np.random.randint(0, len(self.file_names["trt"]))
@@ -238,15 +255,6 @@ class CellDatasetFold(Dataset):
                     'mol_one_hot': self.one_hot_mol[idx_trt], 
                     'y_id': self.y2id[self.y["trt"][idx_trt]],
                     'file_names': (img_file_ctrl, img_file_trt)}
-    
-    def _get_sampler_weights(self):
-        mol_names_idx = [self.mol2id[mol] for mol in self.mols["trt"]]
-        # Counts and uniqueness 
-        mol_names_idx_unique = np.unique(mol_names_idx, return_counts=True)
-        dict_mol_names_idx_unique = {key:1/val for key,val in zip(mol_names_idx_unique[0], mol_names_idx_unique[1])}
-        # Derive weights
-        self.weights = [dict_mol_names_idx_unique[obs] for obs in mol_names_idx]
-
 
 class CellDataLoader(LightningDataModule):
     """General data loader class
@@ -295,21 +303,12 @@ class CellDataLoader(LightningDataModule):
         """
         self.training_set, self.test_set = self.create_torch_datasets()
         
-        # Create data loaders 
-        if self.args.balanced:
-            # Balanced sampler
-            sampler = WeightedRandomSampler(torch.tensor(self.training_set.weights), len(self.training_set.weights), replacement=False)
-            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
-                                                            batch_size=self.args.batch_size, 
-                                                            sampler=sampler, 
-                                                            num_workers=self.args.num_workers, 
-                                                            drop_last=True)   
-        else:
-            self.loader_train = torch.utils.data.DataLoader(self.training_set, 
-                                                            batch_size=self.args.batch_size, 
-                                                            shuffle=True, 
-                                                            num_workers=self.args.num_workers, 
-                                                            drop_last=True)  
+
+        self.loader_train = torch.utils.data.DataLoader(self.training_set, 
+                                                        batch_size=self.args.batch_size, 
+                                                        shuffle=True, 
+                                                        num_workers=self.args.num_workers, 
+                                                        drop_last=True)  
 
         self.loader_test = torch.utils.data.DataLoader(self.test_set, 
                                                        batch_size=self.args.val_batch_size, 

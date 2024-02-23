@@ -2,7 +2,6 @@ from munch import Munch
 from os.path import join as ospj
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from pytorch_lightning import LightningModule
@@ -166,7 +165,6 @@ class IMPAmodule(LightningModule):
             z_emb_trg (torch.tensor): embedding of the target perturbation 
             z_trg (torch.tensor): random noise vector 
         """
-
         # Gradient requirement for gradient penalty loss
         x_real_trt.requires_grad_()
         out = self.nets.discriminator(x_real_trt, y_org)
@@ -177,11 +175,15 @@ class IMPAmodule(LightningModule):
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
-            if self.args.stochastic:
-                z_emb_org = torch.cat([z_emb_org, z_trg], dim=1)
+            if self.args.single_style:
+                if self.args.stochastic:
+                    z_emb_org = torch.cat([z_emb_org, z_trg], dim=1)
 
-            # Single of the noisy embedding vector to a style vector 
-            s_trg = self.nets.mapping_network(z_emb_org)  
+                # Single of the noisy embedding vector to a style vector 
+                s_trg = self.nets.mapping_network(z_emb_org, y=None)  
+            
+            else:
+                s_trg = self.nets.mapping_network(z_trg, y_org)  
             
             # Generate the fake image
             _, x_fake = self.nets.generator(x_real_ctrl, s_trg)
@@ -208,15 +210,15 @@ class IMPAmodule(LightningModule):
         # Couple of random vectors for the difference-sensitivity loss
         z_trg, z_trg2 = z_trgs
         
-        # Adversarial loss
-        if z_trg != None:
-            z_emb_org1 = torch.cat([z_emb_org, z_trg], dim=1)
-        else: 
-            z_emb_org1 = z_emb_org
-
-        # Style vector with the first random component 
-        s_org1 = self.nets.mapping_network(z_emb_org1)  
-
+        # Adversarial loss  
+        if self.args.single_style:
+            if self.args.stochastic:
+                z_emb_org1 = torch.cat([z_emb_org, z_trg], dim=1)
+            # Single of the noisy embedding vector to a style vector 
+            s_org1 = self.nets.mapping_network(z_emb_org1, y=None)  
+        else:
+            s_org1 = self.nets.mapping_network(z_trg, y_org)  
+        
         # Generation of fake images 
         _, x_fake = self.nets.generator(x_real_ctrl, s_org1)
         # Try to deceive the discriminator 
@@ -234,8 +236,11 @@ class IMPAmodule(LightningModule):
 
         # Diversity sensitive loss 
         if self.args.stochastic:
-            z_emb_trg2 = torch.cat([z_emb_org, z_trg2], dim=1)
-            s_trg2 = self.nets.mapping_network(z_emb_trg2) 
+            if self.args.single_style:
+                z_emb_trg2 = torch.cat([z_emb_org, z_trg2], dim=1)
+                s_trg2 = self.nets.mapping_network(z_emb_trg2, y=None) 
+            else:
+                s_trg2 = self.nets.mapping_network(z_trg2, y_org) 
             _, x_fake2 = self.nets.generator(x_real_ctrl, s_trg2)
             x_fake2 = x_fake2.detach()
             loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 

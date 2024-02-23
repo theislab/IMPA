@@ -1,5 +1,5 @@
 # TASK NAME 
-task_name: bbbc021_try
+task_name: bbbc021_six
 
 # IMAGE
 img_size: 96  
@@ -17,8 +17,8 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 100000
-ds_iter: 100000  
+total_epochs: 200
+ds_iter: 30000  
 resume_iter: 0
 batch_size: 32
 val_batch_size: 20
@@ -31,7 +31,7 @@ num_outs_per_domain: 10
 single_style: True
 ood_set: Null
 mol_list: ['AZ138', 'AZ258', 'cytochalasin B', 'DMSO', 'taxol', 'vincristine']
-balanced: True
+balanced: False
 trainable_emb: False
 dataset_name: 'bbbc021'
 n_channels: 3

@@ -240,7 +240,7 @@ class Generator(nn.Module):
         return self.to_rgb(x) 
     
 
-class MappingNetwork(nn.Module):
+class MappingNetworkSingleStyle(nn.Module):
     """Linear projection for raw embeddings 
     """
     def __init__(self, latent_dim=160, style_dim=64, hidden_dim=512, num_layers=4):
@@ -262,11 +262,65 @@ class MappingNetwork(nn.Module):
         h = self.layers(z) 
         return h
 
+class MappingNetworkMultiStyle(nn.Module):
+    def __init__(self, latent_dim=16, style_dim=64, num_domains=2):
+        super().__init__()
+        layers = []
+        layers += [nn.Linear(latent_dim, 512)]
+        layers += [nn.ReLU()]
+        for _ in range(3):
+            layers += [nn.Linear(512, 512)]
+            layers += [nn.ReLU()]
+        self.shared = nn.Sequential(*layers)
+
+        self.unshared = nn.ModuleList()
+        for _ in range(num_domains):
+            self.unshared += [nn.Sequential(nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, style_dim))]
+
+    def forward(self, z, y):
+        h = self.shared(z)
+        out = []
+        for layer in self.unshared:
+            out += [layer(h)]
+        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        idx = torch.LongTensor(range(y.size(0))).to(y.device)
+        s = out[idx, y]  # (batch, style_dim)
+        return s
+
+class MappingNetwork(nn.Module):
+    def __init__(self, latent_dim=160, style_dim=64, num_domains=2, num_layers=4, hidden_dim=512, single_style=True):
+        super().__init__()
+        if single_style:
+            self.mapping_network = MappingNetworkSingleStyle(latent_dim, style_dim, hidden_dim, num_layers)
+        else:
+            self.mapping_network = MappingNetworkMultiStyle(latent_dim, style_dim, num_domains)
+            
+        self.single_style = single_style
+        
+    def forward(self, z, y=None):
+        if y is not None and not self.single_style:
+            return self.mapping_network(z, y)
+        else:
+            return self.mapping_network(z)
 
 class StyleEncoder(nn.Module):
     """Encoder from images to style vector 
     """
-    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512, in_channels=3, dim_in=64):
+    def __init__(self, 
+                 img_size=96,
+                 style_dim=64,
+                 max_conv_dim=512,
+                 in_channels=3, 
+                 dim_in=64, 
+                 single_style=True,
+                 num_domains=None):
+        
         super().__init__()
         blocks = []
         blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
@@ -285,14 +339,30 @@ class StyleEncoder(nn.Module):
         blocks += [nn.Conv2d(dim_out, dim_out, final_conv_dim, 1, 0)]
         blocks += [nn.LeakyReLU(0.2)]
         self.conv = torch.nn.Sequential(*blocks)
+        
+        if not single_style:
+            self.unshared = nn.ModuleList()
+            for _ in range(num_domains):
+                self.unshared += [nn.Linear(dim_out, style_dim)]
+        else:
+            self.linear = nn.Linear(dim_out, style_dim)
+            
+        self.single_style = single_style
 
-        self.linear = nn.Linear(dim_out, style_dim)
-
-    def forward(self, x):
+    def forward(self, x, y=None):
         # Apply shared layer and linearize 
         h = self.conv(x)
         h = h.view(h.size(0), -1)
-        z_style = self.linear(h)
+        
+        if not self.single_style:
+            out = []
+            for layer in self.unshared:
+                out += [layer(h)]
+            out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+            idx = torch.LongTensor(range(y.size(0))).to(y.device)
+            z_style = out[idx, y]  # (batch, style_dim)
+        else:
+            z_style = self.linear(h)
         return z_style
 
 
@@ -327,25 +397,45 @@ class Discriminator(nn.Module):
             out = out[idx, y]  # (batch)
         return out
     
-
+    
 def build_model(args, num_domains, device):
     # Generator autoencoder
-    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
+    generator = nn.DataParallel(Generator(args.img_size,
+                                          args.style_dim, 
+                                          in_channels=args.n_channels, 
+                                          dim_in=args.dim_in).to(device))
     
     # Style encoder 
-    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
-
-    # Discriminator network 
-    discriminator = nn.DataParallel(Discriminator(args.img_size, num_domains, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
+    style_encoder = nn.DataParallel(StyleEncoder(args.img_size,
+                                                 args.style_dim, 
+                                                 in_channels=args.n_channels, 
+                                                 dim_in=args.dim_in, 
+                                                 single_style=args.single_style, 
+                                                 num_domains=num_domains
+                                                 ).to(device))
     
+    # Discriminator network 
+    discriminator = nn.DataParallel(Discriminator(args.img_size,
+                                                  num_domains, 
+                                                  in_channels=args.n_channels, 
+                                                  dim_in=args.dim_in).to(device))
+
     # The rdkit embeddings can be collected together with noise 
     if args.stochastic:
-        input_dim = args.latent_dim + args.z_dimension
+        if args.single_style:
+            input_dim = args.latent_dim + args.z_dimension
+        else:
+            input_dim = args.z_dimension
     else:
         input_dim = args.latent_dim 
-    
+
     # Mapping network
-    mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net).to(device))
+    mapping_network = nn.DataParallel(MappingNetwork(input_dim,
+                                                     args.style_dim,
+                                                     num_domains=num_domains,
+                                                     num_layers=args.num_layers_mapping_net, 
+                                                     hidden_dim=512,
+                                                     single_style=args.single_style).to(device))
 
     # Dictionary with the modules 
     nets = Munch(generator=generator,
