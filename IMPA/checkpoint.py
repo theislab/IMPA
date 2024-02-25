@@ -47,6 +47,12 @@ class CheckpointIO:
             module_dict = torch.load(fname)
         else:
             module_dict = torch.load(fname, map_location=torch.device('cpu'))
+        
+        if "mapping_network" in module_dict:
+            keys = list(module_dict["mapping_network"].keys())
+            for key in keys:
+                module_dict["mapping_network"][f"mapping_network.{key}"] = module_dict["mapping_network"].pop(key)
+            
         # Parametrise the modules 
         for name, module in self.module_dict.items():
             if self.data_parallel:

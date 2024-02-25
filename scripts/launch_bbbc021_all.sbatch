@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/output_bbbc021_all_large.txt
+#SBATCH -o ./logs/output_bbbc021_all_large.out
 
-#SBATCH -e ./logs/output_bbbc021_all_large.txt
+#SBATCH -e ./logs/output_bbbc021_all_large.err
 
 #SBATCH -J bbbc021_all_large
 
@@ -23,5 +23,6 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=bbbc021_all_retrain config.project=bbbc021_all_retrain
+python ../IMPA/main_hydra.py config=bbbc021_all_retrain_fp.yaml config.project=bbbc021_all_retrain_fp
+# python ../IMPA/main_hydra.py config=bbbc021_all_retrain config.project=bbbc021_all_retrain
 # python ../IMPA/main_hydra.py config=bbbc021_large_all config.project=bbbc021_large_all

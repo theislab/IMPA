@@ -9,6 +9,7 @@ style_dim: 64
 stochastic: True 
 z_dimension: 16  
 dim_in: 64 
+add_controls: False
 
 # LOSS
 lambda_reg: 1 

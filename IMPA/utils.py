@@ -210,7 +210,10 @@ def translate_using_latent(nets,
                 z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)                
             
             # Perform mapping 
-            s_trg = nets.mapping_network(z_emb_trg) 
+            if args.single_style:
+                s_trg = nets.mapping_network(z_emb_trg, y=None) 
+            else:
+                s_trg = nets.mapping_network(z_trg, y_trg) 
             _, x_fake = nets.generator(x_real, s_trg)
             x_concat += [x_fake]
     

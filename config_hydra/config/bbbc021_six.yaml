@@ -9,6 +9,7 @@ style_dim: 64
 stochastic: True 
 z_dimension: 16  
 dim_in: 64 
+add_controls: False
 
 # LOSS
 lambda_reg: 1 
@@ -39,12 +40,12 @@ num_workers: 6
 seed: 42  
 
 # DIRECTORIES FOR DATA
-image_path: ../project_folder/datasets/bbbc021_six
-data_index_path: ../project_folder/datasets/bbbc021_six/metadata/bbbc021_df_six.csv
-embedding_path: ../embeddings/csv/emb_rdkit.csv
+image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_six
+data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_six/metadata/bbbc021_df_six.csv
+embedding_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/csv/emb_rdkit.csv
 
 # DIRECTORIES FOR RESULTS 
-experiment_directory: ../project_folder/experiments/
+experiment_directory: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/
 sample_dir: sample   # Name of directory for sampled images 
 checkpoint_dir: checkpoint  # Name of directory for checkpoints
 basal_vs_real_folder: basal_vs_real

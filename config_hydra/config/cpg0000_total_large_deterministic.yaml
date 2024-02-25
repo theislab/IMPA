@@ -9,6 +9,7 @@ style_dim: 64
 stochastic: False 
 z_dimension: 16  
 dim_in: 64 
+add_controls: False
 
 # LOSS
 lambda_reg: 1 
@@ -44,7 +45,7 @@ data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metada
 embedding_path: Null
 
 # DIRECTORIES FOR RESULTS 
-experiment_directory: ../project_folder/experiments/
+experiment_directory: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/
 sample_dir: sample   # Name of directory for sampled images 
 checkpoint_dir: checkpoint  # Name of directory for checkpoints
 basal_vs_real_folder: basal_vs_real

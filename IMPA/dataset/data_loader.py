@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import WeightedRandomSampler
 
 from sklearn.preprocessing import OneHotEncoder
 from torch.utils.data import Dataset
@@ -33,6 +32,7 @@ class CellDataset:
         self.trainable_emb = args.trainable_emb
         self.dataset_name = args.dataset_name 
         self.latent_dim = args.latent_dim
+        self.add_controls = args.add_controls
 
         # Fix the training specifics 
         self.device = device 
@@ -43,11 +43,10 @@ class CellDataset:
         # Count the number of compounds
         if args.add_controls:
             self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"])  # Sorted drug names
-            self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])
         else:
-            self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"][self.fold_datasets["train"]["trt_idx"]])  # Sorted drug names
-            self.y_names = np.unique(self.fold_datasets['train']["ANNOT"][self.fold_datasets["train"]["trt_idx"]]) 
-            
+            self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"][self.fold_datasets["train"]["trt_idx"]]) # Sorted drug names
+        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])
+        
         # Count the number of drugs and MOAs 
         self.n_mol = len(self.mol_names) 
         self.n_y = len(self.y_names)
@@ -80,7 +79,7 @@ class CellDataset:
                                                         self.augment_train, 
                                                         self.normalize, 
                                                         dataset_name=self.dataset_name, 
-                                                        add_controls=args.add_controls),
+                                                        add_controls=self.add_controls),
 
 
                                 'test': CellDatasetFold('test', 
@@ -92,7 +91,7 @@ class CellDataset:
                                                         self.augment_train, 
                                                         self.normalize, 
                                                         dataset_name=self.dataset_name,
-                                                        add_controls=args.add_controls)}  
+                                                        add_controls=self.add_controls)}  
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -120,10 +119,10 @@ class CellDataset:
             # Save the fold name 
             for key in subset.columns:
                 dataset_splits[fold_name][key] = np.array(subset[key])
-            if self.args.add_controls:
+            if not self.add_controls:
                 dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"]=="trt")
             else:
-                dataset_splits[fold_name]["trt_idx"] = (dataset_splits[fold_name]["STATE"])
+                dataset_splits[fold_name]["trt_idx"] = (np.isin(dataset_splits[fold_name]["STATE"], ["trt", "control"]))
             dataset_splits[fold_name]["ctrl_idx"] = (dataset_splits[fold_name]["STATE"]=="control")
         return dataset_splits
 
@@ -196,9 +195,6 @@ class CellDatasetFold(Dataset):
         # One-hot encode molecules and moas
         self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols["trt"].reshape((-1,1))))  
 
-        # Create sampler weights 
-        self._get_sampler_weights()
-        
     def __len__(self):
         """
         Total number of samples 

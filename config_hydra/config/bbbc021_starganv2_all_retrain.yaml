@@ -1,0 +1,78 @@
+# TASK NAME 
+task_name: bbbc021_all_starganv2
+
+# IMAGE
+img_size: 96  
+latent_dim: 160 
+hidden_dim: 512 
+style_dim: 64 
+stochastic: True 
+z_dimension: 16  
+add_controls: False
+dim_in: 64 
+
+# LOSS
+lambda_reg: 1 
+lambda_cyc: 1 
+lambda_sty: 1 
+lambda_ds: 1 
+
+# TRAINING 
+total_epochs: 150
+ds_iter: 100000  
+resume_iter: 0
+batch_size: 32
+val_batch_size: 20
+lr: 0.0001
+f_lr: 0.0001
+beta1: 0
+beta2: 0.99
+weight_decay: 0.0001
+num_outs_per_domain: 10
+single_style: False
+ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
+mol_list: Null
+trainable_emb: True
+dataset_name: 'bbbc021'
+n_channels: 3
+num_workers: 6
+seed: 42  
+
+# DIRECTORIES FOR DATA
+image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_all
+data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_all/metadata/bbbc021_df_all.csv
+embedding_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/csv/emb_rdkit.csv
+
+# DIRECTORIES FOR RESULTS 
+experiment_directory: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/
+sample_dir: sample   # Name of directory for sampled images 
+checkpoint_dir: checkpoint  # Name of directory for checkpoints
+basal_vs_real_folder: basal_vs_real
+naming_key: dataset_name
+embedding_folder: embeddings 
+resume_dir: ''
+
+# DATA HANDLEMENT 
+augment_train: True 
+normalize: True
+
+# LOGGING INFO 
+print_every: 10
+sample_every: 1000
+save_every: 500
+eval_every: 500
+
+# PARAMETERS FOR CONDITION ENCODING 
+encode_rdkit: True
+num_layers_mapping_net: 1
+
+# Lightning 
+filename: epoch_{epoch:04d}
+monitor: fid_transformations
+mode: min
+save_last: True
+offline: False
+project: bbbc021
+log_model: False
+accelerator: gpu 
+log_every_n_steps: 10
