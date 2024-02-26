@@ -1,17 +1,7 @@
 from IMPA.dataset.data_loader import CellDataLoader
-import argparse
 from IMPA.solver import IMPAmodule
+import argparse
 from omegaconf import OmegaConf
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-from pathlib import Path
-import numpy as np
-import os
-import torch
-from tqdm import tqdm
-import pandas as pd
-import seaborn as sns
-from skimage import io, color, filters, measure
 import yaml
 
 import sys
