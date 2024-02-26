@@ -208,7 +208,7 @@ def compute_all_scores(solver,
         channels_fid = [0,1,2]
         # Initialize the classifier for classifier score
         classifier = Discriminator(img_size=96, 
-                          num_domains=n_mols+1, 
+                          num_domains=13, 
                           max_conv_dim=512, 
                           in_channels=3, 
                           dim_in=64, 
@@ -290,7 +290,6 @@ def compute_all_scores(solver,
                 final_scores=append_scores(1-score, '1-Accuracy', i, mol, final_scores, model_name)
                 print(f'1-Accuracy {score}')
                 
-                            
     score_df = pd.DataFrame(final_scores)    
     score_df.to_pickle(save_path)
     return score_df
