@@ -14,7 +14,9 @@ def main(yaml_path,
          dataset_name,
          model_name, 
          classifier_ckpt_path, 
-         result_path):
+         result_path, 
+         leaveout):
+    
     # Read the yaml file 
     with open(yaml_path, 'r') as file:
         # Load YAML data using safe_load() from the file
@@ -27,12 +29,22 @@ def main(yaml_path,
     solver = IMPAmodule(args, ckpt_dir, dataloader)
     solver._load_checkpoint(ckpt_epoch)
     
+    if leaveout:
+        ood_set = config_params["ood_set"]
+        config_params["ood_set"] = None
+        args = OmegaConf.create(config_params)
+        dataloader = CellDataLoader(args)
+        solver.embedding_matrix = dataloader.embedding_matrix
+    else:
+        ood_set = None
+    
     compute_all_scores(solver=solver, 
                     dataset=dataloader,
                     save_path=result_path,
                     ckpt_path=classifier_ckpt_path, 
                     model_name=model_name,
-                    dataset_name=dataset_name)
+                    dataset_name=dataset_name,
+                    ood_set=ood_set)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Measure evaluation metrics for a given yaml config")
@@ -43,6 +55,8 @@ if __name__ == "__main__":
     parser.add_argument('--model_name')
     parser.add_argument('--classifier_ckpt_path')
     parser.add_argument('--result_path')
+    parser.add_argument('--leaveout')
+    
     
     args = parser.parse_args()
     yaml_path = args.yaml_path
@@ -52,6 +66,7 @@ if __name__ == "__main__":
     model_name = args.model_name
     classifier_ckpt_path = args.classifier_ckpt_path
     result_path = args.result_path
+    leaveout = args.leaveout
     
 
     main(yaml_path,
@@ -60,4 +75,5 @@ if __name__ == "__main__":
          dataset_name,
          model_name, 
          classifier_ckpt_path, 
-         result_path)
+         result_path,
+         leaveout)

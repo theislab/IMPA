@@ -191,7 +191,7 @@ class CellDatasetFold(Dataset):
             # Map drugs to moas
             mol_ids, y_ids = [self.mol2id[mol] for mol in self.mols["trt"]] , [self.y2id[y] for y in self.y["trt"]]
             self.couples_mol_y = {mol:y for mol,y in zip(mol_ids, y_ids)}
-
+            
         # One-hot encode molecules and moas
         self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols["trt"].reshape((-1,1))))  
 

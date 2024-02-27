@@ -17,7 +17,7 @@ from IMPA.eval.gan_metrics.fid import *
 from IMPA.eval.gan_metrics.density_and_coverage import compute_d_c
 
 
-def gather_data_by_pert(dataset):
+def gather_data_by_pert(dataset, ood_set=None):
     """Gather images by pertubation
     """
     # Add empty perturbation entries 
@@ -42,6 +42,8 @@ def gather_data_by_pert(dataset):
                 images[pert_dict[drug_id]].append(batch["X"][1][mask])
 
     images = {key: torch.cat(val, dim=0) for key, val in images.items()}
+    if ood_set != None:
+        images = {key: val for key, val in images.items() if key in ood_set+["DMSO"]}
     return images 
 
 
@@ -95,6 +97,7 @@ def perform_transformation(solver,
             z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
         else:
             z = torch.randn(X.shape[0], 100, solver.args.z_dimension).to(device).quantile(0.75, dim=1)
+            # z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
                         
         # Embedding of the labels from RDKit
         if model_name == "IMPA":
@@ -171,7 +174,8 @@ def compute_all_scores(solver,
                         save_path,
                         ckpt_path=None, 
                         model_name='IMPA',
-                        dataset_name='bbbc021'):
+                        dataset_name='bbbc021', 
+                        ood_set=None):
     
     """Compute all scores and save them as a data frame
 
@@ -190,11 +194,14 @@ def compute_all_scores(solver,
     
     # Seed for reproducibility
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    mol2id = dataset.mol2id
+    y2id = dataset.y2id  # MoA to index 
+    mol2id = dataset.mol2id # Mol to index
+    mol2y = dataset.mol2y # Mol to MoA
+    n_y = len(y2id)
     n_mols = len(mol2id)
     
     # Collect mol images
-    X_mols = gather_data_by_pert(dataset)
+    X_mols = gather_data_by_pert(dataset, ood_set)
     
     final_scores = {'score':[],
                     'score_type':[],
@@ -213,6 +220,7 @@ def compute_all_scores(solver,
                           in_channels=3, 
                           dim_in=64, 
                           multi_task=False).to(device)
+        
         classifier.load_state_dict(torch.load(ckpt_path))
         classifier.eval()
         
@@ -233,7 +241,7 @@ def compute_all_scores(solver,
         
         # Iterate through the drugs 
         for mol in tqdm(X_mols):
-            if mol in solver.args.ood_set:
+            if mol in solver.args.ood_set and ood_set==None:
                 continue
 
             print(f'Evaluate on molecule {mol}')
@@ -286,9 +294,9 @@ def compute_all_scores(solver,
                                                 score_type='Accuracy')
                 fake_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(fake_domain), batch_size=20)
                 
-                score = classifier_score(classifier, fake_dataset, mol2id[mol])
-                final_scores=append_scores(1-score, '1-Accuracy', i, mol, final_scores, model_name)
-                print(f'1-Accuracy {score}')
+                score = classifier_score(classifier, fake_dataset, mol2y[mol2id[mol]])
+                final_scores=append_scores(score, 'Accuracy', i, mol, final_scores, model_name)
+                print(f'Accuracy {score}')
                 
     score_df = pd.DataFrame(final_scores)    
     score_df.to_pickle(save_path)

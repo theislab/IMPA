@@ -7,7 +7,7 @@ latent_dim: 160
 hidden_dim: 512 
 style_dim: 64 
 stochastic: True 
-z_dimension: 16  
+z_dimension: 16
 add_controls: False
 dim_in: 64 
 
@@ -31,7 +31,8 @@ weight_decay: 0.0001
 num_outs_per_domain: 10
 single_style: True
 
-ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
+ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin, demecolcine]
+# ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
 mol_list: Null
 balanced: False
 trainable_emb: False

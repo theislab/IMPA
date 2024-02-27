@@ -1,13 +1,13 @@
 # TASK NAME 
-task_name: bbbc021_all_retrain
+task_name: bbbc021_all_retrain_fp
 
 # IMAGE
 img_size: 96  
 latent_dim: 1024 
 hidden_dim: 512 
-style_dim: 64 
+style_dim: 128 
 stochastic: True 
-z_dimension: 16  
+z_dimension: 64  
 add_controls: False
 dim_in: 64 
 
@@ -30,6 +30,7 @@ beta2: 0.99
 weight_decay: 0.0001
 num_outs_per_domain: 10
 single_style: True
+
 ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
 mol_list: Null
 trainable_emb: False
