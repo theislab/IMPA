@@ -94,10 +94,10 @@ def perform_transformation(solver,
     if model_name == 'IMPA' or model_name == 'starGANv2':
         if score_type!='Accuracy':
             # z = torch.randn(X.shape[0], solver.args.z_dimension).to(device)
-            z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
+            z = torch.randn(X.shape[0], 1, solver.args.z_dimension).mean(1).to(device)
         else:
-            z = torch.randn(X.shape[0], 100, solver.args.z_dimension).to(device).quantile(0.75, dim=1)
-            # z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
+            # z = torch.randn(X.shape[0], 100, solver.args.z_dimension).to(device).quantile(0.75, dim=1)
+            z = torch.randn(X.shape[0], 1, solver.args.z_dimension).mean(1).to(device)
                         
         # Embedding of the labels from RDKit
         if model_name == "IMPA":
@@ -215,7 +215,7 @@ def compute_all_scores(solver,
         channels_fid = [0,1,2]
         # Initialize the classifier for classifier score
         classifier = Discriminator(img_size=96, 
-                          num_domains=13, 
+                          num_domains=6, 
                           max_conv_dim=512, 
                           in_channels=3, 
                           dim_in=64, 
@@ -241,7 +241,7 @@ def compute_all_scores(solver,
         
         # Iterate through the drugs 
         for mol in tqdm(X_mols):
-            if mol in solver.args.ood_set and ood_set==None:
+            if  ood_set!=None and mol in solver.args.ood_set:
                 continue
 
             print(f'Evaluate on molecule {mol}')
