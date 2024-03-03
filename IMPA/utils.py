@@ -126,7 +126,18 @@ def tensor2ndarray255(images):
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
 
 @torch.no_grad()
-def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest_dir, num_domains):
+def debug_image(solver, 
+                nets, 
+                embedding_matrix, 
+                args, 
+                inputs,
+                step,
+                device, 
+                id2mol,
+                dest_dir,
+                num_domains, 
+                multimodal, 
+                mod_list):
     """Dump a grid of generated images.
 
     Args:
@@ -144,17 +155,28 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
     x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
 
     # Setup the device and the batch size
-    N = x_real_ctrl.size(0)
+    N = x_real_ctrl.size(0)  # Batch size 
     # Get all the possible output targets
-    range_classes = list(range(num_domains))
-    y_trg_list = [torch.tensor(y).repeat(N).to(device)
-                  for y in range_classes] 
+    if multimodal:
+        y_trg_list = []
+        y_mod = []
+        for i, mod in enumerate(mod_list):
+            range_classes = list(range(num_domains[mod]))
+            y_trg = [torch.tensor(y).repeat(N).to(device) 
+                     for y in range_classes] # Repeat y N times
+            
+            y_trg_list += y_trg[:2]
+            y_mod += [i*torch.ones(N)]*2
     
-    # Only keep 6 classes at random
-    y_trg_list = y_trg_list[:6]  
-    if len(y_trg_list)>6:
-        y_trg_list.shuffle()
-
+    else:
+        range_classes = list(range(num_domains))
+        y_trg_list = [torch.tensor(y).repeat(N).to(device)
+                      for y in range_classes] 
+    
+        # Only keep 6 classes at random
+        y_trg_list = y_trg_list[:6]  
+        y_mod = None 
+        
     # Produce two plots per perturbation
     num_transf_plot = 2 
 
@@ -165,20 +187,24 @@ def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest
         z_trg_list = [None]*num_transf_plot
         
     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
-    translate_using_latent(nets,
+    translate_using_latent(solver,
+                            nets,
                             embedding_matrix, 
                             args, 
                             x_real_ctrl,
                             y_trg_list, 
+                            y_mod,
                             z_trg_list,
                             filename)
 
 @torch.no_grad()
-def translate_using_latent(nets, 
+def translate_using_latent(solver,
+                            nets, 
                             embedding_matrix,
                             args, 
                             x_real,
                             y_trg_list, 
+                            y_mod, 
                             z_trg_list,
                             filename):
     """
@@ -201,22 +227,12 @@ def translate_using_latent(nets,
     # Place the validation input in list for concatenation 
     x_concat = [x_real]
     
-    for _, y_trg in enumerate(y_trg_list):
-        for z_trg in z_trg_list:
-
-            # Perturbation embedding and style embedding 
-            z_emb_trg = embedding_matrix(y_trg) 
-            if args.stochastic:
-                z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)                
-            
-            # Perform mapping 
-            if args.single_style:
-                s_trg = nets.mapping_network(z_emb_trg, y=None) 
-            else:
-                s_trg = nets.mapping_network(z_trg, y_trg) 
-            _, x_fake = nets.generator(x_real, s_trg)
-            x_concat += [x_fake]
-    
+    for i, y_trg in enumerate(y_trg_list):        
+        x_real, s_trg = solver.encode_multimodal_label(x_real, y_trg, y_mod[i], 3)
+                
+        _, x_fake = nets.generator(x_real, s_trg)
+        x_concat += [x_fake]
+                
     # Save images with specific channels depending on the dataset
     x_concat = torch.cat(x_concat, dim=0)
     if args.dataset_name == 'bbbc021':

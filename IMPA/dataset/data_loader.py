@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from pytorch_lightning import LightningDataModule
 from IMPA.dataset.data_utils import CustomTransform
 from IMPA.utils import *
-
+from tqdm import tqdm
 
 class CellDataset:
     """Dataset class for image data 
@@ -33,6 +33,7 @@ class CellDataset:
         self.dataset_name = args.dataset_name 
         self.latent_dim = args.latent_dim
         self.add_controls = args.add_controls
+        self.multimodal = args.multimodal
 
         # Fix the training specifics 
         self.device = device 
@@ -40,34 +41,76 @@ class CellDataset:
         # Read the datasets
         self.fold_datasets = self._read_folds()
         
-        # Count the number of compounds
-        if args.add_controls:
-            self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"])  # Sorted drug names
-        else:
-            self.mol_names = np.unique(self.fold_datasets["train"]["CPD_NAME"][self.fold_datasets["train"]["trt_idx"]]) # Sorted drug names
-        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])
-        
-        # Count the number of drugs and MOAs 
-        self.n_mol = len(self.mol_names) 
-        self.n_y = len(self.y_names)
-        
-        # Create th e embeddings
-        if self.trainable_emb:
-            self.embedding_matrix = torch.nn.Embedding(self.n_mol, self.latent_dim).to(self.device).to(torch.float32)  # Embedding 
-        else:
-            embedding_matrix = pd.read_csv(self.embedding_path, index_col=0)
-            embedding_matrix = embedding_matrix.loc[self.mol_names]  # Sort based on the drug names 
-            embedding_matrix = torch.tensor(embedding_matrix.values, 
-                                                    dtype=torch.float32, device=self.device)
-            self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
+        # ANNOT HERE IS FUNDAMENTAL BEACUSE IT CONTROLS WHAT TYPE OF PERT IT IS 
+        self.y_names = np.unique(self.fold_datasets['train']["ANNOT"])  # ORF, Compound, CRISPR
+        if not self.multimodal:
+            # Count the number of compounds
+            if args.add_controls:
+                # BROAD SAMPLES FOR ALL (ALSO DMSO OR CONTROLS)
+                self.mol_names = np.unique(self.fold_datasets["train"][self.cpd_name])
+            else:
+                # BROAD SAMPLES ONLY FOR THE TREATED (BROAD ID FOR ALL)
+                self.mol_names = np.unique(self.fold_datasets["train"][self.cpd_name][self.fold_datasets["train"]["trt_idx"]]) # Sorted drug names
+            self.n_mol = len(self.mol_names) 
 
-        # Keep track of the indices and numbers 
-        self.mol2id = {mol: id for id, mol in enumerate(self.mol_names)}
+        else:
+            self.mol_names = {}
+            for pert_type in self.y_names:
+                idx_pert = self.fold_datasets["train"]["ANNOT"]==pert_type
+                if args.add_controls:
+                    # BROAD SAMPLES FOR ALL (ALSO DMSO OR CONTROLS)
+                    self.mol_names[pert_type] = np.unique(self.fold_datasets["train"][self.cpd_name][idx_pert])
+                else:
+                    # BROAD SAMPLES ONLY FOR THE TREATED (BROAD ID FOR ALL)
+                    trt_idx = self.fold_datasets["train"]["trt_idx"][idx_pert]
+                    self.mol_names[pert_type] = np.unique(self.fold_datasets["train"][self.cpd_name][idx_pert][trt_idx])
+            self.n_mol = {key: len(val) for key, val in self.mol_names.items()} 
+
+        # Count the number of drugs and MOAs 
+        self.n_y = len(self.y_names)
         self.y2id = {y: id for id, y in enumerate(self.y_names)}
 
-        # Encoders for moa and drug 
-        encoder_mol = OneHotEncoder(sparse=False, categories=[self.mol_names])
-        encoder_mol.fit(np.array(self.mol_names).reshape((-1,1)))
+        # Initialize the embedding matrix
+        if self.multimodal and not self.trainable_emb:
+            embedding_matrix = []
+            mol2id = {}
+            encoder_mol = {}
+            self.latent_dim = {}
+
+            for mod in self.y_names:
+                embedding_matrix_modality = pd.read_csv(self.embedding_path[mod],
+                                                        index_col=0)
+                embedding_matrix_modality = embedding_matrix_modality.loc[self.mol_names[mod]]
+                embedding_matrix_modality = torch.tensor(embedding_matrix_modality.values, 
+                                                            dtype=torch.float32, device=self.device)
+                self.latent_dim[mod]= embedding_matrix_modality.shape[1]
+                embedding_matrix_modality = torch.nn.Embedding.from_pretrained(embedding_matrix_modality, 
+                                                                                    freeze=True).to(self.device)
+                embedding_matrix.append(embedding_matrix_modality)
+                mol2id[mod] = {mol: id for id, mol in enumerate(self.mol_names[mod])}
+                    
+                # Encoders for moa and drug 
+                encoder_mol[mod] = OneHotEncoder(sparse=False, categories=[self.mol_names[mod]])
+                encoder_mol[mod].fit(np.array(self.mol_names[mod]).reshape((-1,1)))
+                
+            self.embedding_matrix = torch.nn.ModuleList(embedding_matrix)
+            self.mol2id = mol2id
+
+        else:
+            if self.trainable_emb:
+                self.embedding_matrix = torch.nn.Embedding(self.n_mol, self.latent_dim).to(self.device).to(torch.float32) 
+            else:
+                embedding_matrix = pd.read_csv(self.embedding_path, index_col=0)
+                embedding_matrix = embedding_matrix.loc[self.mol_names]  # Sort based on the drug names 
+                embedding_matrix = torch.tensor(embedding_matrix.values, 
+                                                dtype=torch.float32, device=self.device)
+                self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
+
+            # Keep track of the indices and numbers 
+            self.mol2id = {mol: id for id, mol in enumerate(self.mol_names)}
+            encoder_mol = OneHotEncoder(sparse=False, categories=[self.mol_names])
+            encoder_mol.fit(np.array(self.mol_names).reshape((-1,1)))
+        
 
         # Initialize the datasets 
         self.fold_datasets = {'train': CellDatasetFold('train', 
@@ -79,7 +122,9 @@ class CellDataset:
                                                         self.augment_train, 
                                                         self.normalize, 
                                                         dataset_name=self.dataset_name, 
-                                                        add_controls=self.add_controls),
+                                                        add_controls=self.add_controls,
+                                                        multimodal=self.multimodal, 
+                                                        cpd_name=self.cpd_name),
 
 
                                 'test': CellDatasetFold('test', 
@@ -91,7 +136,9 @@ class CellDataset:
                                                         self.augment_train, 
                                                         self.normalize, 
                                                         dataset_name=self.dataset_name,
-                                                        add_controls=self.add_controls)}  
+                                                        add_controls=self.add_controls,
+                                                        multimodal=self.multimodal, 
+                                                        cpd_name=self.cpd_name)}  
 
     def _read_folds(self):
         """Extract the filenames of images in the train and test sets 
@@ -100,12 +147,13 @@ class CellDataset:
         # Read the index csv file
         dataset = pd.read_csv(self.data_index_path, index_col=0)
 
+        self.cpd_name = "BROAD_SAMPLE" if self.dataset_name=="cpg0000" else "CPD_NAME"
         # Subset the perturbations if provided in mol_list
         if self.mol_list != None:
-            dataset = dataset.loc[dataset.CPD_NAME.isin(self.mol_list)]
+            dataset = dataset.loc[dataset[self.cpd_name].isin(self.mol_list)]
         # Remove the leave-out drugs if provided in ood_set
         if self.ood_set != None:
-            dataset = dataset.loc[~dataset.CPD_NAME.isin(self.ood_set)]
+            dataset = dataset.loc[~dataset[self.cpd_name].isin(self.ood_set)]
         
         # Collect in a dictionary the folds
         dataset_splits = dict()
@@ -138,7 +186,9 @@ class CellDatasetFold(Dataset):
                 augment_train=True, 
                 normalize=False, 
                 dataset_name="bbbc021", 
-                add_controls=False):
+                add_controls=False, 
+                multimodal=False, 
+                cpd_name="CPD_NAME"):
 
         super(CellDatasetFold, self).__init__() 
 
@@ -147,11 +197,13 @@ class CellDatasetFold(Dataset):
         self.fold = fold  
         self.data = data
         self.dataset_name = dataset_name
+        self.multimodal = multimodal
         
         # Extract variables 
         self.file_names = {}
         self.mols = {}
         self.y = {}
+        
         if dataset_name=="bbbc021":
             self.dose = {}
         
@@ -159,14 +211,14 @@ class CellDatasetFold(Dataset):
             # subset by condition 
             if cond == "trt" and add_controls:
                 self.file_names[cond] = self.data['SAMPLE_KEY']
-                self.mols[cond] = self.data['CPD_NAME']
+                self.mols[cond] = self.data[cpd_name]
                 self.y[cond] = self.data['ANNOT']
                 if dataset_name=="bbbc021":
                     self.dose[cond] = self.data['DOSE']
                     
             else:
                 self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
-                self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
+                self.mols[cond] = self.data[cpd_name][self.data[f"{cond}_idx"]]
                 self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
                 if dataset_name=="bbbc021":
                     self.dose[cond] = self.data['DOSE'][self.data[f"{cond}_idx"]]
@@ -186,15 +238,7 @@ class CellDatasetFold(Dataset):
             self.transform = CustomTransform(augment=True, normalize=normalize)
         else:
             self.transform = CustomTransform(augment=False, normalize=normalize)
-        
-        if self.fold ==  'train':
-            # Map drugs to moas
-            mol_ids, y_ids = [self.mol2id[mol] for mol in self.mols["trt"]] , [self.y2id[y] for y in self.y["trt"]]
-            self.couples_mol_y = {mol:y for mol,y in zip(mol_ids, y_ids)}
-            
-        # One-hot encode molecules and moas
-        self.one_hot_mol = self.encoder_mol.transform(np.array(self.mols["trt"].reshape((-1,1))))  
-
+                    
     def __len__(self):
         """
         Total number of samples 
@@ -239,16 +283,21 @@ class CellDatasetFold(Dataset):
         img_ctrl, img_trt = torch.from_numpy(img_ctrl).to(torch.float), torch.from_numpy(img_trt).to(torch.float)
         img_ctrl, img_trt = img_ctrl.permute(2,0,1), img_trt.permute(2,0,1)  # Place channel dimension in front of the others 
         img_ctrl, img_trt = self.transform(img_ctrl), self.transform(img_trt)
+        if self.multimodal:
+            y_mod = self.y["trt"][idx_trt]
+            mol_one_hot = self.mol2id[y_mod][self.mols["trt"][idx_trt]]
+        else:
+            mol_one_hot = self.mol2id[self.mols["trt"][idx_trt]]
         
         if self.dataset_name == "bbbc021":
             return {'X':(img_ctrl, img_trt), 
-                    'mol_one_hot': self.one_hot_mol[idx_trt], 
+                    'mol_one_hot': mol_one_hot, 
                     'y_id': self.y2id[self.y["trt"][idx_trt]],
                     "dose": self.dose["trt"][idx_trt],
                     'file_names': (img_file_ctrl, img_file_trt)}
         else:
             return {'X':(img_ctrl, img_trt), 
-                    'mol_one_hot': self.one_hot_mol[idx_trt], 
+                    'mol_one_hot': mol_one_hot, 
                     'y_id': self.y2id[self.y["trt"][idx_trt]],
                     'file_names': (img_file_ctrl, img_file_trt)}
 
@@ -275,6 +324,8 @@ class CellDataLoader(LightningDataModule):
 
         # Integrate embeddings as class attribute
         self.embedding_matrix = dataset.embedding_matrix  
+        self.latent_dim = dataset.latent_dim
+        print(self.latent_dim)
 
         # Number of mols and annotations (the latter can be modes of action/genes...)
         self.n_mol = dataset.n_mol
@@ -286,9 +337,16 @@ class CellDataLoader(LightningDataModule):
         # Collect ids 
         self.mol2id = dataset.mol2id
         self.y2id = dataset.y2id
-        self.id2mol = {val:key for key,val in self.mol2id.items()}
-        self.id2y = {val:key for key,val in self.y2id.items()}   
-
+        if self.args.multimodal:
+            self.id2mol = {}
+            self.id2y = {}
+            for mod in self.mol2id:
+                self.id2mol[mod] = {val:key for key,val in self.mol2id[mod].items()}
+                self.id2y[mod] = {val:key for key,val in self.y2id.items()} 
+        else:
+            self.id2mol = {val:key for key,val in self.mol2id.items()}
+            self.id2y = {val:key for key,val in self.y2id.items()} 
+            
         # Free cell painting dataset memory
         del dataset
         return training_set, test_set
@@ -310,8 +368,7 @@ class CellDataLoader(LightningDataModule):
                                                        batch_size=self.args.val_batch_size, 
                                                        shuffle=False, 
                                                        num_workers=self.args.num_workers,
-                                                       drop_last=False)      
-        self.mol2y = self.training_set.couples_mol_y       
+                                                       drop_last=False)           
         
     def train_dataloader(self):
         return self.loader_train

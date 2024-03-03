@@ -30,12 +30,27 @@ class IMPAmodule(LightningModule):
         # Save hyperparameters for lightning/hydra
         self.save_hyperparameters(args)
         
-        # Get the nets
-        self.nets = build_model(args, datamodule.n_mol, self.device)
         self.loader_test = datamodule.val_dataloader()
         self.embedding_matrix = datamodule.embedding_matrix
+        
+        if self.args.multimodal:
+            n_cat = len(self.args.modality_list)
+            self.condition_embedding_matrix = torch.nn.Embedding(n_cat, self.args.condition_embedding_dimension).to(self.device).to(torch.float32) 
+             
         self.id2mol = datamodule.id2mol
         self.num_domains = datamodule.n_mol
+        if args.multimodal:
+            latent_dim = datamodule.latent_dim
+        else:
+            latent_dim = args.latent_dim
+            
+        # Get the nets
+        self.nets = build_model(args, 
+                                datamodule.n_mol, 
+                                self.device, 
+                                multimodal=args.multimodal,
+                                modality_list=args.modality_list,
+                                latent_dim=latent_dim)
         
         # Set modules as attributes of the solver class
         for name, module in self.nets.items():
@@ -66,6 +81,7 @@ class IMPAmodule(LightningModule):
             params = list(self.nets[net].parameters())
             if net == 'mapping_network' and self.args.trainable_emb:
                 params += list(self.embedding_matrix.parameters())  
+                params += list(self.condition_embedding_matrix.parameters())
                 
             # Define optimizers and LR scheduler here
             self.optims[net] = Adam(params=params,
@@ -79,33 +95,27 @@ class IMPAmodule(LightningModule):
         """   
         generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
         # Fetch the real and fake inputs and outputs 
-        x_real, y_one_hot = batch['X'], batch['mol_one_hot']
+        x_real, y, y_mod = batch['X'], batch['mol_one_hot'], batch["y_id"]
         x_real_ctrl, x_real_trt = x_real
         x_real_ctrl, x_real_trt = x_real_ctrl.to(self.device), x_real_trt.to(self.device)
 
         # The original label for the treatment
-        y_org = y_one_hot.argmax(1).long().to(self.device)
+        y_org = y.long().to(self.device)
         
         # Get the perturbation embedding for the target mol
-        z_emb_org = self.embedding_matrix(y_org).to(self.device)
+        x_real_trt, s_trg1 = self.encode_multimodal_label(x_real_trt, y_org, y_mod, 3)
+        _, s_trg2 = self.encode_multimodal_label(x_real_trt, y_org, y_mod, 3)
 
-        # Pick two random weight vectors 
-        if self.args.stochastic:
-            z_trg, z_trg2 = (torch.randn(x_real_ctrl.shape[0], self.args.z_dimension).to(self.device), 
-                                torch.randn(x_real_ctrl.shape[0], self.args.z_dimension).to(self.device))
-        else:
-            z_trg, z_trg2 = None, None
-        
         # Train the discriminator
         d_loss, d_losses_latent = self._compute_d_loss(
-            x_real_ctrl, x_real_trt, y_org, z_emb_org=z_emb_org, z_trg=z_trg)
+            x_real_ctrl, x_real_trt, y_org, y_mod, s_trg=s_trg1)
         discriminator_opt.zero_grad()
         self.manual_backward(d_loss)
         discriminator_opt.step()
         
         # Train the generator
         g_loss, g_losses_latent = self._compute_g_loss(
-            x_real_ctrl, y_org, z_emb_org=z_emb_org, z_trgs=[z_trg, z_trg2])
+            x_real_ctrl, y_org, y_mod, s_org1=s_trg1, s_org2=s_trg2)
         style_encoder_opt.zero_grad()
         generator_opt.zero_grad()
         mapping_network_opt.zero_grad()   
@@ -126,23 +136,15 @@ class IMPAmodule(LightningModule):
                 all_losses[prefix + key] = value
         all_losses['G/lambda_ds'] = self.args.lambda_ds
         self.log_dict(all_losses)
-    
+        
+
     def on_train_start(self):
         self.ckptios.append(CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims))
         
     def on_train_epoch_end(self):
-        # Scores on the validation images 
-        # rmse_disentanglement_dict = evaluate(self.nets,
-        #                                         self.loader_test,
-        #                                         self.device,
-        #                                         self.dest_dir,
-        #                                         self.args.embedding_folder,
-        #                                         args=self.args,
-        #                                         embedding_matrix=self.embedding_matrix)
-        # self.log_dict(rmse_disentanglement_dict)
-        
         inputs_val = next(iter(self.loader_test)) 
-        debug_image(self.nets, 
+        debug_image(self,
+                    self.nets, 
                     self.embedding_matrix, 
                     self.args, 
                     inputs=inputs_val, 
@@ -150,12 +152,14 @@ class IMPAmodule(LightningModule):
                     device=self.device, 
                     id2mol=self.id2mol,
                     dest_dir=self.dest_dir, 
-                    num_domains=self.num_domains)
+                    num_domains=self.num_domains,
+                    multimodal=self.args.multimodal,
+                    mod_list=self.args.modality_list)
 
         # Save model checkpoints
         self._save_checkpoint(step=self.current_epoch+1)        
         
-    def _compute_d_loss(self, x_real_ctrl, x_real_trt, y_org, z_emb_org, z_trg):
+    def _compute_d_loss(self, x_real_ctrl, x_real_trt, y_org, y_mod, s_trg):
         """Compute the discriminator loss real batches
 
         Args:
@@ -167,7 +171,8 @@ class IMPAmodule(LightningModule):
         """
         # Gradient requirement for gradient penalty loss
         x_real_trt.requires_grad_()
-        out = self.nets.discriminator(x_real_trt, y_org)
+        out = self.discriminate_multimodal(x_real_trt, y_org, y_mod, 3)
+        
         # Discriminator assigns a 1 to the real 
         loss_real = self._adv_loss(out, 1)
         # Gradient-based regularization (penalize high gradient on the discriminator)
@@ -175,29 +180,19 @@ class IMPAmodule(LightningModule):
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
-            if self.args.single_style:
-                if self.args.stochastic:
-                    z_emb_org = torch.cat([z_emb_org, z_trg], dim=1)
-
-                # Single of the noisy embedding vector to a style vector 
-                s_trg = self.nets.mapping_network(z_emb_org, y=None)  
-            
-            else:
-                s_trg = self.nets.mapping_network(z_trg, y_org)  
-            
             # Generate the fake image
             _, x_fake = self.nets.generator(x_real_ctrl, s_trg)
 
         # Discriminator trained to predict transformed image as fake in its domain 
-        out = self.nets.discriminator(x_fake, y_org)
+        out = self.discriminate_multimodal(x_fake, y_org, y_mod, 3)
         loss_fake = self._adv_loss(out, 0)
         loss = loss_real + loss_fake + self.args.lambda_reg * loss_reg 
 
         return loss, Munch(real=loss_real.item(),
-                        fake=loss_fake.item(),
-                        reg=loss_reg.item())
+                            fake=loss_fake.item(),
+                            reg=loss_reg.item())
 
-    def _compute_g_loss(self, x_real_ctrl, y_org, z_emb_org, z_trgs=None):
+    def _compute_g_loss(self, x_real_ctrl, y_org, y_mod, s_org1, s_org2):
         """Compute the discriminator loss real batches
 
         Args:
@@ -207,22 +202,11 @@ class IMPAmodule(LightningModule):
             z_emb_trg (torch.tensor): embedding vector for swapped labels
             z_trgs (torch.tensor, optional): pair of randomly drawn noise vectors. Defaults to None.
         """
-        # Couple of random vectors for the difference-sensitivity loss
-        z_trg, z_trg2 = z_trgs
-        
-        # Adversarial loss  
-        if self.args.single_style:
-            if self.args.stochastic:
-                z_emb_org1 = torch.cat([z_emb_org, z_trg], dim=1)
-            # Single of the noisy embedding vector to a style vector 
-            s_org1 = self.nets.mapping_network(z_emb_org1, y=None)  
-        else:
-            s_org1 = self.nets.mapping_network(z_trg, y_org)  
-        
         # Generation of fake images 
         _, x_fake = self.nets.generator(x_real_ctrl, s_org1)
         # Try to deceive the discriminator 
-        out = self.nets.discriminator(x_fake, y_org)
+        out = self.discriminate_multimodal(x_fake, y_org, y_mod, 3)
+        
         loss_adv = self._adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
@@ -236,12 +220,7 @@ class IMPAmodule(LightningModule):
 
         # Diversity sensitive loss 
         if self.args.stochastic:
-            if self.args.single_style:
-                z_emb_trg2 = torch.cat([z_emb_org, z_trg2], dim=1)
-                s_trg2 = self.nets.mapping_network(z_emb_trg2, y=None) 
-            else:
-                s_trg2 = self.nets.mapping_network(z_trg2, y_org) 
-            _, x_fake2 = self.nets.generator(x_real_ctrl, s_trg2)
+            _, x_fake2 = self.nets.generator(x_real_ctrl, s_org2)
             x_fake2 = x_fake2.detach()
             loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 
         else:
@@ -312,7 +291,9 @@ class IMPAmodule(LightningModule):
         """
         self.ckptios = [
             CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
-            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix})]
+            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix}),
+            CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_condition_embeddings.ckpt'), **{'condition_embeddings':self.condition_embedding_matrix}) 
+            ]
     
     def _save_checkpoint(self, step):
         """Save model checkpoints
@@ -323,3 +304,42 @@ class IMPAmodule(LightningModule):
         for ckptio in self.ckptios:
             ckptio.save(step)
             
+    def encode_multimodal_label(self, X, y_mol, y_mod, n_mod):
+        s_emb = []
+        X_emb = []
+        for i in range(n_mod):
+            y_mod_i = y_mod == i
+            if not y_mod_i.any().item():
+                continue
+            
+            # Append cell images based on the mol
+            X_emb.append(X[y_mod_i])
+            # Molecule indices for a certain mode
+            y_mol_mod = y_mol[y_mod_i]
+            z_embeddings_mol_mod = self.embedding_matrix[i](y_mol_mod)
+            
+            i_tensor = i*torch.ones(y_mol_mod.shape[0]).to(self.device).long()
+            cond_embeddings_tensor = self.condition_embedding_matrix(i_tensor)
+            
+            if self.args.stochastic:
+                z_trg = torch.randn(z_embeddings_mol_mod.shape[0], self.args.z_dimension).cuda()
+                z_embeddings_mol_mod = torch.cat([z_embeddings_mol_mod, cond_embeddings_tensor, z_trg], dim=1)
+            else:
+                z_embeddings_mol_mod = torch.cat([z_embeddings_mol_mod, cond_embeddings_tensor], dim=1)
+            # Single of the noisy embedding vector to a style vector 
+            s_emb.append(self.nets.mapping_network(z_embeddings_mol_mod, y_mol_mod, i))
+        X_emb = torch.cat(X_emb, dim=0)
+        s_emb = torch.cat(s_emb, dim=0)
+        return X_emb, s_emb
+            
+    def discriminate_multimodal(self, X, y_mol, y_mod, n_mod):
+        pred = []
+        for i in range(n_mod):
+            y_mod_i = y_mod == i
+            if not y_mod_i.any().item():
+                continue
+            X_mod = X[y_mod_i]
+            y_mol_mod = y_mol[y_mod_i]
+            pred_mod = self.nets.discriminator(X_mod, y_mol_mod, i)
+            pred.append(pred_mod)
+        return torch.cat(pred, dim=0)
