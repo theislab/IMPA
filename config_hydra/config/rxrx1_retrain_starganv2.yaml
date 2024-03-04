@@ -1,5 +1,5 @@
 # TASK NAME 
-task_name: rxrx1_batch_starganv2
+task_name: rxrx1_batch
 
 # IMAGE
 img_size: 96  
@@ -11,6 +11,7 @@ z_dimension: 10
 dim_in: 64 
 add_controls: False
 
+
 # LOSS
 lambda_reg: 1 
 lambda_cyc: 1 
@@ -18,7 +19,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 100
+total_epochs: 200
 ds_iter: 100000  
 resume_iter: 0
 batch_size: 32

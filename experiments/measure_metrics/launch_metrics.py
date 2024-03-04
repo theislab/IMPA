@@ -29,6 +29,7 @@ def main(yaml_path,
     solver = IMPAmodule(args, ckpt_dir, dataloader)
     solver._load_checkpoint(ckpt_epoch)
     
+    leaveout = False
     if leaveout:
         ood_set = config_params["ood_set"]
         config_params["ood_set"] = None
@@ -37,7 +38,7 @@ def main(yaml_path,
         solver.embedding_matrix = dataloader.embedding_matrix
     else:
         ood_set = None
-    
+    print(ood_set)
     compute_all_scores(solver=solver, 
                     dataset=dataloader,
                     save_path=result_path,
