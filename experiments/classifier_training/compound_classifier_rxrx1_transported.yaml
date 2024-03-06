@@ -1,0 +1,42 @@
+# TASK NAME 
+task_name: rxrx1_batch
+
+# IMAGE
+img_size: 96   
+batch_key: None
+pert_modelling: True
+subsample_frac: 1.0 
+
+# DIRECTORIES FOR DATA
+image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/rxrx1_transported
+data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/rxrx1/metadata/rxrx1_df.csv
+embedding_path: Null
+n_channels: 6
+batch_size: 64
+num_workers: 4
+val_batch_size: 64
+
+ood_set: Null
+mol_list: Null
+balanced: False 
+trainable_emb: True
+dataset_name: rxrx1
+latent_dim: 100 
+
+# DATA HANDLEMENT 
+augment_train: True 
+normalize: True
+
+# PARAMETERS FOR CONDITION ENCODING 
+encode_rdkit: True
+num_layers_mapping_net: 1
+
+# Lightning 
+dest_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/pert_classifier_results/rxrx1_transported
+
+sample_dir: sample   # Name of directory for sampled images 
+checkpoint_dir: checkpoint  # Name of directory for checkpoints
+basal_vs_real_folder: basal_vs_real
+naming_key: dataset_name
+embedding_folder: embeddings 
+resume_dir: ''
