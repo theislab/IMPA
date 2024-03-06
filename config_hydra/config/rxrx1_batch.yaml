@@ -12,7 +12,7 @@ dim_in: 64
 pert_modelling: False
 batch_key: BATCH
 subsample_frac: 1.0
-latent_dim: 160
+# latent_dim: 160
 
 # LOSS
 lambda_reg: 1 
@@ -37,7 +37,7 @@ ood_set: Null
 mol_list: Null
 balanced: False 
 trainable_emb: True
-dataset_name: rxrx1_batch
+dataset_name: rxrx1
 n_channels: 6
 num_workers: 6
 seed: 42  

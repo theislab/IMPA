@@ -23,6 +23,6 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-# python ../IMPA/main_hydra.py config=rxrx1_batch.yaml 
-python ../IMPA/main_hydra.py config=cpg0000_batch.yaml 
+python ../IMPA/main_hydra.py config=rxrx1_batch.yaml config.stochastic=False
+# python ../IMPA/main_hydra.py config=cpg0000_batch.yaml 
 # python ../IMPA/main_hydra.py config=cpg0000_batch.yaml config.stochastic=False
