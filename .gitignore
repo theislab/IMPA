@@ -130,7 +130,6 @@ dmypy.json
 
 # Directories 
 checkpoints/
-experiments/
 project_folder
 
 # Script outputs 
