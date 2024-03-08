@@ -81,7 +81,7 @@ class IMPAmodule(LightningModule):
             params = list(self.nets[net].parameters())
             if net == 'mapping_network' and self.args.trainable_emb:
                 params += list(self.embedding_matrix.parameters())  
-                params += list(self.condition_embedding_matrix.parameters())
+            params += list(self.condition_embedding_matrix.parameters())
                 
             # Define optimizers and LR scheduler here
             self.optims[net] = Adam(params=params,

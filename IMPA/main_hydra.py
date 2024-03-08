@@ -62,12 +62,12 @@ def main(config: DictConfig):
     # Initialize the solver 
     solver = IMPAmodule(args, dest_dir, datamodule)
         
-    # Initialize callbacks 
-    model_ckpt_callbacks = ModelCheckpoint(dirpath=Path(dest_dir) / "hydra_checkpoints", 
-                                            filename=args.filename,
-                                            monitor=args.monitor,
-                                            mode=args.mode,
-                                            save_last=args.save_last)
+    # # Initialize callbacks 
+    # model_ckpt_callbacks = ModelCheckpoint(dirpath=Path(dest_dir) / "hydra_checkpoints", 
+    #                                         filename=args.filename,
+    #                                         monitor=args.monitor,
+    #                                         mode=args.mode,
+    #                                         save_last=args.save_last)
 
     # Initialize logger 
     logger = WandbLogger(save_dir=dest_dir, 
@@ -77,8 +77,7 @@ def main(config: DictConfig):
                             name=unique_id) 
                 
     # Initialize the lightning trainer 
-    trainer = Trainer(callbacks=model_ckpt_callbacks, 
-                        default_root_dir=dest_dir,
+    trainer = Trainer(default_root_dir=dest_dir,
                         logger=logger, 
                         max_epochs=args.total_epochs,
                         accelerator=args.accelerator,
