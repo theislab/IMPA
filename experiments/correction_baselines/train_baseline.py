@@ -2,6 +2,7 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 import matplotlib.pyplot as plt
+import scib
 import seaborn as sns
 import pertpy as pt
 import warnings
@@ -83,7 +84,7 @@ def main(args):
         adata_latent = sc.AnnData(data_latent)
         adata_latent.obs = adata_before_correction.obs.copy()
         
-    else:
+    elif model_type=="scgen":
         pt.tl.SCGEN.setup_anndata(adata_before_correction, batch_key=batch_key, labels_key='compound')
         model = pt.tl.SCGEN(adata_before_correction)
         model.train(
@@ -95,12 +96,28 @@ def main(args):
         adata_before_correction_with_latent = model.batch_removal()
         adata_latent = sc.AnnData(adata_before_correction_with_latent.obsm["corrected_latent"])
         adata_latent.obs = adata_before_correction.obs.copy()
-        
-    sc.pp.pca(adata_latent)
-    sc.pp.neighbors(adata_latent)
-    sc.tl.umap(adata_latent)
     
-    adata_latent.write_h5ad(save_path)
+    elif model_type=="harmony":
+        scib.ig.harmony(adata_before_correction, batch="batch")
+        
+    elif model_type=="scanorama":
+        scib.ig.scanorama(adata_before_correction, batch="batch")
+        
+    elif model_type=="combat":
+        scib.ig.combat(adata_before_correction, batch="batch")
+        
+    elif model_type=="mpnn":
+        scib.ig.mpnn(adata_before_correction_with_latent, batch="batch")
+        
+    if model_type in ["scgen", "scpoli"]:    
+        sc.pp.pca(adata_latent)
+        sc.pp.neighbors(adata_latent)
+        sc.tl.umap(adata_latent)
+        adata_latent.write_h5ad(save_path)
+    else:
+        adata_before_correction.X = adata_before_correction.obsm["X_emb"]
+        adata_before_correction.write_h5ad(save_path)
+    
     
 if __name__ == "__main__":
     # Set up the the arguments 
