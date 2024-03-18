@@ -160,31 +160,17 @@ def debug_image(solver,
     if multimodal:
         y_trg_list = []
         y_mod = []
-        for i, mod in enumerate(mod_list):
-            range_classes = list(range(num_domains[mod]))
+        for i, _ in enumerate(mod_list):
             y_trg = [torch.tensor(y).repeat(N).to(device) 
-                     for y in range_classes] # Repeat y N times
+                     for y in range(4)] # Repeat y N times
             
-            y_trg_list += y_trg[:2]
-            y_mod += [i*torch.ones(N)]*2
+            y_trg_list += y_trg
+            y_mod += [i*torch.ones(N).long().cuda()]*4
     
     else:
-        range_classes = list(range(num_domains))
-        y_trg_list = [torch.tensor(y).repeat(N).to(device)
-                      for y in range_classes] 
-    
-        # Only keep 6 classes at random
-        y_trg_list = y_trg_list[:6]  
+        y_trg_list = [torch.tensor(y).repeat(N).cuda().to(device)
+                      for y in range(6)] 
         y_mod = None 
-        
-    # Produce two plots per perturbation
-    num_transf_plot = 2 
-
-    # Create the noise vector 
-    if args.stochastic:
-        z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
-    else:
-        z_trg_list = [None]*num_transf_plot
         
     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
     translate_using_latent(solver,
@@ -194,8 +180,65 @@ def debug_image(solver,
                             x_real_ctrl,
                             y_trg_list, 
                             y_mod,
-                            z_trg_list,
                             filename)
+
+# @torch.no_grad()
+# def debug_image(solver, 
+#                 nets, 
+#                 embedding_matrix, 
+#                 args, 
+#                 inputs,
+#                 step,
+#                 device, 
+#                 id2mol,
+#                 dest_dir,
+#                 num_domains, 
+#                 multimodal, 
+#                 mod_list):
+#     """Dump a grid of generated images.
+
+#     Args:
+#         nets (dict): Dictionary with the neural network modules.
+#         embedding_matrix (torch.Tensor): Perturbation embeddings.
+#         args (dict): Training specifications.
+#         inputs (torch.Tensor): Input used to produce the grid image.
+#         step (int): The step at which the images were produced.
+#         device (str): 'cuda' or 'cpu'.
+#         id2mol (dict): Dictionary mapping identification number to molecule.
+#         dest_dir (str): Destination directory for images.
+#     """
+#     # Get the images and the perturbation targets
+#     x_real_ctrl, x_real_trt = inputs['X']
+#     x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
+#     pert_list = [162, 269, 264, 217]
+    
+#     # Setup the device and the batch size
+#     N = x_real_ctrl.size(0)  # Batch size 
+#     # Get all the possible output targets
+#     y_trg_list = [torch.tensor(y).repeat(N).to(device) 
+#                      for y in pert_list]
+#     y_mod = [1*torch.ones(N)]*len(y_trg_list)
+#     y_mod = [t.long().to(device) for t in y_mod]
+    
+#     # Produce two plots per perturbation
+#     num_transf_plot = 2 
+
+#     # Create the noise vector 
+#     if args.stochastic:
+#         z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
+#     else:
+#         z_trg_list = [None]*num_transf_plot
+        
+#     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
+#     translate_using_latent(solver,
+#                             nets,
+#                             embedding_matrix, 
+#                             args, 
+#                             x_real_ctrl,
+#                             y_trg_list, 
+#                             y_mod,
+#                             z_trg_list,
+#                             filename)
 
 @torch.no_grad()
 def translate_using_latent(solver,
@@ -205,7 +248,6 @@ def translate_using_latent(solver,
                             x_real,
                             y_trg_list, 
                             y_mod, 
-                            z_trg_list,
                             filename):
     """
     Collect images for the translation 
@@ -228,7 +270,7 @@ def translate_using_latent(solver,
     x_concat = [x_real]
     
     for i, y_trg in enumerate(y_trg_list):        
-        x_real, s_trg = solver.encode_multimodal_label(x_real, y_trg, y_mod[i], 3)
+        x_real, s_trg, _, _ = solver.encode_multimodal_label(x_real, y_trg, y_mod[i], 3)
                 
         _, x_fake = nets.generator(x_real, s_trg)
         x_concat += [x_fake]

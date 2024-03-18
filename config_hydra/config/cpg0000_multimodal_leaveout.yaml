@@ -1,0 +1,106 @@
+task_name: cpg0000_multimodal_leaveout
+img_size: 96
+latent_dim: 100
+hidden_dim: 512
+style_dim: 64
+stochastic: True
+z_dimension: 20
+dim_in: 64
+lambda_reg: 1
+lambda_cyc: 1
+lambda_sty: 1
+lambda_ds: 1
+total_epochs: 100
+ds_iter: 200000
+resume_iter: 0
+batch_size: 32
+val_batch_size: 20
+lr: 0.0001
+f_lr: 0.0001
+beta1: 0
+beta2: 0.99
+weight_decay: 0.0001
+num_outs_per_domain: 10
+single_style: True
+mol_list: null
+balanced: false
+trainable_emb: false
+dataset_name: cpg0000
+n_channels: 5
+num_workers: 6
+seed: 42
+image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large_transported
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_large_gene2vec.csv
+experiment_directory: ../project_folder/experiments
+sample_dir: sample
+checkpoint_dir: checkpoint
+basal_vs_real_folder: basal_vs_real
+naming_key: dataset_name
+embedding_folder: embeddings
+resume_dir: ''
+augment_train: True
+normalize: True
+print_every: 10
+sample_every: 1000
+save_every: 500
+eval_every: 500
+encode_rdkit: true
+num_layers_mapping_net: 1
+filename: epoch_{epoch:04d}
+monitor: fid_transformations
+mode: min
+save_last: true
+offline: false
+project: cpg0000_multimodal_leaveout
+log_model: true
+accelerator: gpu
+log_every_n_steps: 10
+add_controls: false
+embedding_path:
+  Compound: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/cpg0000/cpd_embeddings.csv
+  CRISPR: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/cpg0000/crispr_embeddings.csv
+  ORF: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/cpg0000/orf_embeddings.csv
+multimodal: true
+modality_list:
+  - CRISPR
+  - Compound
+  - ORF
+use_condition_embedding: False
+condition_embedding_dimension: Null
+ood_set: [
+          BRDN0001147538, # ABL1
+          BRDN0001479055, # ALDH2
+          BRDN0001479262, # ADH1C
+          BRDN0001145239, # PDKP1
+          BRDN0001144958, # BTK
+          BRDN0001481569, # CYP3A4
+          BRDN0001145324, # FLT3
+          BRDN0001481176, # RPL23A
+          BRDN0001065244, #  MAPK8
+          BRDN0001485334, # CA5A
+          BRDN0001147209, # CLK1
+          BRDN0001490153, # AVPR1A
+          BRDN0001493988, # CDK4
+          BRDN0001487761, # FGF1
+          BRDN0001147450, # CDK7
+          BRD-A65597028-003-08-1, # ADRA2B 
+          BRD-K90747162-001-01-4, #  FLT3
+          BRD-K01824976-300-02-9, #  RPL23A
+          BRD-A22713669-001-04-3, #  PTPN2
+          BRD-K76674262-001-03-3, #  RPL3
+          BRD-A10188456-001-04-9, #  ANXA1
+          BRD-K09295674-001-09-8, #  CA14
+          BRD-K18131774-001-18-4, #  CA5A
+          BRD-K14560436-001-01-4, #  CDK9
+          BRD-K43570081-001-02-4, #  HSP90AB1
+          BRD-K54330070-001-19-6, #  MAPK14
+          BRD-K40109029-001-02-9, #  TGFBR1
+          BRD-K00259736-001-16-4, #  TUBB3
+          BRD-K03601870-001-01-2, # TUBB4B
+          BRD-K18895904-001-16-1, # CHRM2
+          BRD-K15502390-001-20-9,  # CYP2A6
+          BRD-A20697603-001-07-2, # FOXM1
+          BRD-A08187463-001-12-9, # MME
+          BRD-K03109492-001-02-2, # CDC25A
+          ]
+

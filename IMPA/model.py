@@ -470,13 +470,16 @@ def build_model(args, num_domains, device, multimodal, modality_list, latent_dim
 
     # The rdkit embeddings can be collected together with noise 
     if multimodal:
+        # if stochastic
         if args.stochastic:
             if args.single_style:
-                input_dim = {mod: dim + args.condition_embedding_dimension + args.z_dimension for mod, dim in latent_dim.items()}  
+                condition_embedding_dimension = args.condition_embedding_dimension if args.use_condition_embedding else 0
+                input_dim = {mod: dim + condition_embedding_dimension + args.z_dimension for mod, dim in latent_dim.items()}  
             else:
-                input_dim = args.z_dimension 
+                raise NotImplementedError
         else:
-            input_dim = {mod: dim + args.condition_embedding_dimension for mod, dim in latent_dim.items()}
+            condition_embedding_dimension = args.condition_embedding_dimension if args.use_condition_embedding else 0
+            input_dim = {mod: dim + condition_embedding_dimension for mod, dim in latent_dim.items()}
     else:
         if args.stochastic:
             if args.single_style:
@@ -485,7 +488,6 @@ def build_model(args, num_domains, device, multimodal, modality_list, latent_dim
                 input_dim = args.z_dimension
         else:
             input_dim = args.latent_dim 
-
 
     mapping_network = nn.DataParallel(MappingNetwork(input_dim,
                                                      args.style_dim,

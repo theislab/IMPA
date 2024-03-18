@@ -1,7 +1,5 @@
 # TASK NAME 
 task_name: cpg0000_total_large_transported_separate_ORF_CRISPR
-
-# IMAGE
 img_size: 96  
 latent_dim: 100 
 hidden_dim: 512 
@@ -10,8 +8,6 @@ stochastic: True
 z_dimension: 8  
 dim_in: 64 
 add_controls: False
-
-# LOSS
 lambda_reg: 1 
 lambda_cyc: 1 
 lambda_sty: 1 

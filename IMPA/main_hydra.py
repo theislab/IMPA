@@ -61,13 +61,6 @@ def main(config: DictConfig):
         
     # Initialize the solver 
     solver = IMPAmodule(args, dest_dir, datamodule)
-        
-    # # Initialize callbacks 
-    # model_ckpt_callbacks = ModelCheckpoint(dirpath=Path(dest_dir) / "hydra_checkpoints", 
-    #                                         filename=args.filename,
-    #                                         monitor=args.monitor,
-    #                                         mode=args.mode,
-    #                                         save_last=args.save_last)
 
     # Initialize logger 
     logger = WandbLogger(save_dir=dest_dir, 

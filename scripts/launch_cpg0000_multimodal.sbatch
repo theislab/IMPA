@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/multimodal.out
+#SBATCH -o ./logs/multimodal_cond.out
 
-#SBATCH -e ./logs/multimodal.err
+#SBATCH -e ./logs/multimodal_cond.err
 
-#SBATCH -J multimodal
+#SBATCH -J multimodal_cond
 
 #SBATCH -p gpu_p
 
@@ -23,4 +23,5 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=cpg0000_mltimodal.yaml
+# python ../IMPA/main_hydra.py config=cpg0000_multimodal.yaml
+python ../IMPA/main_hydra.py config=cpg0000_multimodal_condition_emb.yaml

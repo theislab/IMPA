@@ -1,0 +1,94 @@
+task_name: cpg0000_multimodal_leaveout
+img_size: 96
+latent_dim: 100
+hidden_dim: 512
+style_dim: 32
+stochastic: True
+z_dimension: 20
+dim_in: 64
+lambda_reg: 1
+lambda_cyc: 1
+lambda_sty: 1
+lambda_ds: 1
+
+total_epochs: 100
+ds_iter: 200000
+resume_iter: 0
+batch_size: 32
+val_batch_size: 20
+lr: 0.0001
+f_lr: 0.0001
+beta1: 0
+beta2: 0.99
+weight_decay: 0.0001
+num_outs_per_domain: 10
+single_style: True
+mol_list: null
+balanced: false
+trainable_emb: false
+dataset_name: cpg0000
+n_channels: 5
+num_workers: 6
+seed: 42
+image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large_transported
+data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_large_gene2vec.csv
+experiment_directory: ../project_folder/experiments
+sample_dir: sample
+checkpoint_dir: checkpoint
+basal_vs_real_folder: basal_vs_real
+naming_key: dataset_name
+embedding_folder: embeddings
+resume_dir: ''
+augment_train: True
+normalize: True
+print_every: 10
+sample_every: 1000
+save_every: 500
+eval_every: 500
+encode_rdkit: true
+num_layers_mapping_net: 1
+filename: epoch_{epoch:04d}
+monitor: fid_transformations
+mode: min
+save_last: true
+offline: false
+project: cpg0000_multimodal_leaveout
+log_model: true
+accelerator: gpu
+log_every_n_steps: 10
+add_controls: false
+embedding_path:
+  Compound: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/cpg0000/cpd_embeddings.csv
+  CRISPR: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/cpg0000/crispr_embeddings.csv
+  ORF: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/cpg0000/orf_embeddings.csv
+multimodal: true
+modality_list:
+  - CRISPR
+  - Compound
+  - ORF
+use_condition_embedding: False
+condition_embedding_dimension: Null
+ood_set: [
+          BRDN0001149473, # BTK 
+          BRDN0000585854, # CHECK 2
+          BRDN0001054037, # PLK1
+          BRDN0001145503, # LCK
+          BRDN0001145503, # TGM2
+          BRD-K47598052-001-14-1, # HCK 
+          BRDN0001162576, # CDK9
+          BRD-K00259736-001-16-4, # TUBB3
+          BRD-A10188456-001-04-9, #  ANXA1 
+          BRDN0000733096, # HDAC3
+          BRDN0001486449, # ALDH3
+          BRDN0001485349, # ASIC1,
+          BRDN0001054845, # AURKB
+          BRDN0001487328, # CACNB4
+          BRDN0001147786, # CDK2
+          BRDN0001144968, # CSK
+          BRD-K80935598-001-01-1, # DYRK1B
+          BRD-A37704979-001-12-3, # MAPK14
+          BRDN0001488321, # PRKCE
+          BRD-K46625559-001-01-8, # S1PR1
+          BRDN0001056840, # SIRT2
+          BRDN0001483086 # SLC7A11
+          ]
