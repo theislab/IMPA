@@ -5,11 +5,11 @@ task_name: bbbc021_all_retrain_fp
 img_size: 96  
 latent_dim: 1024 
 hidden_dim: 512 
-style_dim: 128 
-# style_dim: 64 
+# style_dim: 128 
+style_dim: 64 
 stochastic: True 
-z_dimension: 64  
-# z_dimension: 16  
+# z_dimension: 64  
+z_dimension: 16  
 add_controls: False
 dim_in: 64 
 
