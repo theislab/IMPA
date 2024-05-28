@@ -25,6 +25,6 @@ conda activate IMPA_try
 
 # python ../IMPA/main_hydra.py hparam_search=optuna config=bbbc021_all_retrain_fp.yaml config.project=bbbc021_all_retrain_fp_colchicine --multirun
 # python ../IMPA/main_hydra.py hparam_search=optuna config=bbbc021_all_retrain.yaml config.project=bbbc021_all_retrain --multirun
-# python ../IMPA/main_hydra.py config=bbbc021_large_all config.project=bbbc021_large_all
-python ../IMPA/main_hydra.py config=bbbc021_all_retrain_fp.yaml config.project=bbbc021_all_retrain_fp_colchicine
+python ../IMPA/main_hydra.py config=bbbc021_large_all config.project=bbbc021_large_all_held_out
+# python ../IMPA/main_hydra.py config=bbbc021_all_retrain_fp.yaml config.project=bbbc021_all_retrain_fp_colchicine
 

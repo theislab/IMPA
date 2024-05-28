@@ -30,7 +30,7 @@ beta2: 0.99
 weight_decay: 0.0001
 num_outs_per_domain: 10
 single_style: True
-ood_set: Null
+ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
 mol_list: Null
 balanced: False
 trainable_emb: False
