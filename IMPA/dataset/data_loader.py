@@ -192,6 +192,7 @@ class CellDataset:
                 embedding_matrix = pd.read_csv(self.embedding_path, index_col=0)
                 embedding_matrix = embedding_matrix.loc[self.mol_names]
                 embedding_matrix = torch.tensor(embedding_matrix.values, dtype=torch.float32, device=self.device)
+                self.latent_dim = embedding_matrix.shape[1]
                 self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
             
             self.mol2id = {mol: id for id, mol in enumerate(self.mol_names)}
@@ -287,13 +288,6 @@ class CellDatasetFold(Dataset):
         # Transform only the training set and only if required
         self.transform = CustomTransform(augment=(self.augment_train and self.fold == 'train'), normalize=normalize)
         
-        if self.fold == 'train':
-            mols, ys = (self.mols, self.y) if self.batch_correction else (self.mols["trt"], self.y["trt"])
-            # Map drugs to MOAs
-            mol_ids = [self.mol2id[mol] for mol in mols]
-            y_ids = [self.y2id[y] for y in ys]
-            self.couples_mol_y = {mol: y for mol, y in zip(mol_ids, y_ids)}  # creates unique-key dictionary
-
     def __len__(self):
         """
         Return the total number of samples.
@@ -410,7 +404,6 @@ class CellDataLoader(LightningDataModule):
                                                        num_workers=self.args.num_workers, 
                                                        drop_last=False)      
         
-        self.mol2y = self.training_set.couples_mol_y       
     
     def train_dataloader(self):
         """
