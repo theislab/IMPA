@@ -112,13 +112,13 @@ def read_files_pert(file_names, mols, mol2id, y2id, dose, y, transform, image_pa
     
     return {
         'X': (img_ctrl, img_trt),
-        'mol': mol,
+        'mols': mol,
         'y_id': y2id[y["trt"][idx_trt]],
         'dose': dose["trt"][idx_trt],
         'file_names': (img_file_ctrl, img_file_trt)
     } if dataset_name == "bbbc021" else {
         'X': (img_ctrl, img_trt),
-        'mol': mol,
+        'mols': mol,
         'y_id': y2id[y["trt"][idx_trt]],
         'file_names': (img_file_ctrl, img_file_trt)
     }

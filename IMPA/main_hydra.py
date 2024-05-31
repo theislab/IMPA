@@ -9,7 +9,7 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
-import torch
+import uuid
 from IMPA.dataset.data_loader import CellDataLoader
 from IMPA.solver import IMPAmodule
 
@@ -27,6 +27,9 @@ warnings.filterwarnings(
 def create_dirs(args):
     """Create the directories and sub-directories for training
     """
+    # date and time to name run 
+    unique_id = str(uuid.uuid4())
+    
     # Directory is named based on time stamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d")
     # Setup the key(s) naming the folder (passed as hyperparameter)
@@ -34,7 +37,7 @@ def create_dirs(args):
 
     # Set the directory for the results based on whether training is from begginning or resumed
     if args.resume_iter==0:
-        dest_dir = ospj(args.experiment_directory, timestamp+'_'+task_name)
+        dest_dir = ospj(args.experiment_directory, timestamp+'_'+unique_id+'_'+task_name)
     else:
         dest_dir = args.resume_dir+'_'+task_name
 

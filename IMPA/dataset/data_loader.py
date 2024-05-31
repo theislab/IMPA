@@ -265,13 +265,13 @@ class CellDatasetFold(Dataset):
             for cond in ["ctrl", "trt"]:
                 if cond == "trt" and add_controls:
                     self.file_names[cond] = self.data['SAMPLE_KEY']
-                    self.mols[cond] = self.data['CPD_NAME']
+                    self.mols[cond] = self.data[cpd_name]
                     self.y[cond] = self.data['ANNOT']
                     if dataset_name == "bbbc021":
                         self.dose[cond] = self.data['DOSE']
                 else:
                     self.file_names[cond] = self.data['SAMPLE_KEY'][self.data[f"{cond}_idx"]]
-                    self.mols[cond] = self.data['CPD_NAME'][self.data[f"{cond}_idx"]]
+                    self.mols[cond] = self.data[cpd_name][self.data[f"{cond}_idx"]]
                     self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
                     if dataset_name == "bbbc021":
                         self.dose[cond] = self.data['DOSE'][self.data[f"{cond}_idx"]]

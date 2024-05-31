@@ -9,17 +9,17 @@ import torch.nn.functional as F
 import torchvision.utils as vutils
 
 def print_network(network, name):
-    """Prints neural network parameters.
+    """Print the number of parameters in a neural network.
 
     Args:
         network (torch.nn.Module): The neural network whose parameters are printed.
         name (str): Name of the model.
     """
     num_params = sum(p.numel() for p in network.parameters())
-    print("Number of parameters in %s: %i" % (name, num_params))
+    print(f"Number of parameters in {name}: {num_params}")
 
 def he_init(module):
-    """Initialize neural network using the He initialization method.
+    """Initialize a network module using the He initialization method.
 
     Args:
         module (torch.nn.Module): The network module to initialize.
@@ -30,7 +30,7 @@ def he_init(module):
             nn.init.constant_(module.bias, 0)
 
 def print_checkpoint(i, start_time, total_iters, all_losses):
-    """Print elapsed time and losses during training.
+    """Print the elapsed time and losses during training.
 
     Args:
         i (int): Iteration number.
@@ -52,7 +52,7 @@ def print_metrics(metrics_dict, step):
         step (int): Current step.
     """
     for metric, value in metrics_dict.items():
-        print(f'After {step} {metric} is {value:.4f}')
+        print(f'After {step} steps, {metric} is {value:.4f}')
 
 def denormalize(x):
     """Denormalize an image from the range (-1, 1) to (0, 1).
@@ -78,7 +78,7 @@ def save_image(x, ncol, filename):
     x = denormalize(x)
     vutils.save_image(x.cpu(), filename + '.jpg', nrow=ncol, padding=0)
 
-def swap_attributes(y_mol, mol_id, device):
+def swap_attributes(max_mol, mol_id, device):
     """Perform random swapping of perturbation categories in a target dataset.
 
     Args:
@@ -89,17 +89,9 @@ def swap_attributes(y_mol, mol_id, device):
     Returns:
         torch.Tensor: The swapped tensor.
     """
-    # Initialize the swapped indices
-    swapped_idx = torch.zeros_like(y_mol)
-    # Maximum mol index
-    max_mol = y_mol.shape[1]
-    # Ranges of possible mols
     offsets = torch.randint(1, max_mol, (mol_id.shape[0], 1)).to(device)
-    # Permute
     permutation = (mol_id + offsets.squeeze()) % max_mol
-    # Add ones
-    swapped_idx[np.arange(y_mol.shape[0]), permutation] = 1
-    return swapped_idx
+    return permutation
 
 def sigmoid(x, w=1):
     """Sigmoid function.
@@ -126,102 +118,100 @@ def tensor2ndarray255(images):
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
 
 @torch.no_grad()
-def debug_image(nets, embedding_matrix, args, inputs, step, device, id2mol, dest_dir, num_domains):
+def debug_image(solver, nets, embedding_matrix, args, inputs, step, device, dest_dir, num_domains, batch_correction, multimodal=False, mod_list=None):
     """Dump a grid of generated images.
 
     Args:
+        solver (object): The solver object containing the training logic.
         nets (dict): Dictionary with the neural network modules.
         embedding_matrix (torch.Tensor): Perturbation embeddings.
         args (dict): Training specifications.
         inputs (torch.Tensor): Input used to produce the grid image.
         step (int): The step at which the images were produced.
         device (str): 'cuda' or 'cpu'.
-        id2mol (dict): Dictionary mapping identification number to molecule.
         dest_dir (str): Destination directory for images.
+        num_domains (int): Number of target domains.
+        batch_correction (bool): Whether batch correction is applied.
+        multimodal (bool, optional): Whether to use multimodal data. Defaults to False.
+        mod_list (list, optional): List of modalities. Defaults to None.
     """
     # Get the images and the perturbation targets
-    x_real, y_one_hot = inputs['X'].to(device), inputs['mol_one_hot'].to(device)
-    y_real = y_one_hot.argmax(1).to(device)
-
-    # Setup the device and the batch size
-    N = x_real.size(0)
-    # Get all the possible output targets
-    range_classes = list(range(num_domains))
-    y_trg_list = [torch.tensor(y).repeat(N).to(device)
-                  for y in range_classes] 
-    
-    # Only keep 6 classes at random
-    y_trg_list = y_trg_list[:6]  
-    if len(y_trg_list)>6:
-        y_trg_list.shuffle()
-
-    # Produce two plots per perturbation
-    num_transf_plot = 2 
-
-    # Create the noise vector 
-    if args.stochastic:
-        z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
+    if batch_correction:
+        x_real = inputs['X'].to(device)
+        N = x_real.size(0)
     else:
-        z_trg_list = [None]*num_transf_plot
+        x_real_ctrl, x_real_trt = inputs['X']
+        x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
+        N = x_real_ctrl.size(0)
+    
+    if batch_correction:
+        # Get all the possible output targets
+        range_classes = list(range(num_domains))
+        y_trg_list = [torch.tensor(y).repeat(N).to(device) for y in range_classes]
+        
+        # Only keep a maximum of 6 classes at random
+        y_trg_list = y_trg_list[:6]  
 
-    # Swap attributes for smaller cross-transformation panel 
-    y_swapped_one_hot = swap_attributes(y_mol=y_one_hot, mol_id=y_real, device=device)
+        # Produce two plots per perturbation
+        num_transf_plot = 2 
+
+        # Create the noise vector 
+        z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
+    
+    else:
+        if multimodal:
+            y_trg_list = []
+            y_mod = []
+            for i, _ in enumerate(mod_list):
+                y_trg = [torch.tensor(y).repeat(N).to(device) for y in range(4)]
+                y_trg_list += y_trg
+                y_mod += [i*torch.ones(N).long().cuda()]*4
+        
+        else:
+            y_trg_list = [torch.tensor(y).repeat(N).cuda().to(device) for y in range(6)]
+            y_mod = None         
 
     filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
-    translate_using_latent(nets,
-                            embedding_matrix, 
-                            args, 
-                            x_real,
-                            y_trg_list, 
-                            z_trg_list,
-                            filename)
+    translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_list, z_trg_list, filename, batch_correction, y_mod)
 
 @torch.no_grad()
-def translate_using_latent(nets, 
-                            embedding_matrix,
-                            args, 
-                            x_real,
-                            y_trg_list, 
-                            z_trg_list,
-                            filename):
-    """
-    Collect images for the translation 
+def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_list, z_trg_list, filename, batch_correction=False, y_mod=None):
+    """Generate and save translated images using latent vectors.
 
     Args:
-        nets (dict): the dictionary with the neural network modules
-        embedding_matrix (torch.Tensor): perturbation embeddings 
-        args (dict): the training specification
-        x_real (torch.Tensor): the tensor of real images
-        y_real (torch.Tensor): 1D tensor with original perturbation labels
-        y_swapped (torch.Tensor): 1D tensor with swapped perturbation labels
-        y_trg_list (toch.Tensor): 1D tensor with target perturbations
-        z_trg_list (torch.Tensor): tensor with noise vectors for the transformation
-        filename (str): name of the file to save
-        id2mol (dict): dictionary mapping identification number to molecule 
+        solver (object): The solver object containing the training logic.
+        nets (dict): Dictionary with the neural network modules.
+        embedding_matrix (torch.Tensor): Perturbation embeddings.
+        args (dict): Training specifications.
+        x_real (torch.Tensor): Tensor of real images.
+        y_trg_list (list): List of target perturbations.
+        z_trg_list (list): List of noise vectors for the transformation.
+        filename (str): Name of the file to save.
+        batch_correction (bool, optional): Whether batch correction is applied. Defaults to False.
+        y_mod (list, optional): List of modalities. Defaults to None.
     """
-    # Batch dimension, channel dimension, height and width dimensions 
     N, _, _, _ = x_real.size()
-    # Place the validation input in list for concatenation 
     x_concat = [x_real]
     
     for _, y_trg in enumerate(y_trg_list):
-        for z_trg in z_trg_list:
-
-            # Perturbation embedding and style embedding 
-            z_emb_trg = embedding_matrix(y_trg) 
-            if args.stochastic:
+        if batch_correction:
+            for z_trg in z_trg_list:
+                z_emb_trg = embedding_matrix(y_trg) 
                 z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)                
-            
-            # Perform mapping 
-            s_trg = nets.mapping_network(z_emb_trg) 
-            _, x_fake = nets.generator(x_real, s_trg)
-            x_concat += [x_fake]
-    
-    # Save images with specific channels depending on the dataset
+                
+                s_trg = nets.mapping_network(z_emb_trg) 
+                _, x_fake = nets.generator(x_real, s_trg)
+                x_concat += [x_fake]
+        else:
+            for i, y_trg in enumerate(y_trg_list):        
+                x_real, s_trg, _, _ = solver.encode_multimodal_label(x_real, y_trg, y_mod[i], 3)
+                _, x_fake = nets.generator(x_real, s_trg)
+                x_concat += [x_fake]
+        
     x_concat = torch.cat(x_concat, dim=0)
     if args.dataset_name == 'bbbc021':
         save_image(x_concat, N, filename) 
     elif args.dataset_name == 'bbbc025':
-        save_image(x_concat[:,[1,3,4],:,:], N, filename)
-    else :
-        save_image(x_concat[:,[5,1,0],:,:], N, filename)
+        save_image(x_concat[:, [1, 3, 4], :, :], N, filename)
+    else:
+        save_image(x_concat[:, [5, 1, 0], :, :], N, filename)

@@ -240,7 +240,7 @@ class Generator(nn.Module):
         return self.to_rgb(x) 
     
 
-class MappingNetwork(nn.Module):
+class MappingNetworkSingleStyle(nn.Module):
     """Linear projection for raw embeddings 
     """
     def __init__(self, latent_dim=160, style_dim=64, hidden_dim=512, num_layers=4):
@@ -262,17 +262,101 @@ class MappingNetwork(nn.Module):
         h = self.layers(z) 
         return h
 
+class MappingNetworkMultiStyle(nn.Module):
+    def __init__(self, latent_dim=16, style_dim=64, num_domains=2):
+        super().__init__()
+        layers = []
+        layers += [nn.Linear(latent_dim, 512)]
+        layers += [nn.ReLU()]
+        for _ in range(3):
+            layers += [nn.Linear(512, 512)]
+            layers += [nn.ReLU()]
+        self.shared = nn.Sequential(*layers)
+
+        self.unshared = nn.ModuleList()
+        for _ in range(num_domains):
+            self.unshared += [nn.Sequential(nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, 512),
+                                            nn.ReLU(),
+                                            nn.Linear(512, style_dim))]
+
+    def forward(self, z, y):
+        h = self.shared(z)
+        out = []
+        for layer in self.unshared:
+            out += [layer(h)]
+        out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+        idx = torch.LongTensor(range(y.size(0))).to(y.device)
+        s = out[idx, y]  # (batch, style_dim)
+        return s
+
+class MappingNetwork(nn.Module):
+    def __init__(self,
+                 latent_dim=160, 
+                 style_dim=64,
+                 num_domains=2, 
+                 num_layers=4,
+                 hidden_dim=512,
+                 single_style=True,
+                 multimodal=False, 
+                 modality_list=None):
+        
+        super().__init__()
+        self.multimodal = multimodal
+        if single_style:  # if IMPA, basically
+            if multimodal:
+                self.mapping_network = []
+                for mod in modality_list:
+                    self.mapping_network.append(MappingNetworkSingleStyle(latent_dim[mod], 
+                                                                            style_dim, 
+                                                                            hidden_dim,
+                                                                            num_layers))
+                self.mapping_network = torch.nn.ModuleList(self.mapping_network)
+            else:
+                self.mapping_network = MappingNetworkSingleStyle(latent_dim, style_dim, hidden_dim, num_layers)
+        else:
+            if multimodal:
+                raise NotImplementedError
+            else:
+                self.mapping_network = MappingNetworkMultiStyle(latent_dim, style_dim, num_domains)
+            
+        self.single_style = single_style
+        
+    def forward(self, z, mol=None, y=None):
+        if self.single_style: 
+            if self.multimodal:
+                return self.mapping_network[y](z)
+            else:
+                return self.mapping_network(z)
+        else:
+            if self.multimodal:
+                raise NotImplementedError
+            else:
+                return self.mapping_network(z, mol)
 
 class StyleEncoder(nn.Module):
     """Encoder from images to style vector 
     """
-    def __init__(self, img_size=96, style_dim=64, max_conv_dim=512, in_channels=3, dim_in=64):
+    def __init__(self, 
+                 img_size=96,
+                 style_dim=64,
+                 max_conv_dim=512,
+                 in_channels=3, 
+                 dim_in=64, 
+                 single_style=True,
+                 num_domains=None):
+        
         super().__init__()
         blocks = []
         blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
 
         # For 96x96 image this downsamples till 3x3 spatial dimension 
         repeat_num = math.ceil(np.log2(img_size)) - 2
+        final_conv_dim = img_size // (2**repeat_num)
+        
         for _ in range(repeat_num):
             dim_out = min(dim_in*2, max_conv_dim)
             blocks += [ResBlk(dim_in, dim_out, downsample=True)]
@@ -280,26 +364,52 @@ class StyleEncoder(nn.Module):
 
         blocks += [nn.LeakyReLU(0.2)]
         # Downsamples to spatial dimensionality of 1 
-        blocks += [nn.Conv2d(dim_out, dim_out, 3, 1, 0)]
+        blocks += [nn.Conv2d(dim_out, dim_out, final_conv_dim, 1, 0)]
         blocks += [nn.LeakyReLU(0.2)]
         self.conv = torch.nn.Sequential(*blocks)
+        
+        if not single_style:
+            self.unshared = nn.ModuleList()
+            for _ in range(num_domains):
+                self.unshared += [nn.Linear(dim_out, style_dim)]
+        else:
+            self.linear = nn.Linear(dim_out, style_dim)
+            
+        self.single_style = single_style
 
-        self.linear = nn.Linear(dim_out, style_dim)
-
-    def forward(self, x):
+    def forward(self, x, y=None):
         # Apply shared layer and linearize 
         h = self.conv(x)
         h = h.view(h.size(0), -1)
-        z_style = self.linear(h)
+        
+        if not self.single_style:
+            out = []
+            for layer in self.unshared:
+                out += [layer(h)]
+            out = torch.stack(out, dim=1)  # (batch, num_domains, style_dim)
+            idx = torch.LongTensor(range(y.size(0))).to(y.device)
+            z_style = out[idx, y]  # (batch, style_dim)
+        else:
+            z_style = self.linear(h)
         return z_style
 
 
 class Discriminator(nn.Module):
     """Discriminator network for the GAN model 
     """
-    def __init__(self, img_size=96, num_domains=2, max_conv_dim=512, in_channels=3, dim_in=64, multi_task=True):
+    def __init__(self, 
+                 img_size=96,
+                 num_domains=2,
+                 max_conv_dim=512, 
+                 in_channels=3, 
+                 dim_in=64, 
+                 multi_task=True,
+                 multimodal=False, 
+                 modality_list=None):
+        
         super().__init__()
         self.multi_task = multi_task
+        self.multimodal = multimodal
         blocks = []
         blocks += [nn.Conv2d(in_channels, dim_in, 3, 1, 1)]
 
@@ -313,42 +423,80 @@ class Discriminator(nn.Module):
         blocks += [nn.Conv2d(dim_out, dim_out, 3, 1, 0)]
         blocks += [nn.LeakyReLU(0.2, inplace=True)]
         # Final convolutional layer that points to the number of domains 
-        blocks += [nn.Conv2d(dim_out, num_domains, 1, 1, 0)]
-        self.conv = nn.Sequential(*blocks)
-
-    def forward(self, x, y):
+        self.conv_blocks = nn.Sequential(*blocks)
+        if not multimodal:
+            self.head = nn.Conv2d(dim_out, num_domains, 1, 1, 0)
+        else:
+            self.head = []
+            for mod in modality_list:
+                self.head.append(nn.Conv2d(dim_out, num_domains[mod], 1, 1, 0))
+            self.head = torch.nn.ModuleList(self.head)
+    
+    def forward(self, x, mol, y):
         # Apply the network on X 
-        out = self.conv(x)
+        out = self.conv_blocks(x)
+        if self.multimodal:
+            out = self.head[y](out)
+        else:
+            out = self.head(out)
         out = out.view(out.size(0), -1)  # (batch, num_domains) 
         if self.multi_task:
-            idx = torch.LongTensor(range(y.size(0))).to(y.device)
-            out = out[idx, y]  # (batch)
+            idx = torch.LongTensor(range(mol.size(0))).to(mol.device)
+            out = out[idx, mol]  # (batch)
         return out
     
 
-def build_model(args, num_domains, device):
+def build_model(args, num_domains, device, multimodal, batch_correction, modality_list, latent_dim):
     # Generator autoencoder
-    generator = nn.DataParallel(Generator(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
+    generator = nn.DataParallel(Generator(args.img_size,
+                                          args.style_dim, 
+                                          in_channels=args.n_channels, 
+                                          dim_in=args.dim_in).to(device))
     
     # Style encoder 
-    style_encoder = nn.DataParallel(StyleEncoder(args.img_size, args.style_dim, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
-
+    style_encoder = nn.DataParallel(StyleEncoder(args.img_size,
+                                                 args.style_dim, 
+                                                 in_channels=args.n_channels, 
+                                                 dim_in=args.dim_in, 
+                                                 single_style=args.single_style, 
+                                                 num_domains=num_domains).to(device))
+    
     # Discriminator network 
-    discriminator = nn.DataParallel(Discriminator(args.img_size, num_domains, in_channels=args.n_channels, dim_in=args.dim_in).to(device))
-    
+    discriminator = nn.DataParallel(Discriminator(args.img_size,
+                                                  num_domains, 
+                                                  in_channels=args.n_channels, 
+                                                  dim_in=args.dim_in,
+                                                  multimodal=multimodal, 
+                                                  modality_list=modality_list).to(device))
+
     # The rdkit embeddings can be collected together with noise 
-    if args.stochastic:
-        input_dim = args.latent_dim + args.z_dimension
+    if multimodal:
+        # if stochastic
+        if args.single_style:
+            condition_embedding_dimension = args.condition_embedding_dimension if args.use_condition_embedding else 0
+            input_dim = {mod: dim + condition_embedding_dimension + args.z_dimension for mod, dim in latent_dim.items()}  
+        else:
+            raise NotImplementedError
+
     else:
-        input_dim = args.latent_dim 
-    
-    # Mapping network
-    mapping_network = nn.DataParallel(MappingNetwork(input_dim, args.style_dim, hidden_dim=512, num_layers=args.num_layers_mapping_net).to(device))
+        if args.single_style:
+            input_dim = args.latent_dim + args.z_dimension
+        else:
+            input_dim = args.z_dimension
+
+    mapping_network = nn.DataParallel(MappingNetwork(input_dim,
+                                                     args.style_dim,
+                                                     num_domains=num_domains,
+                                                     num_layers=args.num_layers_mapping_net, 
+                                                     hidden_dim=512,
+                                                     single_style=args.single_style, 
+                                                     multimodal=args.multimodal, 
+                                                     modality_list=modality_list).to(device))
 
     # Dictionary with the modules 
     nets = Munch(generator=generator,
-            style_encoder=style_encoder, 
-            discriminator=discriminator, 
-            mapping_network=mapping_network)
+                    style_encoder=style_encoder, 
+                    discriminator=discriminator, 
+                    mapping_network=mapping_network)
     
     return nets

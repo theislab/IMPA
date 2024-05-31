@@ -44,14 +44,13 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
     for observation in tqdm(loader):
         if batch_correction:
             x_real = observation['X'].to(device)
-            y_org = observation['mol'].long().to(device)
-            y_org_one_hot = F.one_hot(y_org, num_classes=n_classes)
-            y_trg = swap_attributes(y_org_one_hot, y_org, device)
+            y_org = observation['mols'].long().to(device)
+            y_trg = swap_attributes(n_classes, y_org, device)
             Y_org.append(y_org.to('cpu'))
         else:
             x_real_ctrl, x_real_trt = observation['X']
             x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
-            y_trg = observation['mol'].long().to(device)
+            y_trg = observation['mols'].long().to(device)
     
         # Store perturbation labels
         Y_trg.append(y_trg.to('cpu'))
