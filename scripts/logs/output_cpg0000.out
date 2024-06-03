@@ -1,1 +1,0 @@
-['scripts', 'IMPA', 'build', 'embeddings', 'experiments', 'dist', 'docs', '.gitignore', 'environment.yml', 'notebooks', 'checkpoints', 'README.md', 'cellprofiler_feature_names', 'tutorial', 'project_folder', '__pycache__', 'setup.py', 'IMPA.egg-info', '__init__.py', '.ipynb_checkpoints', 'config_hydra', '.git']
