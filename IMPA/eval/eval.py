@@ -77,7 +77,10 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
                 _, x_fake = nets.generator(x_real_ctrl, s)
                 
             X_pred.append(x_fake.cpu())
-            X_real.append(x_real.cpu())  
+            if batch_correction:
+                X_real.append(x_real.cpu())  
+            else:
+                X_real.append(x_real_trt.cpu())  
 
     # Perform list concatenation on all of the results
     if batch_correction:
@@ -95,7 +98,10 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
     # Update the metrics scores (FID, WD)
     for cat in tqdm(categories):
         # Compute FID/WD for a class at a time
-        X_real_cat = X_real[Y_org == cat]
+        if batch_correction:
+            X_real_cat = X_real[Y_org == cat]
+        else:
+            X_real_cat = X_real[Y_trg == cat]
         X_pred_cat = X_pred[Y_trg == cat]
 
         if not batch_correction:

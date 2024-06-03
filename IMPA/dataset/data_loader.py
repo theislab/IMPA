@@ -4,7 +4,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.preprocessing import OneHotEncoder
 from torch.utils.data import Dataset
 from pytorch_lightning import LightningDataModule
 from IMPA.dataset.data_utils import CustomTransform, read_files_batch, read_files_pert
@@ -26,6 +25,7 @@ class CellDataset:
             args (argparse.Namespace): Arguments containing dataset configuration.
             device (torch.device): Device to load the data onto (e.g., 'cuda' or 'cpu').
         """
+        print(os.listdir())
         assert os.path.exists(args.image_path), 'The data path does not exist'
         assert os.path.exists(args.data_index_path), 'The data index path does not exist'
 
@@ -39,10 +39,11 @@ class CellDataset:
         self.ood_set = args.ood_set  # List of out-of-distribution drugs
         self.trainable_emb = args.trainable_emb  # Whether embeddings are trainable
         self.dataset_name = args.dataset_name  # Name of the dataset
-        self.latent_dim = args.latent_dim  # Dimension of the latent space
 
         self.batch_correction = args.batch_correction  # If True, perform batch correction
         self.multimodal = args.multimodal  # If True, handle multiple types of perturbations
+        if self.trainable_emb or self.batch_correction:
+            self.latent_dim = args.latent_dim
 
         if not self.batch_correction:
             self.add_controls = args.add_controls  # Whether to add controls in non-batch correction mode
@@ -187,13 +188,15 @@ class CellDataset:
             
         else:
             if self.trainable_emb or self.batch_correction:
+                self.latent_dim = self.latent_dim
                 self.embedding_matrix = torch.nn.Embedding(self.n_mol, self.latent_dim).to(self.device).to(torch.float32)
             else:
                 embedding_matrix = pd.read_csv(self.embedding_path, index_col=0)
                 embedding_matrix = embedding_matrix.loc[self.mol_names]
                 embedding_matrix = torch.tensor(embedding_matrix.values, dtype=torch.float32, device=self.device)
-                self.latent_dim = embedding_matrix.shape[1]
                 self.embedding_matrix = torch.nn.Embedding.from_pretrained(embedding_matrix, freeze=True).to(self.device)
+            
+                self.latent_dim = embedding_matrix.shape[1]
             
             self.mol2id = {mol: id for id, mol in enumerate(self.mol_names)}
 
@@ -368,6 +371,7 @@ class CellDataLoader(LightningDataModule):
 
         # Integrate embeddings as class attribute
         self.embedding_matrix = dataset.embedding_matrix  
+        self.latent_dim = dataset.latent_dim
 
         # Number of molecules and annotations (the latter can be modes of action/genes...)
         self.n_mol = dataset.n_mol

@@ -1,24 +1,24 @@
 # TASK NAME 
-task_name: bbbc021_try
+task_name: bbbc021_six
 
-# IMAGE
+# NETWORK
 img_size: 96  
-latent_dim: 160 
+latent_dim: 1024  # The dimension of the Morgan fingerprints
 hidden_dim: 512 
 style_dim: 64 
 stochastic: True 
 z_dimension: 16  
 dim_in: 64 
 
-# LOSS
+# LOSS 
 lambda_reg: 1 
 lambda_cyc: 1 
 lambda_sty: 1 
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 100000
-ds_iter: 100000  
+total_epochs: 200
+ds_iter: 100000
 resume_iter: 0
 batch_size: 32
 val_batch_size: 20
@@ -31,20 +31,28 @@ num_outs_per_domain: 10
 single_style: True
 ood_set: Null
 mol_list: ['AZ138', 'AZ258', 'cytochalasin B', 'DMSO', 'taxol', 'vincristine']
-balanced: True
+balanced: False
 trainable_emb: False
 dataset_name: 'bbbc021'
 n_channels: 3
 num_workers: 6
 seed: 42  
+multimodal: False
+batch_correction: False
+batch_key: Null
+use_condition_embeddings: False
+add_controls: False
+condition_embedding_dimension: null
+modality_list: 
+  - Compound
 
 # DIRECTORIES FOR DATA
-image_path: ../project_folder/datasets/bbbc021_six
-data_index_path: ../project_folder/datasets/bbbc021_six/metadata/bbbc021_df_six.csv
-embedding_path: ../embeddings/csv/emb_rdkit.csv
+image_path: project_folder/datasets/bbbc021_six
+data_index_path: project_folder/datasets/bbbc021_six/metadata/bbbc021_df_six.csv
+embedding_path: embeddings/csv/emb_fp.csv
 
 # DIRECTORIES FOR RESULTS 
-experiment_directory: ../project_folder/experiments/
+experiment_directory: project_folder/experiments/
 sample_dir: sample   # Name of directory for sampled images 
 checkpoint_dir: checkpoint  # Name of directory for checkpoints
 basal_vs_real_folder: basal_vs_real
@@ -72,7 +80,7 @@ monitor: fid_transformations
 mode: min
 save_last: True
 offline: False
-project: bbbc021_try
+project: bbbc021_six
 log_model: False
 accelerator: gpu 
 log_every_n_steps: 10

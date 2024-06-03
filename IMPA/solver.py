@@ -37,7 +37,7 @@ class IMPAmodule(LightningModule):
         self.n_mol = datamodule.n_mol
         latent_dim = datamodule.latent_dim
         
-        if self.args.multimodal and self.args.use_condition_embedding and not self.batch_correction:
+        if self.args.multimodal and self.args.use_condition_embeddings and not self.batch_correction:
             n_cat = len(self.args.modality_list)
             self.condition_embedding_matrix = torch.nn.Embedding(n_cat, 
                                                                  self.args.condition_embedding_dimension).to(self.device).to(torch.float32) 
@@ -81,7 +81,7 @@ class IMPAmodule(LightningModule):
             if net == 'mapping_network':
                 if self.args.trainable_emb:
                     params += list(self.embedding_matrix.parameters())  
-                if self.args.use_condition_embedding:
+                if self.args.use_condition_embeddings:
                     # Add condition embedding matrix
                     params += list(self.condition_embedding_matrix.parameters())
                 
@@ -94,7 +94,7 @@ class IMPAmodule(LightningModule):
     
     def training_step(self, batch): 
         """Method for IMPA training across a pre-defined number of iterations. 
-        """   
+        """  
         generator_opt, style_encoder_opt, discriminator_opt, mapping_network_opt = self.optimizers()
         # Fetch the real and fake inputs and outputs 
         if self.args.batch_correction:
@@ -103,10 +103,11 @@ class IMPAmodule(LightningModule):
             y_org = y_org.long().to(self.device)
             y_trg = swap_attributes(self.n_mol, y_org, self.device).long().to(self.device)
         else:
-            x_real, y_trg = batch['X'].to(self.device), batch['mols']
+            x_real, y_trg = batch['X'], batch['mols']
             x_real_ctrl, x_real_trt = x_real
             x_real_ctrl, x_real_trt = x_real_ctrl.to(self.device), x_real_trt.to(self.device)
             y_trg = y_trg.long().to(self.device)            
+            y_org = None 
 
         if self.args.multimodal and not self.args.batch_correction:
             x_real_trt, s_trg1, y_org, y_mod = self.encode_label(x_real_trt, y_org, y_mod, 3)
@@ -117,25 +118,43 @@ class IMPAmodule(LightningModule):
             y_mod = None 
         
         # Train the discriminator
-        d_loss, d_losses_latent = self._compute_d_loss(
-            x_real_ctrl, x_real_trt, y_org, y_mod, s_trg=s_trg1)
-        discriminator_opt.zero_grad()
-        self.manual_backward(d_loss)
-        discriminator_opt.step()
+        if self.args.batch_correction:
+            d_loss, d_losses_latent = self._compute_d_loss(
+                x_real_ctrl, x_real_trt, y_org, y_mod, s_trg=s_trg1)
+            discriminator_opt.zero_grad()
+            self.manual_backward(d_loss)
+            discriminator_opt.step()
+        else:
+            d_loss, d_losses_latent = self._compute_d_loss(
+                x_real_ctrl, x_real_trt, y_trg, y_mod, s_trg=s_trg1)
+            discriminator_opt.zero_grad()
+            self.manual_backward(d_loss)
+            discriminator_opt.step()
         
-        # Train the generator
-        g_loss, g_losses_latent = self._compute_g_loss(
-            x_real_ctrl, y_org, y_mod, s_org1=s_trg1, s_org2=s_trg2)
-        style_encoder_opt.zero_grad()
-        generator_opt.zero_grad()
-        mapping_network_opt.zero_grad()   
-        self.manual_backward(g_loss)
-        style_encoder_opt.step()
-        generator_opt.step()
-        mapping_network_opt.step() 
+        if self.args.batch_correction:
+            # Train the generator
+            g_loss, g_losses_latent = self._compute_g_loss(
+                x_real_ctrl, y_org, y_mod, s_trg1=s_trg1, s_trg2=s_trg2)
+            style_encoder_opt.zero_grad()
+            generator_opt.zero_grad()
+            mapping_network_opt.zero_grad()   
+            self.manual_backward(g_loss)
+            style_encoder_opt.step()
+            generator_opt.step()
+            mapping_network_opt.step() 
+        else:
+            g_loss, g_losses_latent = self._compute_g_loss(
+                x_real_ctrl, y_trg, y_mod, s_trg1=s_trg1, s_trg2=s_trg2)
+            style_encoder_opt.zero_grad()
+            generator_opt.zero_grad()
+            mapping_network_opt.zero_grad()   
+            self.manual_backward(g_loss)
+            style_encoder_opt.step()
+            generator_opt.step()
+            mapping_network_opt.step() 
     
         # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
-        if self.args.lambda_ds > 0 and self.args.stochastic:
+        if self.args.lambda_ds > 0:
             self.args.lambda_ds -= (self.initial_lambda_ds / self.args.ds_iter)
 
         # Log the losses 
@@ -165,15 +184,13 @@ class IMPAmodule(LightningModule):
         debug_image(self,
                     self.nets, 
                     self.embedding_matrix, 
-                    self.args, 
                     inputs=inputs_val, 
                     step=self.current_epoch+1, 
                     device=self.device, 
                     dest_dir=self.dest_dir, 
                     num_domains=self.num_domains,
-                    batch_correction=self.args.batch_correction, 
                     multimodal=self.args.multimodal, 
-                    mod_list=self.args.mod_list)
+                    mod_list=self.args.modality_list)
 
         # Save model checkpoints
         self._save_checkpoint(step=self.current_epoch+1)        
@@ -201,7 +218,10 @@ class IMPAmodule(LightningModule):
         # Discriminator assigns a 1 to the real 
         loss_real = self._adv_loss(out, 1)
         # Gradient-based regularization (penalize high gradient on the discriminator)
-        loss_reg = self._r1_reg(out, x_real_trt)
+        if not self.args.batch_correction:
+            loss_reg = self._r1_reg(out, x_real_trt)
+        else:
+            loss_reg = self._r1_reg(out, x_real_ctrl)
 
         # The discriminator does not train the mapping network and the generator, so they need no gradient 
         with torch.no_grad():
@@ -321,7 +341,7 @@ class IMPAmodule(LightningModule):
     def _create_checkpoints(self):
         """Create the checkpoints objects regulating model weight loading and dumping
         """
-        if self.args.use_condition_embedding:
+        if self.args.use_condition_embeddings:
             self.ckptios = [
                 CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_nets.ckpt'), data_parallel=True, **self.nets),
                 CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_embeddings.ckpt'), **{'embedding_matrix':self.embedding_matrix}),
@@ -367,12 +387,12 @@ class IMPAmodule(LightningModule):
                 # Molecule indices for a certain mode
                 z_embeddings_mol_mod = self.embedding_matrix[i](y_mol_mod)
                 
-                if self.args.use_condition_embedding:
+                if self.args.use_condition_embeddings:
                     cond_embeddings_tensor = self.condition_embedding_matrix(y_mod_batch)
             
                 # Draw random vector and collect embedding
                 z_trg = torch.randn(z_embeddings_mol_mod.shape[0], self.args.z_dimension).cuda()
-                if self.args.use_condition_embedding:
+                if self.args.use_condition_embeddings:
                     z_embeddings_mol_mod = torch.cat([z_embeddings_mol_mod, cond_embeddings_tensor, z_trg], dim=1)
                 else:
                     z_embeddings_mol_mod = torch.cat([z_embeddings_mol_mod, z_trg], dim=1)
@@ -405,5 +425,5 @@ class IMPAmodule(LightningModule):
                 pred.append(pred_mod)
             return torch.cat(pred, dim=0)
         else:
-            return self.nets.discriminator(X, y_mol)
+            return self.nets.discriminator(X, y_mol, None)
                 

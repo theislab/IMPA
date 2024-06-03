@@ -1,6 +1,6 @@
 import torch
 import torchvision.transforms as T
-from numpy import np
+import numpy as np
 from pathlib import Path
 
 class CustomTransform:
@@ -162,11 +162,11 @@ def read_files_batch(file_names, mols, mol2id, y2id, y, transform, image_path, d
     img = img.permute(2, 0, 1)  # Place channel dimension in front of the others 
     img = transform(img)
 
-    mol = mol2id[mols["trt"][idx]]
+    mol = mol2id[mols[idx]]
     
     return {
         'X': img,
-        'mol': mol,
+        'mols': mol,
         'y_id': y2id[y[idx]],
         'file_names': img_file
     }

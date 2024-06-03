@@ -1,0 +1,85 @@
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
+Error executing job with overrides: ['config=cpg0000']
+Traceback (most recent call last):
+  File "/ictstr01/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/main_hydra.py", line 60, in main
+    datamodule = CellDataLoader(args)
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 358, in __init__
+    self.init_dataset()
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 397, in init_dataset
+    self.training_set, self.test_set = self.create_torch_datasets()
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 367, in create_torch_datasets
+    dataset = CellDataset(self.args, device=self.device)
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 70, in __init__
+    self.initialize_embeddings()
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 178, in initialize_embeddings
+    embedding_matrix_modality = pd.read_csv(self.embedding_path[mod], index_col=0)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/util/_decorators.py", line 211, in wrapper
+    return func(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/util/_decorators.py", line 331, in wrapper
+    return func(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 950, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 605, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1442, in __init__
+    self._engine = self._make_engine(f, self.engine)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1735, in _make_engine
+    self.handles = get_handle(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/common.py", line 856, in get_handle
+    handle = open(
+FileNotFoundError: [Errno 2] No such file or directory: 'embeddings/cpg0000/crispr_embeddings.csv'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+Traceback (most recent call last):
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+  File "/ictstr01/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/main_hydra.py", line 60, in main
+    datamodule = CellDataLoader(args)
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 358, in __init__
+    self.init_dataset()
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 397, in init_dataset
+    self.training_set, self.test_set = self.create_torch_datasets()
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 367, in create_torch_datasets
+    dataset = CellDataset(self.args, device=self.device)
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 70, in __init__
+    self.initialize_embeddings()
+  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/dataset/data_loader.py", line 178, in initialize_embeddings
+    embedding_matrix_modality = pd.read_csv(self.embedding_path[mod], index_col=0)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/util/_decorators.py", line 211, in wrapper
+    return func(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/util/_decorators.py", line 331, in wrapper
+    return func(*args, **kwargs)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 950, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 605, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1442, in __init__
+    self._engine = self._make_engine(f, self.engine)
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1735, in _make_engine
+    self.handles = get_handle(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pandas/io/common.py", line 856, in get_handle
+    handle = open(
+FileNotFoundError: [Errno 2] No such file or directory: 'embeddings/cpg0000/crispr_embeddings.csv'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/ictstr01/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/main_hydra.py", line 93, in <module>
+    main()
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 303, in run_and_report
+    sys.exit(1)
+SystemExit: 1

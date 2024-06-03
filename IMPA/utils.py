@@ -118,14 +118,13 @@ def tensor2ndarray255(images):
     return images.cpu().numpy().transpose(0, 2, 3, 1) * 255
 
 @torch.no_grad()
-def debug_image(solver, nets, embedding_matrix, args, inputs, step, device, dest_dir, num_domains, batch_correction, multimodal=False, mod_list=None):
+def debug_image(solver, nets, embedding_matrix, inputs, step, device, dest_dir, num_domains, multimodal=False, mod_list=None):
     """Dump a grid of generated images.
 
     Args:
         solver (object): The solver object containing the training logic.
         nets (dict): Dictionary with the neural network modules.
         embedding_matrix (torch.Tensor): Perturbation embeddings.
-        args (dict): Training specifications.
         inputs (torch.Tensor): Input used to produce the grid image.
         step (int): The step at which the images were produced.
         device (str): 'cuda' or 'cpu'.
@@ -136,46 +135,46 @@ def debug_image(solver, nets, embedding_matrix, args, inputs, step, device, dest
         mod_list (list, optional): List of modalities. Defaults to None.
     """
     # Get the images and the perturbation targets
-    if batch_correction:
+    if solver.args.batch_correction:
         x_real = inputs['X'].to(device)
-        N = x_real.size(0)
     else:
-        x_real_ctrl, x_real_trt = inputs['X']
-        x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
-        N = x_real_ctrl.size(0)
+        x_real, _ = inputs['X']
+        x_real = x_real.to(device)
+        
+    # Number of observations 
+    N = x_real.size(0)
     
-    if batch_correction:
+    if solver.args.batch_correction or (not solver.args.batch_correction and not solver.args.multimodal):
         # Get all the possible output targets
         range_classes = list(range(num_domains))
-        y_trg_list = [torch.tensor(y).repeat(N).to(device) for y in range_classes]
+        y_trg_list = [torch.tensor(y).repeat(N).to(device) for y in range_classes] 
         
         # Only keep a maximum of 6 classes at random
-        y_trg_list = y_trg_list[:6]  
+        y_trg_list = y_trg_list[:5]  
 
         # Produce two plots per perturbation
         num_transf_plot = 2 
 
         # Create the noise vector 
-        z_trg_list = torch.randn(num_transf_plot, 1, args.z_dimension).repeat(1, N, 1).to(device)  
+        z_trg_list = torch.randn(num_transf_plot, 1, solver.args.z_dimension).repeat(1, N, 1).to(device)  # 2 x N x D 
+        
+        y_mod = None   
     
     else:
-        if multimodal:
-            y_trg_list = []
-            y_mod = []
-            for i, _ in enumerate(mod_list):
-                y_trg = [torch.tensor(y).repeat(N).to(device) for y in range(4)]
-                y_trg_list += y_trg
-                y_mod += [i*torch.ones(N).long().cuda()]*4
+        y_trg_list = []
+        y_mod = []
+        for i, _ in enumerate(mod_list):
+            y_trg = [torch.tensor(y).repeat(N).to(device) for y in range(4)]
+            y_trg_list += y_trg
+            y_mod += [i*torch.ones(N).long().cuda()]*4
         
-        else:
-            y_trg_list = [torch.tensor(y).repeat(N).cuda().to(device) for y in range(6)]
-            y_mod = None         
+        z_trg_list = None    
 
-    filename = ospj(dest_dir, args.sample_dir, '%06d_latent' % (step))
-    translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_list, z_trg_list, filename, batch_correction, y_mod)
+    filename = ospj(dest_dir, solver.args.sample_dir, '%06d_latent' % (step))
+    translate_using_latent(solver, nets, embedding_matrix, solver.args, x_real, y_trg_list, z_trg_list, filename, y_mod)
 
 @torch.no_grad()
-def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_list, z_trg_list, filename, batch_correction=False, y_mod=None):
+def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_list, z_trg_list, filename, y_mod=None):
     """Generate and save translated images using latent vectors.
 
     Args:
@@ -194,7 +193,7 @@ def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_l
     x_concat = [x_real]
     
     for _, y_trg in enumerate(y_trg_list):
-        if batch_correction:
+        if solver.args.batch_correction or (not solver.args.batch_correction and not solver.args.multimodal):
             for z_trg in z_trg_list:
                 z_emb_trg = embedding_matrix(y_trg) 
                 z_emb_trg = torch.cat([z_emb_trg, z_trg], dim=1)                
@@ -204,7 +203,10 @@ def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_l
                 x_concat += [x_fake]
         else:
             for i, y_trg in enumerate(y_trg_list):        
-                x_real, s_trg, _, _ = solver.encode_multimodal_label(x_real, y_trg, y_mod[i], 3)
+                if solver.args.multimodal:
+                    x_real, s_trg, _, _ = solver.encode_label(x_real, y_trg, y_mod[i], 3)
+                else:
+                    s_trg = solver.encode_label(x_real, y_trg, None, None)
                 _, x_fake = nets.generator(x_real, s_trg)
                 x_concat += [x_fake]
         
@@ -215,3 +217,4 @@ def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_l
         save_image(x_concat[:, [1, 3, 4], :, :], N, filename)
     else:
         save_image(x_concat[:, [5, 1, 0], :, :], N, filename)
+    

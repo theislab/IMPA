@@ -1,187 +1,0 @@
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
-  warnings.warn(_create_warning_msg(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/lightning_fabric/plugins/environments/slurm.py:191: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python ../IMPA/main_hydra.py ...
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
-wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.0 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.15.12
-wandb: Run data is saved locally in ../project_folder/experiments/20231108_bbbc021_try/wandb/run-20231108_195616-ydvvtflg
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run northern-oath-75
-wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_try
-wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_try/runs/ydvvtflg
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-
-  | Name             | Type         | Params
---------------------------------------------------
-0 | embedding_matrix | Embedding    | 960   
-1 | generator        | DataParallel | 24.3 M
-2 | style_encoder    | DataParallel | 14.3 M
-3 | discriminator    | DataParallel | 14.3 M
-4 | mapping_network  | DataParallel | 11.3 K
---------------------------------------------------
-53.0 M    Trainable params
-960       Non-trainable params
-53.0 M    Total params
-211.840   Total estimated model params size (MB)
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
-  warnings.warn(_create_warning_msg(
-
-  0%|          | 0/103 [00:00<?, ?it/s][A
-  1%|          | 1/103 [00:03<05:15,  3.09s/it][A
-  4%|▍         | 4/103 [00:03<01:01,  1.62it/s][A
-  7%|▋         | 7/103 [00:03<00:29,  3.23it/s][A
- 10%|▉         | 10/103 [00:03<00:18,  5.16it/s][A
- 13%|█▎        | 13/103 [00:03<00:12,  7.40it/s][A
- 16%|█▌        | 16/103 [00:03<00:08,  9.77it/s][A
- 18%|█▊        | 19/103 [00:03<00:06, 12.27it/s][A
- 21%|██▏       | 22/103 [00:03<00:05, 14.59it/s][A
- 24%|██▍       | 25/103 [00:04<00:04, 16.63it/s][A
- 27%|██▋       | 28/103 [00:04<00:04, 18.40it/s][A
- 30%|███       | 31/103 [00:04<00:03, 19.89it/s][A
- 33%|███▎      | 34/103 [00:04<00:03, 21.34it/s][A
- 36%|███▌      | 37/103 [00:04<00:02, 22.49it/s][A
- 39%|███▉      | 40/103 [00:04<00:02, 23.33it/s][A
- 42%|████▏     | 43/103 [00:04<00:02, 23.88it/s][A
- 45%|████▍     | 46/103 [00:04<00:02, 24.30it/s][A
- 48%|████▊     | 49/103 [00:05<00:02, 24.82it/s][A
- 50%|█████     | 52/103 [00:05<00:02, 25.08it/s][A
- 53%|█████▎    | 55/103 [00:05<00:01, 25.24it/s][A
- 56%|█████▋    | 58/103 [00:05<00:01, 25.33it/s][A
- 59%|█████▉    | 61/103 [00:05<00:01, 25.50it/s][A
- 62%|██████▏   | 64/103 [00:05<00:01, 25.78it/s][A
- 65%|██████▌   | 67/103 [00:05<00:01, 26.15it/s][A
- 68%|██████▊   | 70/103 [00:05<00:01, 26.26it/s][A
- 71%|███████   | 73/103 [00:05<00:01, 26.07it/s][A
- 74%|███████▍  | 76/103 [00:06<00:01, 25.93it/s][A
- 77%|███████▋  | 79/103 [00:06<00:00, 25.77it/s][A
- 80%|███████▉  | 82/103 [00:06<00:00, 25.23it/s][A
- 83%|████████▎ | 85/103 [00:06<00:00, 24.54it/s][A
- 85%|████████▌ | 88/103 [00:06<00:00, 24.60it/s][A
- 88%|████████▊ | 91/103 [00:06<00:00, 24.58it/s][A
- 91%|█████████▏| 94/103 [00:06<00:00, 25.32it/s][A
- 94%|█████████▍| 97/103 [00:06<00:00, 25.98it/s][A
- 97%|█████████▋| 100/103 [00:07<00:00, 26.69it/s][A
-100%|██████████| 103/103 [00:07<00:00, 22.95it/s][A100%|██████████| 103/103 [00:07<00:00, 14.19it/s]
-
-  0%|          | 0/6 [00:00<?, ?it/s][A/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
-  warnings.warn(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
-  warnings.warn(msg)
-  0%|          | 0/6 [00:21<?, ?it/s]
-Error executing job with overrides: []
-Traceback (most recent call last):
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/../IMPA/main_hydra.py", line 84, in main
-    trainer.fit(model=solver,
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 545, in fit
-    call._call_and_handle_interrupt(
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 44, in _call_and_handle_interrupt
-    return trainer_fn(*args, **kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 581, in _fit_impl
-    self._run(model, ckpt_path=ckpt_path)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 990, in _run
-    results = self._run_stage()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1036, in _run_stage
-    self.fit_loop.run()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
-    self.advance()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 359, in advance
-    self.epoch_loop.run(self._data_fetcher)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 136, in run
-    self.advance(data_fetcher)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 242, in advance
-    batch_output = self.manual_optimization.run(kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/optimization/manual.py", line 92, in run
-    self.advance(kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/optimization/manual.py", line 112, in advance
-    training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 309, in _call_strategy_hook
-    output = fn(*args, **kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/strategies/strategy.py", line 382, in training_step
-    return self.lightning_module.training_step(*args, **kwargs)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/solver.py", line 78, in training_step
-    evaluate(self.nets,
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/eval/eval.py", line 107, in evaluate
-    fid = cal_fid(X_real_dataset, X_swapped_dataset, 2048, True, custom_channels=channels)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/eval/gan_metrics/fid.py", line 113, in cal_fid
-    fid_value = cal_frechet_distance(m1, s1, m2, s2)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/eval/gan_metrics/fid.py", line 79, in cal_frechet_distance
-    raise ValueError('Imaginary component {}'.format(m))
-ValueError: Imaginary component 1.1430626888756403e+101
-
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
-Traceback (most recent call last):
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
-    return func()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
-    lambda: hydra.run(
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/hydra.py", line 132, in run
-    _ = ret.return_value
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/core/utils.py", line 260, in return_value
-    raise self._return_value
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/core/utils.py", line 186, in run_job
-    ret.return_value = task_function(task_cfg)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/../IMPA/main_hydra.py", line 84, in main
-    trainer.fit(model=solver,
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 545, in fit
-    call._call_and_handle_interrupt(
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 44, in _call_and_handle_interrupt
-    return trainer_fn(*args, **kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 581, in _fit_impl
-    self._run(model, ckpt_path=ckpt_path)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 990, in _run
-    results = self._run_stage()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1036, in _run_stage
-    self.fit_loop.run()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
-    self.advance()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/fit_loop.py", line 359, in advance
-    self.epoch_loop.run(self._data_fetcher)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 136, in run
-    self.advance(data_fetcher)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 242, in advance
-    batch_output = self.manual_optimization.run(kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/optimization/manual.py", line 92, in run
-    self.advance(kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/loops/optimization/manual.py", line 112, in advance
-    training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/call.py", line 309, in _call_strategy_hook
-    output = fn(*args, **kwargs)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/strategies/strategy.py", line 382, in training_step
-    return self.lightning_module.training_step(*args, **kwargs)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/solver.py", line 78, in training_step
-    evaluate(self.nets,
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/eval/eval.py", line 107, in evaluate
-    fid = cal_fid(X_real_dataset, X_swapped_dataset, 2048, True, custom_channels=channels)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/eval/gan_metrics/fid.py", line 113, in cal_fid
-    fid_value = cal_frechet_distance(m1, s1, m2, s2)
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/IMPA/eval/gan_metrics/fid.py", line 79, in cal_frechet_distance
-    raise ValueError('Imaginary component {}'.format(m))
-ValueError: Imaginary component 1.1430626888756403e+101
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/home/icb/alessandro.palma/environment/IMPA/IMPA/scripts/../IMPA/main_hydra.py", line 90, in <module>
-    main()
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/main.py", line 94, in decorated_main
-    _run_hydra(
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-    _run_app(
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 457, in _run_app
-    run_and_report(
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/hydra/_internal/utils.py", line 303, in run_and_report
-    sys.exit(1)
-  File "/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/wandb/sdk/lib/exit_hooks.py", line 36, in exit
-    self._orig_exit(orig_code)  # type: ignore
-SystemExit: 1
-wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
-wandb: - 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: \ 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: | 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: / 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: 🚀 View run northern-oath-75 at: https://wandb.ai/allepalma/bbbc021_try/runs/ydvvtflg
-wandb: ️⚡ View job at https://wandb.ai/allepalma/bbbc021_try/jobs/QXJ0aWZhY3RDb2xsZWN0aW9uOjExMTIxNDQ2Nw==/version_details/v6
-wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ../project_folder/experiments/20231108_bbbc021_try/wandb/run-20231108_195616-ydvvtflg/logs

@@ -1,67 +1,0 @@
-An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
-  warnings.warn(_create_warning_msg(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/lightning_fabric/plugins/environments/slurm.py:191: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python ../IMPA/main_hydra.py config=bbbc021_large_all confi ...
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/trainer/configuration_validator.py:72: You passed in a `val_dataloader` but have no `validation_step`. Skipping val loop.
-You are using a CUDA device ('NVIDIA A100 80GB PCIe') that has Tensor Cores. To properly utilize them, you should set `torch.set_float32_matmul_precision('medium' | 'high')` which will trade-off precision for performance. For more details, read https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
-wandb: Currently logged in as: allepalma. Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.6 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.15.12
-wandb: Run data is saved locally in ../project_folder/experiments/20240430_5e25dcca-a011-4912-8f45-64038cc25854_bbbc021_large_all/wandb/run-20240430_093357-g77fz4hl
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run 5e25dcca-a011-4912-8f45-64038cc25854
-wandb: ⭐️ View project at https://wandb.ai/allepalma/bbbc021_large_all_held_out
-wandb: 🚀 View run at https://wandb.ai/allepalma/bbbc021_large_all_held_out/runs/g77fz4hl
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-
-  | Name             | Type         | Params
---------------------------------------------------
-0 | embedding_matrix | Embedding    | 4.2 K 
-1 | generator        | DataParallel | 24.3 M
-2 | style_encoder    | DataParallel | 16.2 M
-3 | discriminator    | DataParallel | 14.3 M
-4 | mapping_network  | DataParallel | 11.3 K
---------------------------------------------------
-54.8 M    Trainable params
-4.2 K     Non-trainable params
-54.8 M    Total params
-219.234   Total estimated model params size (MB)
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
-  warnings.warn(_create_warning_msg(
-/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:367: `ModelCheckpoint(monitor='fid_transformations')` could not find the monitored key in the returned metrics: ['D/latent_real', 'D/latent_fake', 'D/latent_reg', 'G/latent_adv', 'G/latent_sty', 'G/latent_ds', 'G/latent_cyc', 'G/lambda_ds', 'epoch', 'step']. HINT: Did you call `log('fid_transformations', value)` in the `LightningModule`?
-`Trainer.fit` stopped: `max_epochs=200` reached.
-wandb: Waiting for W&B process to finish... (success).
-wandb: - 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: \ 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: | 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: / 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: - 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: \ 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: | 0.014 MB of 0.014 MB uploaded (0.000 MB deduped)wandb: 
-wandb: Run history:
-wandb:       D/latent_fake ▄▁▄▃▄▅▂▅▂▄▄▃█▂▃▃▂▂▂▂▃▄▂▃▂▂▂▂▂▂▃▄▂▁▂▂▂▃▁▂
-wandb:       D/latent_real ▄▂▁▂▃▂▄▃▆▆▄▄▃█▅▂▃▆▃▃▁▃▂▃▃▃▂▃▂▂▂▁▂▂▂▂▁▂▃▂
-wandb:        D/latent_reg ▁▅▂▃▂▄▄▃█▄▅▅▂▆▄▅█▇▇▆▅▆▆█▇▆▆█▇▅▃▄▅▆▆▅▆▄▅▅
-wandb:         G/lambda_ds ███▇▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▅▄▄▄▄▄▃▃▃▃▃▂▂▂▂▂▂▁▁▁
-wandb:        G/latent_adv ▁▄▇▅▃▆▄▃▂▂▃▂▃▂▃▄▄▄▆▅▅▅▅▄▆▆▆▄█▆▆█▆▅█▆▇▆▅▇
-wandb:        G/latent_cyc █▅▄▃▃▂▂▂▂▁▁▂▂▂▂▂▁▂▃▂▂▂▂▃▂▂▂▂▂▂▂▂▂▃▂▁▁▁▂▂
-wandb:         G/latent_ds █▇▇▅▄▃▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▁▂▁▂▁▁▁▁▁▁
-wandb:        G/latent_sty █▆▅▄▃▂▂▂▂▁▂▂▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
-wandb:               epoch ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
-wandb: trainer/global_step ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
-wandb: 
-wandb: Run summary:
-wandb:       D/latent_fake 0.25391
-wandb:       D/latent_real 0.02526
-wandb:        D/latent_reg 0.09147
-wandb:         G/lambda_ds 0.566
-wandb:        G/latent_adv 4.92581
-wandb:        G/latent_cyc 0.1377
-wandb:         G/latent_ds 0.0031
-wandb:        G/latent_sty 0.03619
-wandb:               epoch 199
-wandb: trainer/global_step 43399
-wandb: 
-wandb: 🚀 View run 5e25dcca-a011-4912-8f45-64038cc25854 at: https://wandb.ai/allepalma/bbbc021_large_all_held_out/runs/g77fz4hl
-wandb: ️⚡ View job at https://wandb.ai/allepalma/bbbc021_large_all_held_out/jobs/QXJ0aWZhY3RDb2xsZWN0aW9uOjE2ODcxMDc0MA==/version_details/v0
-wandb: Synced 6 W&B file(s), 0 media file(s), 2 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ../project_folder/experiments/20240430_5e25dcca-a011-4912-8f45-64038cc25854_bbbc021_large_all/wandb/run-20240430_093357-g77fz4hl/logs
