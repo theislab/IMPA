@@ -16,7 +16,7 @@ If trained on a meaniningful prior perturbation space, IMPA learns to map unseen
 To run the model, clone this repository and create the environment via:
 
 ```
-conda env create environment.yml
+conda env create -f environment.yml
 ```
 
 Navigate to the repository and install the Python package. 
