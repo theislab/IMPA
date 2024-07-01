@@ -45,7 +45,6 @@ def create_dirs(args):
     os.makedirs(dest_dir, exist_ok=True)
     os.makedirs(ospj(dest_dir, args.sample_dir), exist_ok=True)
     os.makedirs(ospj(dest_dir, args.checkpoint_dir), exist_ok=True)
-    os.makedirs(ospj(dest_dir, args.embedding_folder), exist_ok=True)   
     return dest_dir
 
 @hydra.main(config_path="../config_hydra", config_name="train", version_base=None)

@@ -44,7 +44,9 @@ use_condition_embeddings: False
 add_controls: False
 condition_embedding_dimension: null
 modality_list: 
+  - CRISPR
   - Compound
+  - ORF
 
 # DIRECTORIES FOR DATA
 image_path: project_folder/datasets/cpg0000/cpg0000_u2os_normalized_segmented_large_transported

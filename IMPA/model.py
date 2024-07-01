@@ -473,7 +473,7 @@ def build_model(args, num_domains, device, multimodal, batch_correction, modalit
     if multimodal:
         # if stochastic
         if args.single_style:
-            condition_embedding_dimension = args.condition_embedding_dimension if args.use_condition_embedding else 0
+            condition_embedding_dimension = args.condition_embedding_dimension if args.use_condition_embeddings else 0
             input_dim = {mod: dim + condition_embedding_dimension + args.z_dimension for mod, dim in latent_dim.items()}  
         else:
             raise NotImplementedError

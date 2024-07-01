@@ -103,15 +103,15 @@ class IMPAmodule(LightningModule):
             y_org = y_org.long().to(self.device)
             y_trg = swap_attributes(self.n_mol, y_org, self.device).long().to(self.device)
         else:
-            x_real, y_trg = batch['X'], batch['mols']
+            x_real, y_trg, y_mod = batch['X'], batch['mols'], batch['y_id']
             x_real_ctrl, x_real_trt = x_real
             x_real_ctrl, x_real_trt = x_real_ctrl.to(self.device), x_real_trt.to(self.device)
             y_trg = y_trg.long().to(self.device)            
             y_org = None 
 
         if self.args.multimodal and not self.args.batch_correction:
-            x_real_trt, s_trg1, y_org, y_mod = self.encode_label(x_real_trt, y_org, y_mod, 3)
-            _, s_trg2, _, _ = self.encode_label(x_real_trt, y_org, y_mod, 3)
+            x_real_trt, s_trg1, y_trg, y_mod = self.encode_label(x_real_trt, y_trg, y_mod, 3)
+            _, s_trg2, _, _ = self.encode_label(x_real_trt, y_trg, y_mod, 3)
         else:
             s_trg1 = self.encode_label(x_real_ctrl, y_trg, None, None)
             s_trg2 = self.encode_label(x_real_ctrl, y_trg, None, None)

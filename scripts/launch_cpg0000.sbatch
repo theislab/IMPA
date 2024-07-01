@@ -21,6 +21,7 @@
 #SBATCH --nice=10000
 
 source $HOME/.bashrc
+export CUDA_LAUNCH_BLOCKING=1
 conda activate IMPA_try
 
 cd ..

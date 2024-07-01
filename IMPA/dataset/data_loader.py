@@ -258,12 +258,16 @@ class CellDatasetFold(Dataset):
             self.y = data['ANNOT']
             if dataset_name == "bbbc021":
                 self.dose = data['DOSE']
+            else:
+                self.dose = None
         else:
             self.file_names = {}
             self.mols = {}
             self.y = {}
             if dataset_name == "bbbc021":
                 self.dose = {}
+            else:
+                self.dose = None
             
             for cond in ["ctrl", "trt"]:
                 if cond == "trt" and add_controls:
@@ -383,8 +387,15 @@ class CellDataLoader(LightningDataModule):
         # Collect IDs
         self.mol2id = dataset.mol2id
         self.y2id = dataset.y2id
-        self.id2mol = {val: key for key, val in self.mol2id.items()}
-        self.id2y = {val: key for key, val in self.y2id.items()}   
+        if self.args.multimodal:
+            self.id2mol = {}
+            self.id2y = {}
+            for mod in self.mol2id:
+                self.id2mol[mod] = {val:key for key,val in self.mol2id[mod].items()}
+                self.id2y[mod] = {val:key for key,val in self.y2id.items()} 
+        else:
+            self.id2mol = {val:key for key,val in self.mol2id.items()}
+            self.id2y = {val:key for key,val in self.y2id.items()} 
 
         # Free cell painting dataset memory
         del dataset
