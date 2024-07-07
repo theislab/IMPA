@@ -33,6 +33,7 @@ class IMPAmodule(LightningModule):
         self.nets = build_model(args, datamodule.n_mol, self.device)
         self.loader_test = datamodule.val_dataloader()
         self.embedding_matrix = datamodule.embedding_matrix
+        print(self.embedding_matrix)
         self.id2mol = datamodule.id2mol
         self.num_domains = datamodule.n_mol
         

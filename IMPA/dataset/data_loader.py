@@ -23,6 +23,7 @@ class CellDataset:
         assert os.path.exists(args.data_index_path), 'The data index path does not exist'
 
         # Set up the variables 
+        self.args = args
         self.image_path = args.image_path  # Path to the image folder (.pkl file)
         self.data_index_path = args.data_index_path  # Path to data index (.csv file) 
         self.embedding_path = args.embedding_path
@@ -102,11 +103,14 @@ class CellDataset:
         dataset = pd.read_csv(self.data_index_path, index_col=0)
 
         # Subset the perturbations if provided in mol_list
+        CPD_NAME = self.args.batch_key 
+        print(self.mol_list)
+        print(self.ood_set)
         if self.mol_list != None:
-            dataset = dataset.loc[dataset.CPD_NAME.isin(self.mol_list)]
+            dataset = dataset.loc[dataset[CPD_NAME].isin(self.mol_list)]
         # Remove the leave-out drugs if provided in ood_set
         if self.ood_set!=None:
-            dataset = dataset.loc[~dataset.CPD_NAME.isin(self.ood_set)]
+            dataset = dataset.loc[~dataset[CPD_NAME].isin(self.ood_set)]
         
         # Collect in a dictionary the folds
         dataset_splits = dict()

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/det_cpg0000_batch.out
+#SBATCH -o ./logs/recursion_leaveout.out
 
-#SBATCH -e ./logs/det_cpg0000_batch.err
+#SBATCH -e ./logs/recursion_leaveout.err
 
-#SBATCH -J det_cpg0000_batch
+#SBATCH -J recursion_leaveout
 
 #SBATCH -p gpu_p
 
@@ -23,6 +23,6 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=rxrx1_batch.yaml config.stochastic=False
+python ../IMPA/main_hydra.py config=rxrx1_batch_leavout.yaml config.stochastic=True
 # python ../IMPA/main_hydra.py config=cpg0000_batch.yaml 
 # python ../IMPA/main_hydra.py config=cpg0000_batch.yaml config.stochastic=False
