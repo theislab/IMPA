@@ -29,8 +29,8 @@ dataset_name: cpg0000
 n_channels: 5
 num_workers: 6
 seed: 42
-image_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/cpg0000_u2os_normalized_segmented_large_transported
-data_index_path: /lustre/groups/ml01/datasets/projects/cpg0000_alessandro/metadata/metadata_large_gene2vec.csv
+image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/cpg0000/cpg0000_u2os_normalized_segmented_large_transported
+data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/cpg0000/metadata/metadata_large_gene2vec.csv
 experiment_directory: ../project_folder/experiments
 sample_dir: sample
 checkpoint_dir: checkpoint
