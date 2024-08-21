@@ -5,6 +5,7 @@ import ot
 import pandas as pd
 from tqdm import tqdm
 from nets import *
+import matplotlib.pyplot as plt
 import pickle as pkl 
 import seml 
 import git
@@ -15,31 +16,28 @@ from IMPA.model import Discriminator
 from util_functions import classifier_score
 from IMPA.eval.gan_metrics.fid import *
 from IMPA.eval.gan_metrics.density_and_coverage import compute_d_c
-
+from IMPA.dataset.data_utils import CustomTransform
 
 def gather_data_by_pert(dataset, ood_set=None):
     """Gather images by pertubation
     """
-    # Add empty perturbation entries 
+    # KEEP THE SAME
     pert_list = list(dataset.mol2id.keys())
     pert_dict = dataset.id2mol
-    # Collect the images
+    
+    # KEEP THE SAME
     images = {}
     for pert_key in pert_list:
         images[pert_key] = []
-    if "DMSO" not in pert_list:
-        images["DMSO"] = []
 
     # Loop across loaders 
     for loader in [dataset.train_dataloader(), dataset.val_dataloader()]:
         for batch in loader:
-            images["DMSO"].append(batch["X"][0])
-            # Get the drugs in the batch
             drugs_batch = batch["mol_one_hot"].argmax(1).numpy()
             drugs_batch_unique = np.unique(drugs_batch)
             for drug_id in drugs_batch_unique:
                 mask = batch["mol_one_hot"].argmax(1)==drug_id
-                images[pert_dict[drug_id]].append(batch["X"][1][mask])
+                images[pert_dict[drug_id]].append(batch["X"][mask])
 
     images = {key: torch.cat(val, dim=0) for key, val in images.items()}
     if ood_set != None:
@@ -91,47 +89,26 @@ def perform_transformation(solver,
     Returns:
         torch.Tensor: transformed images
     """
-    if model_name == 'IMPA' or model_name == 'starGANv2':
-        if score_type!='Accuracy':
-            # z = torch.randn(X.shape[0], solver.args.z_dimension).to(device)
-            z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
-        else:
-            z = torch.randn(X.shape[0], 100, solver.args.z_dimension).to(device).quantile(0.75, dim=1)
-            # z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
-                        
-        # Embedding of the labels from RDKit
-        if model_name == "IMPA":
-            z_emb = solver.embedding_matrix(y).view(X.shape[0], -1)
+    # Initialize generator 
+    generator = torch.Generator(device="cuda").manual_seed(5742877512)
+    # Go to noise from DMSO 
+    for t in tqdm(solver["inverse_scheduler"].timesteps):
+        model_output = solver["denoiser"](X, t, torch.tensor([2]*X.shape[0]).cuda()).sample
+
+        X = solver["inverse_scheduler"].step(
+            model_output,
+            t,
+            X,
+        ).prev_sample
         
-            if solver.args.stochastic:
-                z_emb = torch.cat([z_emb, z], dim=1)
-            
-            s_trg = solver.nets.mapping_network(z_emb, y=None)
-        
-        else:
-            z_emb = z
-            s_trg = solver.nets.mapping_network(z_emb, y=y)
-        
-
-        # Generate the image 
-        _, x_fake = solver.nets.generator(X, s_trg)
-    
-
-    elif model_name=='DRIT++': 
-        z = torch.randn(X.shape[0], 8).to(device)
-        z_c = solver.model.enc_c.forward(X)
-        x_fake = solver.model.gen(z_c, z, y_one_hot)
-
-    # PhenDiff
-    elif model_name=='starGANv1':
-        x_fake = solver.G(X, y_one_hot)
-
-    # DMIT
-    else:
-        z = torch.randn(X.shape[0], solver.args.n_style).to(device)
-        z_c = solver.model.enc_content(X)
-        z_code = torch.cat([y_one_hot, z],  dim=1)
-        x_fake = solver.model.dec(z_c,z_code)    
+    x_fake = solver["pipeline"](y,
+                                None,
+                                1,
+                                generator=generator,
+                                num_inference_steps=100,
+                                output_type="numpy",
+                                start_image=X,
+                                frac_diffusion_skipped=0).images
     return x_fake
 
 
@@ -144,11 +121,12 @@ def transform_controls(solver,
                        n_mols,
                        score_type='FID'):
     fake_domain = []
-    for X in data:
+    num_batches = (len(data) + 64 - 1) // 64  # Calculate the number of batches
+    
+    for i in range(num_batches):
         # Get batch example
-        X = X.unsqueeze(0)
+        X = data[i * 64:(i + 1) * 64]  # Slice data for the batch
         
-        # Transform drugs from the domain to the domain of interest 
         if model_name != 'baseline':
             mol_id = mol2id[mol]
             
@@ -163,9 +141,10 @@ def transform_controls(solver,
                                                 y_trg, 
                                                 device, 
                                                 score_type=score_type)
-            fake_domain.append(X_fake)
+            fake_domain.append(torch.tensor(X_fake))
         else: 
             fake_domain.append(X)  # Keep original DMSOs as baseline
+                
     return torch.cat(fake_domain, dim=0)
 
 
@@ -192,22 +171,22 @@ def compute_all_scores(solver,
     np.random.seed(42)
     torch.manual_seed(42)
     
+    transform = CustomTransform(augment=False, normalize=True)
+    
     # Seed for reproducibility
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    y2id = dataset.y2id  # MoA to index 
     mol2id = dataset.mol2id # Mol to index
     mol2y = dataset.mol2y # Mol to MoA
-    n_y = len(y2id)
     n_mols = len(mol2id)
     
-    # Collect mol images
+    # Gather controls and perturbation images
     X_mols = gather_data_by_pert(dataset, ood_set)
     
-    final_scores = {'score':[],
-                    'score_type':[],
-                    'run':[],
+    final_scores = {'score': [],
+                    'score_type': [],
+                    'run': [],
                     'mol': [], 
-                    'model':[]}
+                    'model': []}
 
     # The index of the control first depending on the dataset 
     if dataset_name == 'bbbc021':
@@ -215,7 +194,7 @@ def compute_all_scores(solver,
         channels_fid = [0,1,2]
         # Initialize the classifier for classifier score
         classifier = Discriminator(img_size=96, 
-                          num_domains=13, 
+                          num_domains=6, 
                           max_conv_dim=512, 
                           in_channels=3, 
                           dim_in=64, 
@@ -231,10 +210,11 @@ def compute_all_scores(solver,
         control_id = 'UNTREATED'
         channels_fid = [0,1,5]
   
-    n_bootstrap = 3
+    n_bootstrap = 1
     for i in range(n_bootstrap):
         # Do three bootstrap replicates 
-        idx = np.random.choice(np.arange(len(X_mols[control_id])), len(X_mols[control_id]), replace=True )
+        idx = np.random.choice(np.arange(len(X_mols[control_id])), 
+                               len(X_mols[control_id]), replace=True )
         
         # Control indexes
         X_control = X_mols[control_id][idx].to(device).float().contiguous()
@@ -250,9 +230,10 @@ def compute_all_scores(solver,
             true_domain = X_mols[mol].to(device).float().contiguous()
 
             # Skip controls 
-            if mol==control_id:
-                continue 
+            # if mol==control_id:
+            #     continue 
             
+            # TODO: add PhenDiff to transform function
             fake_domain=transform_controls(solver, 
                                             dataset.mol2id,
                                             X_control, 
@@ -260,15 +241,18 @@ def compute_all_scores(solver,
                                             model_name, 
                                             device,
                                             n_mols,
-                                            score_type='FID')            
-
-            # Create the data loaders 
+                                            score_type='FID').cuda()      
+                  
+            # Normalize between -1 and 1 
+            fake_domain = fake_domain.contiguous().permute(0,3,1,2)
+            fake_domain = (fake_domain * 2)-1
+            
             fake_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(fake_domain), batch_size=20)
             true_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(true_domain), batch_size=20)
             
             # Flatten datasets (needed for some of the metrics)
-            fake_dataset_flat = fake_domain.view(fake_domain.shape[0], -1)
-            true_dataset_flat = true_domain.view(true_domain.shape[0], -1)
+            fake_dataset_flat = fake_domain.contiguous().view(fake_domain.shape[0], -1)
+            true_dataset_flat = true_domain.contiguous().view(true_domain.shape[0], -1)
 
             # FID
             fid = cal_fid(fake_dataset, true_dataset, 2048, True, channels_fid)
@@ -282,22 +266,11 @@ def compute_all_scores(solver,
             final_scores=append_scores(d_and_c['coverage'], 'Coverage', i, mol, final_scores, model_name)
             print(f'D&C score {d_and_c}')
             
-            # classifier score - take the 0.75 quantile of IMPA 
-            if  dataset_name == 'bbbc021':
-                fake_domain= transform_controls(solver, 
-                                                dataset.mol2id,
-                                                X_control, 
-                                                mol, 
-                                                model_name, 
-                                                device,
-                                                n_mols,
-                                                score_type='Accuracy')
-                fake_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(fake_domain), batch_size=20)
-                
-                score = classifier_score(classifier, fake_dataset, mol2y[mol2id[mol]])
-                final_scores=append_scores(score, 'Accuracy', i, mol, final_scores, model_name)
-                print(f'Accuracy {score}')
-                
+
+            score = classifier_score(classifier, fake_dataset, mol2y[mol2id[mol]])
+            final_scores=append_scores(score, 'Accuracy', i, mol, final_scores, model_name)
+            print(f'Accuracy {score}')
+            
     score_df = pd.DataFrame(final_scores)    
     score_df.to_pickle(save_path)
     return score_df

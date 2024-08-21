@@ -1,20 +1,15 @@
 import numpy as np 
 import torch
-import sys
-import ot
 import pandas as pd
 from tqdm import tqdm
 from nets import *
-import pickle as pkl 
-import seml 
-import git
-from pathlib import Path
 
+# Stay because constant for alternative methods too
 from IMPA.model import Discriminator 
-
 from util_functions import classifier_score
 from IMPA.eval.gan_metrics.fid import *
 from IMPA.eval.gan_metrics.density_and_coverage import compute_d_c
+from IMPA.dataset.data_utils import CustomTransform
 
 
 def gather_data_by_pert(dataset, ood_set=None):
@@ -70,103 +65,40 @@ def append_scores(score, score_type, bs_fold, mol_name, score_dict, model_name):
     score_dict['model'] += [model_name]
     return score_dict
 
-
-def perform_transformation(solver, 
-                        model_name, 
-                        X, 
-                        y_one_hot,
-                        y, 
-                        device, 
-                        score_type='FID'):
-    """Given input images, we use the model to perform transformations and predict on the data
-
-    Args:
-        solver (Solver): solver object 
-        model_name (str): name of the model to use  
-        X (torch.Tensor): the images submitted to transformation  
-        y_one_hot (torch.tensor): one-hot encoded binary tensor for conditioning
-        y (torch.Tensor): 1D tensor with condition labels included 
-        device (str): device used for the transformation
-
-    Returns:
-        torch.Tensor: transformed images
-    """
-    if model_name == 'IMPA' or model_name == 'starGANv2':
-        if score_type!='Accuracy':
-            # z = torch.randn(X.shape[0], solver.args.z_dimension).to(device)
-            z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
-        else:
-            z = torch.randn(X.shape[0], 100, solver.args.z_dimension).to(device).quantile(0.75, dim=1)
-            # z = torch.randn(X.shape[0], 100, solver.args.z_dimension).mean(1).to(device)
-                        
-        # Embedding of the labels from RDKit
-        if model_name == "IMPA":
-            z_emb = solver.embedding_matrix(y).view(X.shape[0], -1)
-        
-            if solver.args.stochastic:
-                z_emb = torch.cat([z_emb, z], dim=1)
-            
-            s_trg = solver.nets.mapping_network(z_emb, y=None)
-        
-        else:
-            z_emb = z
-            s_trg = solver.nets.mapping_network(z_emb, y=y)
-        
-
-        # Generate the image 
-        _, x_fake = solver.nets.generator(X, s_trg)
-    
-
-    elif model_name=='DRIT++': 
-        z = torch.randn(X.shape[0], 8).to(device)
-        z_c = solver.model.enc_c.forward(X)
-        x_fake = solver.model.gen(z_c, z, y_one_hot)
-
-    # PhenDiff
-    elif model_name=='starGANv1':
-        x_fake = solver.G(X, y_one_hot)
-
-    # DMIT
-    else:
-        z = torch.randn(X.shape[0], solver.args.n_style).to(device)
-        z_c = solver.model.enc_content(X)
-        z_code = torch.cat([y_one_hot, z],  dim=1)
-        x_fake = solver.model.dec(z_c,z_code)    
-    return x_fake
-
-
 def transform_controls(solver, 
                        mol2id,
-                       data, 
+                       data_content,
+                       data_style, 
                        mol, 
                        model_name, 
                        device,
                        n_mols,
                        score_type='FID'):
     fake_domain = []
-    for X in data:
-        # Get batch example
-        X = X.unsqueeze(0)
+    
+    batch_size=64
+    # Calculate the number of batches needed
+    num_batches = (len(data_content) + batch_size - 1) // batch_size
+    
+    for i in range(num_batches):
+        # Get the start and end indices for the current batch
+        start_idx = i * batch_size
+        end_idx = min(start_idx + batch_size, len(data_content))
         
-        # Transform drugs from the domain to the domain of interest 
-        if model_name != 'baseline':
-            mol_id = mol2id[mol]
-            
-            # Create an array of target drug labels 
-            y_trg = mol_id * torch.ones(X.shape[0]).to(device).long()
-            y_trg_one_hot = torch.nn.functional.one_hot(y_trg, num_classes=n_mols).float()
-            with torch.no_grad():
-                X_fake = perform_transformation(solver, 
-                                                model_name, 
-                                                X, 
-                                                y_trg_one_hot,
-                                                y_trg, 
-                                                device, 
-                                                score_type=score_type)
-            fake_domain.append(X_fake)
-        else: 
-            fake_domain.append(X)  # Keep original DMSOs as baseline
+        # Extract the current batch
+        data_content_batch = data_content[start_idx:end_idx].to(device)
+        data_style_batch = data_style[start_idx:end_idx].to(device)
+
+        with torch.no_grad():
+            # Transform the batch
+            X_fake, _, _, _, _ = solver["network"](data_content_batch, 
+                                                   data_style_batch, 
+                                                   solver["embedding"])
+            fake_domain.append(X_fake.cpu())
+    
+    # Concatenate all the batches into a single tensor
     return torch.cat(fake_domain, dim=0)
+
 
 
 def compute_all_scores(solver, 
@@ -187,20 +119,18 @@ def compute_all_scores(solver,
     Returns:
         pandas.DataFrame: data frame containing the results 
     """
-    
     # Seed for reproducibility
     np.random.seed(42)
     torch.manual_seed(42)
     
     # Seed for reproducibility
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    y2id = dataset.y2id  # MoA to index 
     mol2id = dataset.mol2id # Mol to index
     mol2y = dataset.mol2y # Mol to MoA
-    n_y = len(y2id)
     n_mols = len(mol2id)
+    transform = CustomTransform(augment=False, normalize=True)
     
-    # Collect mol images
+    # COLLECT DATA LIKE DMSO TO EMBEDDING 
     X_mols = gather_data_by_pert(dataset, ood_set)
     
     final_scores = {'score':[],
@@ -210,26 +140,18 @@ def compute_all_scores(solver,
                     'model':[]}
 
     # The index of the control first depending on the dataset 
-    if dataset_name == 'bbbc021':
-        control_id = 'DMSO'
-        channels_fid = [0,1,2]
-        # Initialize the classifier for classifier score
-        classifier = Discriminator(img_size=96, 
-                          num_domains=13, 
-                          max_conv_dim=512, 
-                          in_channels=3, 
-                          dim_in=64, 
-                          multi_task=False).to(device)
-        
-        classifier.load_state_dict(torch.load(ckpt_path))
-        classifier.eval()
-        
-    elif dataset_name == 'bbbc025':
-        control_id = '0'
-        channels_fid = [1,3,4]
-    else:
-        control_id = 'UNTREATED'
-        channels_fid = [0,1,5]
+    control_id = 'DMSO'
+    channels_fid = [0,1,2]
+    # Initialize the classifier for classifier score
+    classifier = Discriminator(img_size=96, 
+                        num_domains=6, 
+                        max_conv_dim=512, 
+                        in_channels=3, 
+                        dim_in=64, 
+                        multi_task=False).to("cuda")
+    
+    classifier.load_state_dict(torch.load(ckpt_path))
+    classifier.eval()
   
     n_bootstrap = 3
     for i in range(n_bootstrap):
@@ -241,27 +163,40 @@ def compute_all_scores(solver,
         
         # Iterate through the drugs 
         for mol in tqdm(X_mols):
-            if  ood_set!=None and mol in solver.args.ood_set:
+            if ood_set!=None and mol in solver.args.ood_set:
                 continue
 
             print(f'Evaluate on molecule {mol}')
 
             # The true domain we'll compare against
             true_domain = X_mols[mol].to(device).float().contiguous()
+        
+            # Difference in numbers of images 
+            delta = X_control.shape[0] - true_domain.shape[0] 
+            if delta > 0:
+                idx_resamp = np.random.choice(range(len(true_domain)), delta, replace=True, p=None)
+                true_domain = torch.cat([true_domain, true_domain[idx_resamp]], dim=0)
 
             # Skip controls 
             if mol==control_id:
                 continue 
             
+            # TO MODIFY: use transformer 
             fake_domain=transform_controls(solver, 
                                             dataset.mol2id,
                                             X_control, 
+                                            true_domain[:X_control.shape[0]],
                                             mol, 
                                             model_name, 
                                             device,
                                             n_mols,
-                                            score_type='FID')            
-
+                                            score_type='FID')    
+            
+            true_domain = (true_domain * 2)-1
+            fake_domain = (fake_domain * 2)-1
+            true_domain = true_domain.cuda()
+            fake_domain = fake_domain.cuda()
+            
             # Create the data loaders 
             fake_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(fake_domain), batch_size=20)
             true_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(true_domain), batch_size=20)
@@ -282,21 +217,9 @@ def compute_all_scores(solver,
             final_scores=append_scores(d_and_c['coverage'], 'Coverage', i, mol, final_scores, model_name)
             print(f'D&C score {d_and_c}')
             
-            # classifier score - take the 0.75 quantile of IMPA 
-            if  dataset_name == 'bbbc021':
-                fake_domain= transform_controls(solver, 
-                                                dataset.mol2id,
-                                                X_control, 
-                                                mol, 
-                                                model_name, 
-                                                device,
-                                                n_mols,
-                                                score_type='Accuracy')
-                fake_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(fake_domain), batch_size=20)
-                
-                score = classifier_score(classifier, fake_dataset, mol2y[mol2id[mol]])
-                final_scores=append_scores(score, 'Accuracy', i, mol, final_scores, model_name)
-                print(f'Accuracy {score}')
+            score = classifier_score(classifier, fake_dataset, mol2y[mol2id[mol]])
+            final_scores=append_scores(score, 'Accuracy', i, mol, final_scores, model_name)
+            print(f'Accuracy {score}')
                 
     score_df = pd.DataFrame(final_scores)    
     score_df.to_pickle(save_path)

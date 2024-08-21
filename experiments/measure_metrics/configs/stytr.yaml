@@ -1,0 +1,41 @@
+vgg: /home/icb/alessandro.palma/environment/IMPA/StyTR-2/experiments/vgg_normalised.pth
+
+# Training options
+save_dir: /home/icb/alessandro.palma/environment/IMPA/StyTR-2/experiments
+log_dir: /home/icb/alessandro.palma/environment/IMPA/StyTR-2/logs
+lr: 0.0005
+lr_decay: 0.00001
+max_iter: 160000
+style_weight: 10.0
+content_weight: 7.0
+n_threads: 16
+save_model_interval: 10000
+position_embedding: 'sine'  # choices: ['sine', 'learned']
+hidden_dim: 512
+
+# Paths
+image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_six
+data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_six/metadata/bbbc021_df_six.csv
+embedding_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/csv/emb_rdkit.csv
+
+# Dataset and augmentation options
+dataset_name: bbbc021
+augment_train: false
+normalize: false
+mol_list: null
+ood_set: null
+trainable_emb: false
+add_controls: false
+
+# Model and training parameters
+latent_dim: 160
+n_channels: 3
+batch_size: 8
+num_workers: 2
+val_batch_size: 20
+
+# Mixed precision
+mixed_precision: 'no'  # choices: ['no', 'fp16', 'bf16']
+
+# Multimodal options
+multimodal: false
