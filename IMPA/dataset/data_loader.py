@@ -170,7 +170,7 @@ class CellDatasetFold(Dataset):
                 self.y[cond] = self.data['ANNOT'][self.data[f"{cond}_idx"]]
                 if dataset_name=="bbbc021":
                     self.dose[cond] = self.data['DOSE'][self.data[f"{cond}_idx"]]
-         
+
         del data 
 
         # Whether to perform training augmentation
