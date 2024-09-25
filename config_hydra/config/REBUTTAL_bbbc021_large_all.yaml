@@ -1,5 +1,5 @@
 # TASK NAME 
-task_name: bbbc021_unannotated_large
+task_name: bbbc021_unannotated_large_cytoB
 
 # IMAGE
 img_size: 128  
@@ -7,7 +7,7 @@ latent_dim: 1024
 hidden_dim: 512 
 style_dim: 64 
 stochastic: True 
-z_dimension: 16  
+z_dimension: 8 
 dim_in: 64 
 add_controls: False
 
@@ -30,7 +30,7 @@ beta2: 0.99
 weight_decay: 0.0001
 num_outs_per_domain: 10
 single_style: True
-ood_set: [taxol, ALLN, bryostatin, simvastatin, demecolcine, nocodazole, colchicine, cytochalasin D, AZ258, cisplatin]
+ood_set: [taxol, ALLN, bryostatin, simvastatin, MG-132, methotrexate, colchicine, cytochalasin B, AZ258, cisplatin]
 mol_list: Null
 balanced: False
 trainable_emb: False

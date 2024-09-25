@@ -7,7 +7,6 @@ from torch.optim import Adam
 from pytorch_lightning import LightningModule
 
 from IMPA.checkpoint import CheckpointIO
-from IMPA.eval.eval import evaluate
 from IMPA.model import build_model
 from IMPA.utils import he_init, print_network, swap_attributes, debug_image
 

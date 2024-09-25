@@ -319,6 +319,6 @@ class CellDataLoader(LightningDataModule):
     def val_dataloader(self):
         return self.loader_test
     
-    def val_dataloader(self):
+    def test_dataloader(self):
         return self.loader_test
     

@@ -1,0 +1,273 @@
+An NVIDIA GPU may be present on this machine, but a CUDA-enabled jaxlib is not installed. Falling back to cpu.
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+  0%|          | 0/10 [00:00<?, ?it/s]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 10%|█         | 1/10 [01:54<17:06, 114.08s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 20%|██        | 2/10 [02:55<11:03, 83.00s/it] /home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 30%|███       | 3/10 [03:52<08:17, 71.10s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 40%|████      | 4/10 [04:52<06:40, 66.73s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 50%|█████     | 5/10 [05:54<05:25, 65.06s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 60%|██████    | 6/10 [06:54<04:13, 63.49s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 70%|███████   | 7/10 [07:56<03:08, 62.82s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 80%|████████  | 8/10 [08:56<02:03, 61.97s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 90%|█████████ | 9/10 [09:56<01:01, 61.35s/it]/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+100%|██████████| 10/10 [10:57<00:00, 61.24s/it]100%|██████████| 10/10 [10:57<00:00, 65.74s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torch/utils/data/dataloader.py:557: UserWarning: This DataLoader will create 6 worker processes in total. Our suggested max number of worker in current system is 4, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(_create_warning_msg(
+/home/icb/alessandro.palma/environment/IMPA/mol2image/models/glow.py:108: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at ../torch/csrc/utils/tensor_numpy.cpp:206.)
+  w_s = torch.from_numpy(w_s)
+  0%|          | 0/10 [00:00<?, ?it/s]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:14<03:40, 14.72s/it][A
+ 12%|█▎        | 2/16 [00:16<01:42,  7.31s/it][A
+ 19%|█▉        | 3/16 [00:18<01:03,  4.90s/it][A
+ 25%|██▌       | 4/16 [00:21<00:46,  3.84s/it][A
+ 31%|███▏      | 5/16 [00:23<00:35,  3.19s/it][A
+ 38%|███▊      | 6/16 [00:25<00:27,  2.79s/it][A
+ 44%|████▍     | 7/16 [00:27<00:22,  2.54s/it][A
+ 50%|█████     | 8/16 [00:29<00:19,  2.42s/it][A
+ 56%|█████▋    | 9/16 [00:31<00:16,  2.30s/it][A
+ 62%|██████▎   | 10/16 [00:33<00:13,  2.22s/it][A
+ 69%|██████▉   | 11/16 [00:35<00:11,  2.23s/it][A
+ 75%|███████▌  | 12/16 [00:37<00:08,  2.17s/it][A
+ 81%|████████▏ | 13/16 [00:39<00:06,  2.13s/it][A
+ 88%|████████▊ | 14/16 [00:41<00:04,  2.14s/it][A
+ 94%|█████████▍| 15/16 [00:43<00:02,  2.11s/it][A
+100%|██████████| 16/16 [00:45<00:00,  1.86s/it][A100%|██████████| 16/16 [00:45<00:00,  2.83s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 10%|█         | 1/10 [01:41<15:16, 101.80s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:25,  1.71s/it][A
+ 12%|█▎        | 2/16 [00:03<00:23,  1.70s/it][A
+ 19%|█▉        | 3/16 [00:05<00:22,  1.70s/it][A
+ 25%|██▌       | 4/16 [00:06<00:20,  1.70s/it][A
+ 31%|███▏      | 5/16 [00:08<00:18,  1.70s/it][A
+ 38%|███▊      | 6/16 [00:10<00:17,  1.70s/it][A
+ 44%|████▍     | 7/16 [00:12<00:16,  1.79s/it][A
+ 50%|█████     | 8/16 [00:13<00:14,  1.76s/it][A
+ 56%|█████▋    | 9/16 [00:15<00:12,  1.74s/it][A
+ 62%|██████▎   | 10/16 [00:17<00:10,  1.73s/it][A
+ 69%|██████▉   | 11/16 [00:18<00:08,  1.72s/it][A
+ 75%|███████▌  | 12/16 [00:20<00:06,  1.72s/it][A
+ 81%|████████▏ | 13/16 [00:22<00:05,  1.71s/it][A
+ 88%|████████▊ | 14/16 [00:24<00:03,  1.71s/it][A
+ 94%|█████████▍| 15/16 [00:25<00:01,  1.71s/it][A
+100%|██████████| 16/16 [00:26<00:00,  1.52s/it][A100%|██████████| 16/16 [00:26<00:00,  1.68s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 20%|██        | 2/10 [02:40<10:11, 76.48s/it] 
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:02<00:34,  2.28s/it][A
+ 12%|█▎        | 2/16 [00:04<00:29,  2.13s/it][A
+ 19%|█▉        | 3/16 [00:06<00:27,  2.08s/it][A
+ 25%|██▌       | 4/16 [00:08<00:25,  2.14s/it][A
+ 31%|███▏      | 5/16 [00:10<00:23,  2.10s/it][A
+ 38%|███▊      | 6/16 [00:12<00:20,  2.08s/it][A
+ 44%|████▍     | 7/16 [00:14<00:18,  2.06s/it][A
+ 50%|█████     | 8/16 [00:16<00:17,  2.13s/it][A
+ 56%|█████▋    | 9/16 [00:18<00:14,  2.10s/it][A
+ 62%|██████▎   | 10/16 [00:20<00:12,  2.08s/it][A
+ 69%|██████▉   | 11/16 [00:23<00:10,  2.11s/it][A
+ 75%|███████▌  | 12/16 [00:25<00:08,  2.09s/it][A
+ 81%|████████▏ | 13/16 [00:27<00:06,  2.07s/it][A
+ 88%|████████▊ | 14/16 [00:29<00:04,  2.10s/it][A
+ 94%|█████████▍| 15/16 [00:31<00:02,  2.07s/it][A
+100%|██████████| 16/16 [00:32<00:00,  1.84s/it][A100%|██████████| 16/16 [00:32<00:00,  2.04s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 30%|███       | 3/10 [03:41<08:04, 69.28s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:26,  1.77s/it][A
+ 12%|█▎        | 2/16 [00:03<00:24,  1.75s/it][A
+ 19%|█▉        | 3/16 [00:05<00:22,  1.74s/it][A
+ 25%|██▌       | 4/16 [00:06<00:20,  1.74s/it][A
+ 31%|███▏      | 5/16 [00:08<00:19,  1.74s/it][A
+ 38%|███▊      | 6/16 [00:10<00:17,  1.74s/it][A
+ 44%|████▍     | 7/16 [00:12<00:16,  1.82s/it][A
+ 50%|█████     | 8/16 [00:14<00:14,  1.79s/it][A
+ 56%|█████▋    | 9/16 [00:15<00:12,  1.77s/it][A
+ 62%|██████▎   | 10/16 [00:17<00:10,  1.76s/it][A
+ 69%|██████▉   | 11/16 [00:19<00:08,  1.76s/it][A
+ 75%|███████▌  | 12/16 [00:21<00:07,  1.75s/it][A
+ 81%|████████▏ | 13/16 [00:22<00:05,  1.75s/it][A
+ 88%|████████▊ | 14/16 [00:24<00:03,  1.74s/it][A
+ 94%|█████████▍| 15/16 [00:26<00:01,  1.74s/it][A
+100%|██████████| 16/16 [00:27<00:00,  1.55s/it][A100%|██████████| 16/16 [00:27<00:00,  1.71s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 40%|████      | 4/10 [04:40<06:31, 65.24s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:02<00:31,  2.12s/it][A
+ 12%|█▎        | 2/16 [00:03<00:26,  1.93s/it][A
+ 19%|█▉        | 3/16 [00:06<00:26,  2.06s/it][A
+ 25%|██▌       | 4/16 [00:07<00:23,  1.94s/it][A
+ 31%|███▏      | 5/16 [00:09<00:20,  1.89s/it][A
+ 38%|███▊      | 6/16 [00:11<00:19,  1.98s/it][A
+ 44%|████▍     | 7/16 [00:13<00:17,  1.91s/it][A
+ 50%|█████     | 8/16 [00:15<00:14,  1.87s/it][A
+ 56%|█████▋    | 9/16 [00:17<00:12,  1.84s/it][A
+ 62%|██████▎   | 10/16 [00:18<00:10,  1.82s/it][A
+ 69%|██████▉   | 11/16 [00:20<00:09,  1.87s/it][A
+ 75%|███████▌  | 12/16 [00:22<00:07,  1.84s/it][A
+ 81%|████████▏ | 13/16 [00:24<00:05,  1.82s/it][A
+ 88%|████████▊ | 14/16 [00:26<00:03,  1.80s/it][A
+ 94%|█████████▍| 15/16 [00:27<00:01,  1.79s/it][A
+100%|██████████| 16/16 [00:29<00:00,  1.59s/it][A100%|██████████| 16/16 [00:29<00:00,  1.82s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 50%|█████     | 5/10 [05:41<05:19, 63.89s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:29,  1.94s/it][A
+ 12%|█▎        | 2/16 [00:03<00:25,  1.84s/it][A
+ 19%|█▉        | 3/16 [00:05<00:23,  1.81s/it][A
+ 25%|██▌       | 4/16 [00:07<00:21,  1.79s/it][A
+ 31%|███▏      | 5/16 [00:09<00:19,  1.79s/it][A
+ 38%|███▊      | 6/16 [00:10<00:17,  1.78s/it][A
+ 44%|████▍     | 7/16 [00:12<00:16,  1.87s/it][A
+ 50%|█████     | 8/16 [00:14<00:14,  1.84s/it][A
+ 56%|█████▋    | 9/16 [00:16<00:12,  1.82s/it][A
+ 62%|██████▎   | 10/16 [00:18<00:10,  1.81s/it][A
+ 69%|██████▉   | 11/16 [00:19<00:08,  1.80s/it][A
+ 75%|███████▌  | 12/16 [00:21<00:07,  1.79s/it][A
+ 81%|████████▏ | 13/16 [00:23<00:05,  1.78s/it][A
+ 88%|████████▊ | 14/16 [00:25<00:03,  1.78s/it][A
+ 94%|█████████▍| 15/16 [00:27<00:01,  1.78s/it][A
+100%|██████████| 16/16 [00:28<00:00,  1.58s/it][A100%|██████████| 16/16 [00:28<00:00,  1.76s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 60%|██████    | 6/10 [06:41<04:10, 62.57s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:25,  1.73s/it][A
+ 12%|█▎        | 2/16 [00:03<00:25,  1.85s/it][A
+ 19%|█▉        | 3/16 [00:05<00:23,  1.79s/it][A
+ 25%|██▌       | 4/16 [00:07<00:21,  1.76s/it][A
+ 31%|███▏      | 5/16 [00:08<00:19,  1.75s/it][A
+ 38%|███▊      | 6/16 [00:10<00:17,  1.74s/it][A
+ 44%|████▍     | 7/16 [00:12<00:15,  1.74s/it][A
+ 50%|█████     | 8/16 [00:14<00:13,  1.74s/it][A
+ 56%|█████▋    | 9/16 [00:15<00:12,  1.73s/it][A
+ 62%|██████▎   | 10/16 [00:17<00:10,  1.73s/it][A
+ 69%|██████▉   | 11/16 [00:19<00:08,  1.73s/it][A
+ 75%|███████▌  | 12/16 [00:20<00:06,  1.73s/it][A
+ 81%|████████▏ | 13/16 [00:22<00:05,  1.77s/it][A
+ 88%|████████▊ | 14/16 [00:24<00:03,  1.76s/it][A
+ 94%|█████████▍| 15/16 [00:26<00:01,  1.75s/it][A
+100%|██████████| 16/16 [00:27<00:00,  1.55s/it][A100%|██████████| 16/16 [00:27<00:00,  1.71s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+/home/icb/alessandro.palma/environment/IMPA/IMPA/experiments/measure_metrics/comparison_mol2image/compute_scores_ood.py:286: RuntimeWarning: divide by zero encountered in scalar divide
+  final_scores=append_scores(1/d_and_c['density'], 'Density', i, mol, final_scores, model_name)
+/home/icb/alessandro.palma/environment/IMPA/IMPA/experiments/measure_metrics/comparison_mol2image/compute_scores_ood.py:287: RuntimeWarning: divide by zero encountered in scalar divide
+  final_scores=append_scores(1/d_and_c['coverage'], 'Coverage', i, mol, final_scores, model_name)
+ 70%|███████   | 7/10 [07:40<03:04, 61.42s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:27,  1.81s/it][A
+ 12%|█▎        | 2/16 [00:03<00:25,  1.80s/it][A
+ 19%|█▉        | 3/16 [00:05<00:23,  1.80s/it][A
+ 25%|██▌       | 4/16 [00:07<00:21,  1.80s/it][A
+ 31%|███▏      | 5/16 [00:08<00:19,  1.80s/it][A
+ 38%|███▊      | 6/16 [00:10<00:17,  1.80s/it][A
+ 44%|████▍     | 7/16 [00:12<00:16,  1.80s/it][A
+ 50%|█████     | 8/16 [00:14<00:14,  1.80s/it][A
+ 56%|█████▋    | 9/16 [00:16<00:12,  1.80s/it][A
+ 62%|██████▎   | 10/16 [00:17<00:10,  1.80s/it][A
+ 69%|██████▉   | 11/16 [00:19<00:08,  1.80s/it][A
+ 75%|███████▌  | 12/16 [00:21<00:07,  1.80s/it][A
+ 81%|████████▏ | 13/16 [00:23<00:05,  1.80s/it][A
+ 88%|████████▊ | 14/16 [00:25<00:03,  1.80s/it][A
+ 94%|█████████▍| 15/16 [00:26<00:01,  1.80s/it][A
+100%|██████████| 16/16 [00:28<00:00,  1.60s/it][A100%|██████████| 16/16 [00:28<00:00,  1.76s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 80%|████████  | 8/10 [08:40<02:01, 60.78s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:27,  1.82s/it][A
+ 12%|█▎        | 2/16 [00:03<00:27,  1.96s/it][A
+ 19%|█▉        | 3/16 [00:05<00:24,  1.89s/it][A
+ 25%|██▌       | 4/16 [00:07<00:22,  1.86s/it][A
+ 31%|███▏      | 5/16 [00:09<00:20,  1.85s/it][A
+ 38%|███▊      | 6/16 [00:11<00:18,  1.84s/it][A
+ 44%|████▍     | 7/16 [00:12<00:16,  1.83s/it][A
+ 50%|█████     | 8/16 [00:14<00:14,  1.83s/it][A
+ 56%|█████▋    | 9/16 [00:16<00:12,  1.83s/it][A
+ 62%|██████▎   | 10/16 [00:18<00:11,  1.88s/it][A
+ 69%|██████▉   | 11/16 [00:20<00:09,  1.86s/it][A
+ 75%|███████▌  | 12/16 [00:22<00:07,  1.85s/it][A
+ 81%|████████▏ | 13/16 [00:24<00:05,  1.84s/it][A
+ 88%|████████▊ | 14/16 [00:25<00:03,  1.84s/it][A
+ 94%|█████████▍| 15/16 [00:27<00:01,  1.83s/it][A
+100%|██████████| 16/16 [00:28<00:00,  1.63s/it][A100%|██████████| 16/16 [00:28<00:00,  1.80s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 90%|█████████ | 9/10 [09:40<01:00, 60.60s/it]
+  0%|          | 0/16 [00:00<?, ?it/s][A
+  6%|▋         | 1/16 [00:01<00:22,  1.53s/it][A
+ 12%|█▎        | 2/16 [00:03<00:21,  1.52s/it][A
+ 19%|█▉        | 3/16 [00:04<00:19,  1.52s/it][A
+ 25%|██▌       | 4/16 [00:06<00:18,  1.54s/it][A
+ 31%|███▏      | 5/16 [00:07<00:16,  1.53s/it][A
+ 38%|███▊      | 6/16 [00:09<00:15,  1.53s/it][A
+ 44%|████▍     | 7/16 [00:10<00:13,  1.54s/it][A
+ 50%|█████     | 8/16 [00:12<00:12,  1.58s/it][A
+ 56%|█████▋    | 9/16 [00:13<00:10,  1.56s/it][A
+ 62%|██████▎   | 10/16 [00:15<00:09,  1.54s/it][A
+ 69%|██████▉   | 11/16 [00:16<00:07,  1.53s/it][A
+ 75%|███████▌  | 12/16 [00:18<00:06,  1.53s/it][A
+ 81%|████████▏ | 13/16 [00:19<00:04,  1.52s/it][A
+ 88%|████████▊ | 14/16 [00:21<00:03,  1.52s/it][A
+ 94%|█████████▍| 15/16 [00:22<00:01,  1.52s/it][A
+100%|██████████| 16/16 [00:23<00:00,  1.35s/it][A100%|██████████| 16/16 [00:23<00:00,  1.50s/it]
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/IMPA_try/lib/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+100%|██████████| 10/10 [10:35<00:00, 58.99s/it]100%|██████████| 10/10 [10:35<00:00, 63.59s/it]

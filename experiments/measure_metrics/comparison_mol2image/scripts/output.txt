@@ -1,0 +1,293 @@
+Number of parameters in generator: 24318595
+Number of parameters in style_encoder: 16164480
+Number of parameters in discriminator: 14341784
+Number of parameters in mapping_network: 66112
+Initializing embedding_matrix...
+Initializing generator...
+Initializing style_encoder...
+Initializing discriminator...
+Initializing mapping_network...
+IMPAmodule(
+  (embedding_matrix): Embedding(88, 1024)
+  (generator): DataParallel(
+    (module): Generator(
+      (from_rgb): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+      (encode): ModuleList(
+        (0): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (norm2): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (conv1x1): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (1): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (norm2): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (conv1x1): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (2): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (norm2): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (conv1x1): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (3-4): 2 x ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+          (norm2): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+        )
+      )
+      (decode): ModuleList(
+        (0-1): 2 x AdainResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): AdaIN(
+            (norm): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=1024, bias=True)
+          )
+          (norm2): AdaIN(
+            (norm): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=1024, bias=True)
+          )
+        )
+        (2): AdainResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): AdaIN(
+            (norm): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=1024, bias=True)
+          )
+          (norm2): AdaIN(
+            (norm): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=512, bias=True)
+          )
+          (conv1x1): Conv2d(512, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (3): AdainResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(256, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): AdaIN(
+            (norm): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=512, bias=True)
+          )
+          (norm2): AdaIN(
+            (norm): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=256, bias=True)
+          )
+          (conv1x1): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (4): AdainResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(128, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (norm1): AdaIN(
+            (norm): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=256, bias=True)
+          )
+          (norm2): AdaIN(
+            (norm): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
+            (fc): Linear(in_features=64, out_features=128, bias=True)
+          )
+          (conv1x1): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+      )
+      (to_rgb): Sequential(
+        (0): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
+        (1): LeakyReLU(negative_slope=0.2)
+        (2): Conv2d(64, 3, kernel_size=(1, 1), stride=(1, 1))
+      )
+    )
+  )
+  (style_encoder): DataParallel(
+    (module): StyleEncoder(
+      (conv): Sequential(
+        (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        (1): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv1x1): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (2): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv1x1): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (3): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv1x1): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (4): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        )
+        (5): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        )
+        (6): LeakyReLU(negative_slope=0.2)
+        (7): Conv2d(512, 512, kernel_size=(4, 4), stride=(1, 1))
+        (8): LeakyReLU(negative_slope=0.2)
+      )
+      (linear): Linear(in_features=512, out_features=64, bias=True)
+    )
+  )
+  (discriminator): DataParallel(
+    (module): Discriminator(
+      (conv): Sequential(
+        (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        (1): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv1x1): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (2): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv1x1): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (3): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv1x1): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        )
+        (4): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        )
+        (5): ResBlk(
+          (actv): LeakyReLU(negative_slope=0.2)
+          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        )
+        (6): LeakyReLU(negative_slope=0.2, inplace=True)
+        (7): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1))
+        (8): LeakyReLU(negative_slope=0.2, inplace=True)
+        (9): Conv2d(512, 88, kernel_size=(1, 1), stride=(1, 1))
+      )
+    )
+  )
+  (mapping_network): DataParallel(
+    (module): MappingNetwork(
+      (mapping_network): MappingNetworkSingleStyle(
+        (layers): Sequential(
+          (0): Linear(in_features=1032, out_features=64, bias=True)
+        )
+      )
+    )
+  )
+)
+Loading checkpoint from /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/20240902_fc588378-f1f0-4cfb-84f5-92ed48f31a44_bbbc021_unannotated_large/checkpoint/000200_nets.ckpt...
+/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/20240902_fc588378-f1f0-4cfb-84f5-92ed48f31a44_bbbc021_unannotated_large/checkpoint/000200_nets.ckpt
+Loading checkpoint from /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/20240902_fc588378-f1f0-4cfb-84f5-92ed48f31a44_bbbc021_unannotated_large/checkpoint/000200_embeddings.ckpt...
+/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/20240902_fc588378-f1f0-4cfb-84f5-92ed48f31a44_bbbc021_unannotated_large/checkpoint/000200_embeddings.ckpt
+Evaluate on molecule taxol
+FID score 95.52839354384551
+D&C score {'precision': 0.6146095717884131, 'recall': 0.424, 'density': 0.23165407220822842, 'coverage': 0.26266666666666666}
+1-Accuracy 0.702350965575147
+Evaluate on molecule ALLN
+FID score 47.706220675583864
+D&C score {'precision': 0.9605373635600336, 'recall': 0.2349537037037037, 'density': 1.7929051217464318, 'coverage': 0.9988425925925926}
+1-Accuracy 0.0
+Evaluate on molecule bryostatin
+FID score 80.42201221163774
+D&C score {'precision': 0.8769941225860621, 'recall': 0.5243055555555556, 'density': 0.5992443324937028, 'coverage': 0.6770833333333334}
+1-Accuracy 0.036523929471032744
+Evaluate on molecule simvastatin
+FID score 99.60040562433792
+D&C score {'precision': 0.5793450881612091, 'recall': 0.7951388888888888, 'density': 0.29525608732157854, 'coverage': 0.5069444444444444}
+1-Accuracy 0.05373635600335852
+Evaluate on molecule MG-132
+FID score 97.54218279853458
+D&C score {'precision': 0.6259445843828715, 'recall': 0.6840277777777778, 'density': 0.28089840470193117, 'coverage': 0.4375}
+1-Accuracy 0.0
+Evaluate on molecule methotrexate
+FID score 50.48745067867546
+D&C score {'precision': 0.8165407220822838, 'recall': 0.14930555555555555, 'density': 0.7122586062132662, 'coverage': 0.9907407407407407}
+1-Accuracy 0.017632241813602016
+Evaluate on molecule colchicine
+FID score 201.45547917089212
+D&C score {'precision': 0.00797649034424853, 'recall': 0.0625, 'density': 0.0008816120906801008, 'coverage': 0.005787037037037037}
+1-Accuracy 0.9319899244332494
+Evaluate on molecule cytochalasin B
+FID score 38.68396226103894
+D&C score {'precision': 0.8287153652392947, 'recall': 0.6319444444444444, 'density': 1.1945004198152813, 'coverage': 0.9594907407407407}
+1-Accuracy 0.8303946263643996
+Evaluate on molecule AZ258
+FID score 45.997834603284076
+D&C score {'precision': 0.7460117548278757, 'recall': 0.6041666666666666, 'density': 0.9102434928631402, 'coverage': 0.9583333333333334}
+1-Accuracy 0.9214945424013434
+Evaluate on molecule cisplatin
+FID score 78.0513082020347
+D&C score {'precision': 0.4156171284634761, 'recall': 0.7777777777777778, 'density': 0.6264903442485307, 'coverage': 0.6261574074074074}
+1-Accuracy 0.0
+{'use_gpu': True, 'img_size': 128, 'dim_in': 128, 'lambda_glow': 1, 'lambda_contr': 1, 'total_iters': 100000, 'ds_iter': 100000, 'resume_iter': 0, 'batch_size': 8, 'in_channels': 3, 'val_batch_size': 20, 'lr': 0.0001, 'beta1': 0, 'beta2': 0.99, 'weight_decay': 1e-05, 'num_outs_per_domain': 10, 'ood_set': ['taxol', 'ALLN', 'bryostatin', 'simvastatin', 'MG-132', 'methotrexate', 'colchicine', 'cytochalasin D', 'AZ258', 'cisplatin'], 'mol_list': None, 'balanced': True, 'dataset_name': 'bbbc021', 'affine': True, 'mode': 'train', 'num_workers': 6, 'seed': 42, 'image_path': '/lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021_unannotated/processed/bbbc021_unannotated_large', 'data_index_path': '/lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021_unannotated/processed/bbbc021_unannotated_large/metadata/bbbc021_unannotated_large.csv', 'experiment_directory': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image', 'sample_dir': 'sample', 'checkpoint_dir': 'checkpoint', 'basal_vs_real_folder': 'basal_vs_real', 'naming_key': 'img_size', 'embedding_folder': 'embeddings', 'resume_dir': '', 'augment_train': True, 'normalize': True, 'freeze': True, 'print_every': 10, 'sample_every': 500, 'save_every': 500, 'eval_every': 500, 'modules': [{'type': 'cond_proglowmpn', 'n_flow': 32, 'n_block': 1, 'in_channel': 3, 'img_size': 128, 'n_cond': 150, 'pretrained': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image/20240902_128/checkpoint/063500_nets.ckpt'}, {'type': 'cond_proglowmpn', 'n_flow': 32, 'n_block': 1, 'in_channel': 3, 'img_size': 64, 'n_cond': 150, 'pretrained': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image/20240901_64/checkpoint/049500_nets.ckpt'}, {'type': 'cond_glowmpn', 'n_flow': 32, 'n_block': 1, 'in_channel': 3, 'img_size': 32, 'n_cond': 150, 'pretrained': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image/20240825_32/checkpoint/093000_nets.ckpt'}], 'z_shapes': [[9, 48, 48], [9, 24, 24], [12, 12, 12]], 'temp': [1.0, 1.0, 1.0], 'tau': 0.07}
+Lodading the data...
+Training with 89 mols
+Successfully loaded the data
+Solver loaded with parameters: 
+ {'use_gpu': True, 'img_size': 128, 'dim_in': 128, 'lambda_glow': 1, 'lambda_contr': 1, 'total_iters': 100000, 'ds_iter': 100000, 'resume_iter': 0, 'batch_size': 8, 'in_channels': 3, 'val_batch_size': 20, 'lr': 0.0001, 'beta1': 0, 'beta2': 0.99, 'weight_decay': 1e-05, 'num_outs_per_domain': 10, 'ood_set': ['taxol', 'ALLN', 'bryostatin', 'simvastatin', 'MG-132', 'methotrexate', 'colchicine', 'cytochalasin D', 'AZ258', 'cisplatin'], 'mol_list': None, 'balanced': True, 'dataset_name': 'bbbc021', 'affine': True, 'mode': 'train', 'num_workers': 6, 'seed': 42, 'image_path': '/lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021_unannotated/processed/bbbc021_unannotated_large', 'data_index_path': '/lustre/groups/ml01/workspace/alessandro.palma/imCPA_official/data/bbbc021_unannotated/processed/bbbc021_unannotated_large/metadata/bbbc021_unannotated_large.csv', 'experiment_directory': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image', 'sample_dir': 'sample', 'checkpoint_dir': 'checkpoint', 'basal_vs_real_folder': 'basal_vs_real', 'naming_key': 'img_size', 'embedding_folder': 'embeddings', 'resume_dir': '', 'augment_train': True, 'normalize': True, 'freeze': True, 'print_every': 10, 'sample_every': 500, 'save_every': 500, 'eval_every': 500, 'modules': [{'type': 'cond_proglowmpn', 'n_flow': 32, 'n_block': 1, 'in_channel': 3, 'img_size': 128, 'n_cond': 150, 'pretrained': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image/20240902_128/checkpoint/063500_nets.ckpt'}, {'type': 'cond_proglowmpn', 'n_flow': 32, 'n_block': 1, 'in_channel': 3, 'img_size': 64, 'n_cond': 150, 'pretrained': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image/20240901_64/checkpoint/049500_nets.ckpt'}, {'type': 'cond_glowmpn', 'n_flow': 32, 'n_block': 1, 'in_channel': 3, 'img_size': 32, 'n_cond': 150, 'pretrained': '/home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/mol2image/20240825_32/checkpoint/093000_nets.ckpt'}], 'z_shapes': [[9, 48, 48], [9, 24, 24], [12, 12, 12]], 'temp': [1.0, 1.0, 1.0], 'tau': 0.07, 'num_domains': 89}
+Initializing blocks...
+Initializing base_blocks...
+Initializing cond_embedding...
+Initializing cond_reduce...
+Evaluate on molecule taxol
+FID score 3384.5884445203133
+D&C score {'precision': 0.599, 'recall': 0.005, 'density': 2.3870999999999998, 'coverage': 0.04133333333333333}
+1-Accuracy 0.787
+Evaluate on molecule ALLN
+FID score 1073.188838960081
+D&C score {'precision': 0.3045, 'recall': 0.0, 'density': 1.99235, 'coverage': 0.22685185185185186}
+1-Accuracy 0.029
+Evaluate on molecule bryostatin
+FID score 1710.6914099089504
+D&C score {'precision': 0.0115, 'recall': 0.010416666666666666, 'density': 0.0017000000000000001, 'coverage': 0.017361111111111112}
+1-Accuracy 0.0375
+Evaluate on molecule simvastatin
+FID score 2000.313857271358
+D&C score {'precision': 0.5235, 'recall': 0.03935185185185185, 'density': 3.6098500000000002, 'coverage': 0.27546296296296297}
+1-Accuracy 0.046
+Evaluate on molecule MG-132
+FID score 1516.5313439764504
+D&C score {'precision': 0.3075, 'recall': 0.017361111111111112, 'density': 0.213, 'coverage': 0.0787037037037037}
+1-Accuracy 0.0185
+Evaluate on molecule methotrexate
+FID score 1370.8469680820729
+D&C score {'precision': 0.395, 'recall': 0.006944444444444444, 'density': 5.9192, 'coverage': 0.4340277777777778}
+1-Accuracy 0.0165
+Evaluate on molecule colchicine
+FID score 2834.3530563478025
+D&C score {'precision': 0.0, 'recall': 0.0023148148148148147, 'density': 0.0, 'coverage': 0.0}
+1-Accuracy 0.024
+Evaluate on molecule cytochalasin B
+FID score 1294.1289481427134
+D&C score {'precision': 0.3605, 'recall': 0.0, 'density': 1.10905, 'coverage': 0.39351851851851855}
+1-Accuracy 0.0215
+Evaluate on molecule AZ258
+FID score 1528.097515398124
+D&C score {'precision': 0.4105, 'recall': 0.003472222222222222, 'density': 4.6588, 'coverage': 0.3761574074074074}
+1-Accuracy 0.0175
+Evaluate on molecule cisplatin
+FID score 1726.4137911401776
+D&C score {'precision': 0.393, 'recall': 0.016203703703703703, 'density': 6.6834999999999996, 'coverage': 0.6192129629629629}
+1-Accuracy 0.003

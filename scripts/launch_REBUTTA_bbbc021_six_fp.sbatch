@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -o ./logs/fp_large_all.out
+#SBATCH -o ./logs/cyto_fp_large_all_sub.out
 
-#SBATCH -e ./logs/fp_large_all.err
+#SBATCH -e ./logs/cyto_fp_large_all_sub.err
 
-#SBATCH -J fp_large_all
+#SBATCH -J cyto_fp_large_all_sub
 
 #SBATCH -p gpu_p
 
@@ -23,4 +23,5 @@
 source $HOME/.bashrc
 conda activate IMPA_try
 
-python ../IMPA/main_hydra.py config=REBUTTAL_bbbc021_large_all.yaml
+# python ../IMPA/main_hydra.py config=REBUTTAL_bbbc021_large_all.yaml
+python ../IMPA/main_hydra.py config=REBUTTAL_bbbc021_large_all_subset.yaml
