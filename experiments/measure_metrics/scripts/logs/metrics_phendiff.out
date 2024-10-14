@@ -1,0 +1,24 @@
+Evaluate on molecule AZ138
+FID score 101.28308683329675
+D&C score {'precision': 0.8907692307692308, 'recall': 0.0, 'density': 0.8531538461538463, 'coverage': 0.0655980271270037}
+Accuracy 0.0
+Evaluate on molecule AZ258
+FID score 98.56389614258345
+D&C score {'precision': 0.9686538461538462, 'recall': 0.0, 'density': 0.8658846153846155, 'coverage': 0.0602247191011236}
+Accuracy 0.859423076923077
+Evaluate on molecule DMSO
+FID score 104.72601983173962
+D&C score {'precision': 0.9373076923076923, 'recall': 0.0, 'density': 0.9963076923076923, 'coverage': 0.06019230769230769}
+Accuracy 0.796923076923077
+Evaluate on molecule cytochalasin B
+FID score 88.68632140499301
+D&C score {'precision': 0.890576923076923, 'recall': 0.0, 'density': 0.9253846153846155, 'coverage': 0.15853658536585366}
+Accuracy 0.0
+Evaluate on molecule taxol
+FID score 119.52738845307815
+D&C score {'precision': 0.9217307692307692, 'recall': 0.0, 'density': 1.0378461538461539, 'coverage': 0.2076700434153401}
+Accuracy 0.10923076923076923
+Evaluate on molecule vincristine
+FID score 113.82268527099319
+D&C score {'precision': 0.859423076923077, 'recall': 0.0, 'density': 0.9096153846153847, 'coverage': 0.07905251141552512}
+Accuracy 0.0

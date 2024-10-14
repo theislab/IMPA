@@ -1,0 +1,63 @@
+  0%|          | 0/6 [00:00<?, ?it/s]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 17%|█▋        | 1/6 [02:35<12:58, 155.76s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 33%|███▎      | 2/6 [05:06<10:10, 152.73s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 50%|█████     | 3/6 [07:36<07:34, 151.53s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 67%|██████▋   | 4/6 [10:06<05:01, 150.93s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 83%|████████▎ | 5/6 [12:38<02:31, 151.18s/it]100%|██████████| 6/6 [12:38<00:00, 126.36s/it]
+  0%|          | 0/6 [00:00<?, ?it/s]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 17%|█▋        | 1/6 [02:31<12:36, 151.37s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 33%|███▎      | 2/6 [05:01<10:03, 150.80s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 50%|█████     | 3/6 [07:29<07:27, 149.20s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 67%|██████▋   | 4/6 [09:57<04:58, 149.01s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 83%|████████▎ | 5/6 [12:28<02:29, 149.76s/it]100%|██████████| 6/6 [12:28<00:00, 124.82s/it]
+  0%|          | 0/6 [00:00<?, ?it/s]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 17%|█▋        | 1/6 [02:29<12:27, 149.44s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 33%|███▎      | 2/6 [04:58<09:57, 149.26s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 50%|█████     | 3/6 [07:26<07:25, 148.60s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 67%|██████▋   | 4/6 [09:55<04:57, 148.78s/it]/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/icb/alessandro.palma/miniconda3/envs/diffusion-experiments/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+ 83%|████████▎ | 5/6 [12:26<02:29, 149.58s/it]100%|██████████| 6/6 [12:26<00:00, 124.42s/it]
