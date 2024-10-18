@@ -1,201 +1,0 @@
-['scripts', 'IMPA', 'build', 'embeddings', 'experiments', 'dist', 'docs', '.gitignore', 'environment.yml', 'notebooks', 'checkpoints', 'README.md', 'cellprofiler_feature_names', 'tutorial', 'project_folder', '__pycache__', 'setup.py', 'IMPA.egg-info', '__init__.py', '.ipynb_checkpoints', 'config_hydra', '.git']
-Number of parameters in generator: 24319877
-Number of parameters in style_encoder: 14330624
-Number of parameters in discriminator: 14302922
-Number of parameters in mapping_network: 7104
-Initializing embedding_matrix...
-Initializing generator...
-Initializing style_encoder...
-Initializing discriminator...
-Initializing mapping_network...
-IMPAmodule(
-  (embedding_matrix): Embedding(10, 100)
-  (generator): DataParallel(
-    (module): Generator(
-      (from_rgb): Conv2d(5, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-      (encode): ModuleList(
-        (0): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (norm2): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (conv1x1): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (1): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (norm2): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (conv1x1): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (2): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (norm2): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (conv1x1): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (3-4): 2 x ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-          (norm2): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-        )
-      )
-      (decode): ModuleList(
-        (0-1): 2 x AdainResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): AdaIN(
-            (norm): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=1024, bias=True)
-          )
-          (norm2): AdaIN(
-            (norm): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=1024, bias=True)
-          )
-        )
-        (2): AdainResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): AdaIN(
-            (norm): InstanceNorm2d(512, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=1024, bias=True)
-          )
-          (norm2): AdaIN(
-            (norm): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=512, bias=True)
-          )
-          (conv1x1): Conv2d(512, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (3): AdainResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(256, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): AdaIN(
-            (norm): InstanceNorm2d(256, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=512, bias=True)
-          )
-          (norm2): AdaIN(
-            (norm): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=256, bias=True)
-          )
-          (conv1x1): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (4): AdainResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(128, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (norm1): AdaIN(
-            (norm): InstanceNorm2d(128, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=256, bias=True)
-          )
-          (norm2): AdaIN(
-            (norm): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=False, track_running_stats=False)
-            (fc): Linear(in_features=64, out_features=128, bias=True)
-          )
-          (conv1x1): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-      )
-      (to_rgb): Sequential(
-        (0): InstanceNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=False)
-        (1): LeakyReLU(negative_slope=0.2)
-        (2): Conv2d(64, 5, kernel_size=(1, 1), stride=(1, 1))
-      )
-    )
-  )
-  (style_encoder): DataParallel(
-    (module): StyleEncoder(
-      (conv): Sequential(
-        (0): Conv2d(5, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (1): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv1x1): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (2): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv1x1): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (3): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv1x1): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (4): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        )
-        (5): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        )
-        (6): LeakyReLU(negative_slope=0.2)
-        (7): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1))
-        (8): LeakyReLU(negative_slope=0.2)
-      )
-      (linear): Linear(in_features=512, out_features=64, bias=True)
-    )
-  )
-  (discriminator): DataParallel(
-    (module): Discriminator(
-      (conv_blocks): Sequential(
-        (0): Conv2d(5, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (1): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv1x1): Conv2d(64, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (2): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv1x1): Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (3): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv1x1): Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        )
-        (4): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        )
-        (5): ResBlk(
-          (actv): LeakyReLU(negative_slope=0.2)
-          (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-          (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        )
-        (6): LeakyReLU(negative_slope=0.2, inplace=True)
-        (7): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1))
-        (8): LeakyReLU(negative_slope=0.2, inplace=True)
-      )
-      (head): Conv2d(512, 10, kernel_size=(1, 1), stride=(1, 1))
-    )
-  )
-  (mapping_network): DataParallel(
-    (module): MappingNetwork(
-      (mapping_network): MappingNetworkSingleStyle(
-        (layers): Sequential(
-          (0): Linear(in_features=110, out_features=64, bias=True)
-        )
-      )
-    )
-  )
-)
-Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/5902 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/5902 [00:00<?, ?it/s] Epoch 0:   0%|          | 1/5902 [00:13<22:44:18,  0.07it/s]Epoch 0:   0%|          | 1/5902 [00:13<22:44:32,  0.07it/s, v_num=77j0]Epoch 0:   0%|          | 2/5902 [00:14<11:46:45,  0.14it/s, v_num=77j0]Epoch 0:   0%|          | 2/5902 [00:14<11:46:48,  0.14it/s, v_num=77j0]Epoch 0:   0%|          | 3/5902 [00:14<8:07:39,  0.20it/s, v_num=77j0] Epoch 0:   0%|          | 3/5902 [00:14<8:07:41,  0.20it/s, v_num=77j0]Epoch 0:   0%|          | 4/5902 [00:15<6:18:01,  0.26it/s, v_num=77j0]Epoch 0:   0%|          | 4/5902 [00:15<6:18:03,  0.26it/s, v_num=77j0]Epoch 0:   0%|          | 5/5902 [00:15<5:12:14,  0.31it/s, v_num=77j0]Epoch 0:   0%|          | 5/5902 [00:15<5:12:17,  0.31it/s, v_num=77j0]Epoch 0:   0%|          | 6/5902 [00:16<4:28:23,  0.37it/s, v_num=77j0]Epoch 0:   0%|          | 6/5902 [00:16<4:28:24,  0.37it/s, v_num=77j0]Epoch 0:   0%|          | 7/5902 [00:16<3:57:04,  0.41it/s, v_num=77j0]Epoch 0:   0%|          | 7/5902 [00:16<3:57:04,  0.41it/s, v_num=77j0]Epoch 0:   0%|          | 8/5902 [00:17<3:33:33,  0.46it/s, v_num=77j0]Epoch 0:   0%|          | 8/5902 [00:17<3:33:34,  0.46it/s, v_num=77j0]Epoch 0:   0%|          | 9/5902 [00:17<3:15:11,  0.50it/s, v_num=77j0]Epoch 0:   0%|          | 9/5902 [00:17<3:15:12,  0.50it/s, v_num=77j0]Epoch 0:   0%|          | 10/5902 [00:18<3:00:30,  0.54it/s, v_num=77j0]Epoch 0:   0%|          | 10/5902 [00:18<3:00:31,  0.54it/s, v_num=77j0]Epoch 0:   0%|          | 11/5902 [00:18<2:48:30,  0.58it/s, v_num=77j0]Epoch 0:   0%|          | 11/5902 [00:18<2:48:30,  0.58it/s, v_num=77j0]Epoch 0:   0%|          | 12/5902 [00:19<2:38:29,  0.62it/s, v_num=77j0]Epoch 0:   0%|          | 12/5902 [00:19<2:38:30,  0.62it/s, v_num=77j0]Epoch 0:   0%|          | 13/5902 [00:19<2:30:01,  0.65it/s, v_num=77j0]Epoch 0:   0%|          | 13/5902 [00:19<2:30:01,  0.65it/s, v_num=77j0]Epoch 0:   0%|          | 14/5902 [00:20<2:22:46,  0.69it/s, v_num=77j0]Epoch 0:   0%|          | 14/5902 [00:20<2:22:46,  0.69it/s, v_num=77j0]Epoch 0:   0%|          | 15/5902 [00:20<2:16:31,  0.72it/s, v_num=77j0]Epoch 0:   0%|          | 15/5902 [00:20<2:16:31,  0.72it/s, v_num=77j0]Epoch 0:   0%|          | 16/5902 [00:21<2:11:02,  0.75it/s, v_num=77j0]Epoch 0:   0%|          | 16/5902 [00:21<2:11:03,  0.75it/s, v_num=77j0]
