@@ -1,4 +1,4 @@
-name: IMPA_try
+name: IMPA
 channels:
   - conda-forge
 dependencies:
