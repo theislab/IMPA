@@ -2,7 +2,7 @@ task_name: cpg0000_multimodal_leaveout
 img_size: 96
 latent_dim: 100
 hidden_dim: 512
-style_dim: 64
+style_dim: 32
 stochastic: True
 z_dimension: 20
 dim_in: 64
@@ -10,6 +10,7 @@ lambda_reg: 1
 lambda_cyc: 1
 lambda_sty: 1
 lambda_ds: 1
+
 total_epochs: 100
 ds_iter: 200000
 resume_iter: 0

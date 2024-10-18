@@ -1,13 +1,13 @@
-# TASK NAME 
-task_name: bbbc021_all_retrain
+# RETRAIN BBBC021 WITH FINGERPRINTS
+task_name: bbbc021_all_retrain_fp
 
 # IMAGE
 img_size: 96  
-latent_dim: 160 
+latent_dim: 1024 
 hidden_dim: 512 
-style_dim: 64 
+style_dim: 128 
 stochastic: True 
-z_dimension: 16
+z_dimension: 64  
 add_controls: False
 dim_in: 64 
 
@@ -31,10 +31,9 @@ weight_decay: 0.0001
 num_outs_per_domain: 10
 single_style: True
 
-ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin, demecolcine]
-# ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
+# ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin, colchicine]
+ood_set: [docetaxel, AZ841, cytochalasin D, simvastatin, cyclohexamide, latrunculin B, epothilone B, lactacystin]
 mol_list: Null
-balanced: False
 trainable_emb: False
 dataset_name: 'bbbc021'
 n_channels: 3
@@ -44,7 +43,7 @@ seed: 42
 # DIRECTORIES FOR DATA
 image_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_all
 data_index_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/datasets/bbbc021_all/metadata/bbbc021_df_all.csv
-embedding_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/csv/emb_rdkit.csv
+embedding_path: /home/icb/alessandro.palma/environment/IMPA/IMPA/embeddings/csv/emb_fp.csv
 
 # DIRECTORIES FOR RESULTS 
 experiment_directory: /home/icb/alessandro.palma/environment/IMPA/IMPA/project_folder/experiments/
