@@ -144,6 +144,7 @@ class CellDataset:
         """
         Initialize molecule names and counts based on dataset splits.
         """
+        # Get unique mol names 
         if not self.batch_correction:
             if not self.multimodal:
                 if self.add_controls:
@@ -360,6 +361,24 @@ class CellDataLoader(LightningDataModule):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.args = args
         self.init_dataset()
+    
+    def init_dataset(self):
+        """
+        Initialize dataset and data loaders.
+        """
+        self.training_set, self.test_set = self.create_torch_datasets()
+        
+        self.loader_train = torch.utils.data.DataLoader(self.training_set, 
+                                                        batch_size=self.args.batch_size, 
+                                                        shuffle=True, 
+                                                        num_workers=self.args.num_workers, 
+                                                        drop_last=True)  
+
+        self.loader_test = torch.utils.data.DataLoader(self.test_set, 
+                                                       batch_size=self.args.val_batch_size, 
+                                                       shuffle=False, 
+                                                       num_workers=self.args.num_workers, 
+                                                       drop_last=False)          
         
     def create_torch_datasets(self):
         """
@@ -400,25 +419,6 @@ class CellDataLoader(LightningDataModule):
         # Free cell painting dataset memory
         del dataset
         return training_set, test_set
-        
-    def init_dataset(self):
-        """
-        Initialize dataset and data loaders.
-        """
-        self.training_set, self.test_set = self.create_torch_datasets()
-        
-        self.loader_train = torch.utils.data.DataLoader(self.training_set, 
-                                                        batch_size=self.args.batch_size, 
-                                                        shuffle=True, 
-                                                        num_workers=self.args.num_workers, 
-                                                        drop_last=True)  
-
-        self.loader_test = torch.utils.data.DataLoader(self.test_set, 
-                                                       batch_size=self.args.val_batch_size, 
-                                                       shuffle=False, 
-                                                       num_workers=self.args.num_workers, 
-                                                       drop_last=False)      
-        
     
     def train_dataloader(self):
         """
