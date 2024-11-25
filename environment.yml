@@ -5,17 +5,17 @@ dependencies:
   - python=3.9
   - pip 
   - pip:
+    - torch 
+    - torchvision 
     - pandas
     - numpy
     - scipy
     - matplotlib==3.5.2
     - munch==2.5.0
     - pillow==9.1.1
-    - pymongo==4.0.2
     - sacred==0.8.2
     - scikit-image==0.19.1
     - scikit-learn==1.0.2
     - seaborn==0.11.2
-    - seml==0.3.6
     - tqdm==4.62.3
     
