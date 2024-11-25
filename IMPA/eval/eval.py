@@ -54,7 +54,7 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
     
         # Store perturbation labels
         Y_trg.append(y_trg.to('cpu'))
-
+ 
         # Draw random vector for style conditioning
         if args.stochastic:
             if batch_correction:
@@ -92,6 +92,7 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
     X_pred = torch.cat(X_pred, dim=0)
     X_real = torch.cat(X_real, dim=0)
     
+    # Evaluate on 100  conditions at random if there are more than 100 conditions
     if len(categories) > 100:
         categories = np.random.choice(categories, 100)
 
@@ -101,7 +102,7 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
         if batch_correction:
             X_real_cat = X_real[Y_org == cat]
         else:
-            X_real_cat = X_real[Y_trg == cat]
+            X_real_cat = X_real[Y_trg == cat]  # Real cells from a category
         X_pred_cat = X_pred[Y_trg == cat]
 
         if not batch_correction:
@@ -112,10 +113,9 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
             wd_transformations += wd
 
         else:
-            num_samples_to_keep_real =  200
-            indices_to_keep_real = random.sample(range(len(X_real_cat)), num_samples_to_keep_real)
-            num_samples_to_keep_generated = 200
-            indices_to_keep_generated = random.sample(range(len(X_pred_cat)), num_samples_to_keep_generated)
+            num_samples_to_keep =  200
+            indices_to_keep_real = random.sample(range(len(X_real_cat)), num_samples_to_keep)
+            indices_to_keep_generated = random.sample(range(len(X_pred_cat)), num_samples_to_keep)
 
             X_real_cat = X_real_cat[indices_to_keep_real]
             X_pred_cat = X_pred_cat[indices_to_keep_generated]
