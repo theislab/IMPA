@@ -37,6 +37,7 @@ class IMPAmodule(LightningModule):
         self.n_mol = datamodule.n_mol
         latent_dim = datamodule.latent_dim
         
+        # If addition of an embedding specific for the condition 
         if self.args.multimodal and self.args.use_condition_embeddings and not self.batch_correction:
             n_cat = len(self.args.modality_list)
             self.condition_embedding_matrix = torch.nn.Embedding(n_cat, 
@@ -79,6 +80,7 @@ class IMPAmodule(LightningModule):
         for net in self.nets.keys():
             params = list(self.nets[net].parameters())
             if net == 'mapping_network':
+                # If the embeddings are trainable, attach them to the mapping network's optimizer 
                 if self.args.trainable_emb:
                     params += list(self.embedding_matrix.parameters())  
                 if self.args.use_condition_embeddings:
@@ -121,15 +123,13 @@ class IMPAmodule(LightningModule):
         if self.args.batch_correction:
             d_loss, d_losses_latent = self._compute_d_loss(
                 x_real_ctrl, x_real_trt, y_org, y_mod, s_trg=s_trg1)
-            discriminator_opt.zero_grad()
-            self.manual_backward(d_loss)
-            discriminator_opt.step()
         else:
             d_loss, d_losses_latent = self._compute_d_loss(
                 x_real_ctrl, x_real_trt, y_trg, y_mod, s_trg=s_trg1)
-            discriminator_opt.zero_grad()
-            self.manual_backward(d_loss)
-            discriminator_opt.step()
+            
+        discriminator_opt.zero_grad()
+        self.manual_backward(d_loss)
+        discriminator_opt.step()
         
         if self.args.batch_correction:
             # Train the generator
@@ -213,7 +213,7 @@ class IMPAmodule(LightningModule):
                 out = self.discriminate(x_real_trt, y_org, None, None)
         else:
             x_real_ctrl.requires_grad_()
-            out = self.discriminate(x_real_ctrl, y_org, None, None)
+            out = self.discriminate(x_real_ctrl, y_org, None, None)  # If batch correction, train discriminator on source images
         
         # Discriminator assigns a 1 to the real 
         loss_real = self._adv_loss(out, 1)
@@ -261,7 +261,6 @@ class IMPAmodule(LightningModule):
             out = self.discriminate(x_fake, y_trg, y_mod, 3)
         else:
             out = self.discriminate(x_fake, y_trg, None, None)
-            
         loss_adv = self._adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
@@ -363,12 +362,21 @@ class IMPAmodule(LightningModule):
             ckptio.save(step)
             
     def encode_label(self, X, y_trg, y_mod, n_mod, y_org=None):    
-        # For each unique modality
+        """Function to encode the labels. It handles both the single-perturbation and multi-perturbation model. 
+
+        Args:
+            X (torch.tensor): The tensor of cell images.
+            y_trg (torch.tensor): The target class for the transformation.
+            y_mod (torch.tensor): The tensor of modality encodings per observation.
+            n_mod (int): The number of modalities. 
+            y_org (torch.tensor, optional): The source labels per observation. Defaults to None.
+        """
+        # If multimodal and batch correction, we must encode each modality separately
         if self.args.multimodal and not self.args.batch_correction:
-            s_trg = []  
-            X_trg = []
-            y_org_trg = []
-            y_mod_trg = []
+            s_trg = []  # Contains the style for different modalities
+            X_trg = []  # Contains the images from different modalities 
+            y_org_trg = []  # The type of perturbation per type of modality 
+            y_mod_trg = []  # The modality list per observation 
             for i in range(n_mod):
                 y_mod_i = y_mod == i 
                 if not y_mod_i.any().item():
@@ -399,6 +407,7 @@ class IMPAmodule(LightningModule):
                                         
                 s_trg.append(self.nets.mapping_network(z_embeddings_mol_mod, y_mol_mod, i))
             
+            # Concatenate the results 
             X_trg = torch.cat(X_trg, dim=0)
             s_trg = torch.cat(s_trg, dim=0)
             y_org_trg = torch.cat(y_org_trg, dim=0)
@@ -413,6 +422,14 @@ class IMPAmodule(LightningModule):
             return s_trg
             
     def discriminate(self, X, y_mol, y_mod, n_mod):
+        """_summary_
+
+        Args:
+            X (torch.tensor): The input observations.
+            y_mol (torch.tensor): The category of observations.
+            y_mod (torch.tensor): The modality oer observations.
+            n_mod (int): The number of modalities
+        """
         if self.args.multimodal and not self.args.batch_correction:
             pred = []
             for i in range(n_mod):
