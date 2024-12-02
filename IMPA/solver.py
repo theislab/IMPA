@@ -165,6 +165,14 @@ class IMPAmodule(LightningModule):
                 all_losses[prefix + key] = value
         all_losses['G/lambda_ds'] = self.args.lambda_ds
         self.log_dict(all_losses)
+        
+        metrics_dict = evaluate(self.nets,
+                            self.loader_test,
+                            self.device,
+                            self.args,
+                            self.embedding_matrix,
+                            self.args.batch_correction, 
+                            self.n_mol)
     
     def on_train_start(self):
         self.ckptios.append(CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims))

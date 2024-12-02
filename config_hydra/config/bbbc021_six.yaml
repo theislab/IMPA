@@ -43,6 +43,7 @@ batch_key: Null
 use_condition_embeddings: False
 add_controls: False
 condition_embedding_dimension: null
+n_mod: 1
 modality_list: 
   - Compound
 

@@ -213,7 +213,7 @@ def translate_using_latent(solver, nets, embedding_matrix, args, x_real, y_trg_l
     x_concat = torch.cat(x_concat, dim=0)
     if args.dataset_name == 'bbbc021':
         save_image(x_concat, N, filename) 
-    elif args.dataset_name == 'bbbc025':
+    elif args.dataset_name == 'bbbc025' or ('cpg0000'in args.dataset_name):
         save_image(x_concat[:, [1, 3, 4], :, :], N, filename)
     else:
         save_image(x_concat[:, [5, 1, 0], :, :], N, filename)

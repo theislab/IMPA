@@ -29,16 +29,19 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
     """
 
     # Initialize accumulated metrics
-    if not batch_correction:
-        wd_transformations = 0
+    if not batch_correction:  
+        wd_transformations = 0 
     fid_transformations = 0
 
     # Lists to store the true labels and generated images
-    X_real = []
-    X_pred = []
-    Y_trg = []
+    Y_trg = []  # Target condition
+    X_real = []  # Real images 
+    X_pred = []  # Predicted images
+    
     if batch_correction:
         Y_org = []
+    if args.multimodal:
+        Y_mod = []
 
     # Loop over single observations
     for observation in tqdm(loader):
@@ -50,11 +53,9 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
         else:
             x_real_ctrl, x_real_trt = observation['X']
             x_real_ctrl, x_real_trt = x_real_ctrl.to(device), x_real_trt.to(device)
-            y_trg = observation['mols'].long().to(device)
-    
-        # Store perturbation labels
-        Y_trg.append(y_trg.to('cpu'))
- 
+            y_trg = observation['mols'].long().to(device)  # The modality-specific category of interest 
+            y_mod = observation['y_id'].long().to(device)  # The perturbation modality of an observation
+        
         # Draw random vector for style conditioning
         if args.stochastic:
             if batch_correction:
@@ -64,11 +65,47 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
 
         with torch.no_grad():
             # Get perturbation embedding and concatenate with the noise vector
-            z_emb = embedding_matrix(y_trg)
-            z_emb = torch.cat([z_emb, z], dim=1)
-
-            # Map to style
-            s = nets.mapping_network(z_emb)
+            if not args.multimodal:
+                z_emb = embedding_matrix(y_trg)
+                if args.stochastic:
+                    z_emb = torch.cat([z_emb, z], dim=1)
+                s = nets.mapping_network(z_emb)
+            else:
+                # If model is multimodal
+                x_real_ctrl_reordered = []
+                x_real_trt_reordered = []
+                y_trg_reorderd = []
+                y_mod_reordered = []
+                z_emb = []
+                s = []                
+                for i in range(args.n_mod):
+                    index_mod = (y_mod==i)
+                    x_real_ctrl_mod = x_real_ctrl[index_mod]
+                    x_real_trt_mod = x_real_trt[index_mod]
+                    y_trg_mod = y_trg[index_mod] 
+                    y_mod_mod = y_mod[index_mod]
+                    
+                    z_emb_mod = embedding_matrix[i](y_trg_mod)
+                    if args.stochastic:
+                        z_emb_mod = torch.cat([z_emb_mod, z[index_mod]], dim=1)
+                    
+                    x_real_ctrl_reordered.append(x_real_ctrl_mod)
+                    x_real_trt_reordered.append(x_real_trt_mod)
+                    y_trg_reorderd.append(y_trg_mod)
+                    y_mod_reordered.append(y_mod_mod)
+                    z_emb.append(z_emb_mod)
+                    s.append(nets.mapping_network(z_emb_mod, y_trg_mod, i))
+                
+                x_real_ctrl = torch.cat(x_real_ctrl_reordered, dim=0)   
+                x_real_trt = torch.cat(x_real_trt_reordered, dim=0)   
+                y_trg = torch.cat(y_trg_reorderd, dim=0)   
+                y_mod = torch.cat(y_mod_reordered, dim=0) 
+                del x_real_ctrl_reordered
+                del x_real_trt_reordered
+                del y_trg_reorderd
+                del y_mod_reordered
+                z_emb = torch.cat(z_emb, dim=0)   
+                s = torch.cat(s, dim=0)            
 
             # Generate images
             if batch_correction:
@@ -81,50 +118,89 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
                 X_real.append(x_real.cpu())  
             else:
                 X_real.append(x_real_trt.cpu())  
+            
+            # Store perturbation labels
+            Y_trg.append(y_trg.to('cpu'))
+            if args.multimodal:
+                Y_mod.append(y_mod.to('cpu'))
 
-    # Perform list concatenation on all of the results
+    # Concatenate batches
     if batch_correction:
         Y_org = torch.cat(Y_org).to('cpu').numpy()
+    # Concatenate perturbation index 
+    if args.multimodal:
+        Y_mod = torch.cat(Y_mod).to('cpu').numpy()
+    # Concatenate the perturbation id
     Y_trg = torch.cat(Y_trg).to('cpu').numpy()
-    categories = np.unique(Y_trg)
+    
+    if not args.multimodal:
+        categories = np.unique(Y_trg)
+    else:
+        categories = []
+        for i in range(args.n_mod):
+            idx_mod = (Y_mod==i)
+            categories.append(np.unique(Y_trg[idx_mod]))
 
     # Concatenate and get the flattened versions of the images
     X_pred = torch.cat(X_pred, dim=0)
     X_real = torch.cat(X_real, dim=0)
     
     # Evaluate on 100  conditions at random if there are more than 100 conditions
-    if len(categories) > 100:
-        categories = np.random.choice(categories, 100)
+    if not args.multimodal:
+        if len(categories) > 100:
+            categories = np.random.choice(categories, 100)
+    else:
+        categories = [np.random.choice(cat, 100) for cat in categories]
 
     # Update the metrics scores (FID, WD)
-    for cat in tqdm(categories):
-        # Compute FID/WD for a class at a time
-        if batch_correction:
-            X_real_cat = X_real[Y_org == cat]
-        else:
-            X_real_cat = X_real[Y_trg == cat]  # Real cells from a category
-        X_pred_cat = X_pred[Y_trg == cat]
+    if not args.multimodal:
+        for cat in tqdm(categories):       
+            # Compute FID/WD for a class at a time
+            if batch_correction:
+                X_real_cat = X_real[Y_org == cat]
+            else:
+                X_real_cat = X_real[Y_trg == cat]  # Real cells from a category
+            X_pred_cat = X_pred[Y_trg == cat]
 
-        if not batch_correction:
-            # Wasserstein distance
-            wd = ot.emd2(torch.tensor([]), torch.tensor([]),
-                        ot.dist(X_real_cat.view(len(X_real_cat), -1),
-                                X_pred_cat.view(len(X_pred_cat), -1), 'euclidean'), 1)
-            wd_transformations += wd
+            if not batch_correction:
+                # Wasserstein distance
+                wd = ot.emd2(torch.tensor([]), torch.tensor([]),
+                            ot.dist(X_real_cat.view(len(X_real_cat), -1),
+                                    X_pred_cat.view(len(X_pred_cat), -1), 'euclidean'), 1)
+                wd_transformations += wd
 
-        else:
-            num_samples_to_keep =  200
-            indices_to_keep_real = random.sample(range(len(X_real_cat)), num_samples_to_keep)
-            indices_to_keep_generated = random.sample(range(len(X_pred_cat)), num_samples_to_keep)
+            else:
+                num_samples_to_keep =  200
+                indices_to_keep_real = random.sample(range(len(X_real_cat)), num_samples_to_keep)
+                indices_to_keep_generated = random.sample(range(len(X_pred_cat)), num_samples_to_keep)
 
-            X_real_cat = X_real_cat[indices_to_keep_real]
-            X_pred_cat = X_pred_cat[indices_to_keep_generated]
-            
-        # FID
-        X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
-        X_pred_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_pred_cat.to(device)))
-        fid = cal_fid(X_real_dataset, X_pred_dataset, 2048, True, custom_channels=channels)
-        fid_transformations += fid
+                X_real_cat = X_real_cat[indices_to_keep_real]
+                X_pred_cat = X_pred_cat[indices_to_keep_generated]
+                
+            # FID
+            X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
+            X_pred_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_pred_cat.to(device)))
+            fid = cal_fid(X_real_dataset, X_pred_dataset, 2048, True, custom_channels=channels)
+            fid_transformations += fid
+        
+    else:
+        for i, cat in enumerate(categories):  # Different categories drawn per modality 
+            for cat_mod in tqdm(cat):  #  For each of the categories in the selected modality
+                X_real_cat = X_real[Y_mod == i][Y_trg == cat_mod]  # Real cells from a category
+                X_pred_cat = X_pred[Y_mod == i][Y_trg == cat_mod]
+                
+                num_samples_to_keep =  min(200, len(X_real_cat))
+                indices_to_keep_real = random.sample(range(len(X_real_cat)), num_samples_to_keep)
+                indices_to_keep_generated = random.sample(range(len(X_pred_cat)), num_samples_to_keep)
+
+                X_real_cat = X_real_cat[indices_to_keep_real]
+                X_pred_cat = X_pred_cat[indices_to_keep_generated]
+                    
+                # FID
+                X_real_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_real_cat.to(device)))
+                X_pred_dataset = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_pred_cat.to(device)))
+                fid = cal_fid(X_real_dataset, X_pred_dataset, 2048, True, custom_channels=channels)
+                fid_transformations += fid
 
     # Save metrics
     if batch_correction:
