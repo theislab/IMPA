@@ -1,12 +1,15 @@
 # IMPA
 
-**IMage Perturbation Autoencoder** (IMPA) is a computer vision model performing style transfer on images of cells undergoing perturbation. IMPA learns a perturbation space and uses it to perform style transfer by conditioning the latent space of an autoencoder. Through this process, the model is used to translate a cell image into what it would look like had it been treated with a certain perturbation. 
+# Image Perturbation Autoencoder (IMPA)
 
-The perturbation space can be expressed as:
-* A prior on the perturbation space (e.g. drug embeddings reflecting compound-specific physiochemical characteristics)
-* Trainable embeddings optimized alongside the model 
+**Image Perturbation Autoencoder** (IMPA) is a computer vision model designed for style transfer on images of cells subjected to various perturbations. By learning a structured perturbation space, IMPA enables style transfer by conditioning the latent space of an autoencoder. This approach allows the model to transform a given cell image into its predicted appearance under a specified perturbation.
 
-If trained on a meaniningful prior perturbation space, IMPA learns to map unseen drugs in proximity of drugs used for training. When proximity also involves functional similarity, IMPA is able to predict the effect of unseen drugs on control cells. Moreover, distances between the style encodings of different perturbations are correlated with distances in the phenotypic space. As a result, IMPA can be used to fastly inspect active compounds based on the comparison of the style vectors learned for different perturbations. 
+The perturbation space is composed of:
+
+- **Perturbation embeddings**: Representations capturing compound-specific physiochemical properties, such as drug characteristics.  
+- **Trainable embeddings**: Learned representations that are optimized in tandem with the model during training.
+
+Beyond style transfer, IMPA is also effective for batch correction. By training the model to harmonize cell images from different experimental sources, it can standardize data into a unified batch for downstream analysis.
 
 <p align="center">
   <img src="https://github.com/theislab/IMPA/blob/main/docs/IMPA.png" width="700" height="400">
@@ -48,7 +51,7 @@ sbatch training_config.yaml
 ```
 And the script will be submitted automatically. The logs of the run will be saved in the `training_config/logs` folder. 
 
-For other scheduling systems the user may be required to apply minor modifications to the `main.py` file to accept custom configuration files. For training with `seml` we redirect the user to the [official page](https://github.com/TUM-DAML/seml) of the package.
+For other scheduling systems, the user may be required to apply minor modifications to the `main.py` file to accept custom configuration files. For training with `seml` we redirect the user to the [official page](https://github.com/TUM-DAML/seml) of the package.
 
 
 
