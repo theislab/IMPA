@@ -7,7 +7,7 @@ latent_dim: 100  # The dimension of the Morgan fingerprints
 hidden_dim: 512 
 style_dim: 64 
 stochastic: True 
-z_dimension: 16  
+z_dimension: 10
 dim_in: 64 
 
 # LOSS 
@@ -43,7 +43,6 @@ batch_key: BATCH
 n_mod: 1
 use_condition_embeddings: False
 condition_embedding_dimension: null
-n_mod: 1
 modality_list: 
   - Compound
 

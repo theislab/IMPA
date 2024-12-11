@@ -16,7 +16,7 @@
 
 #SBATCH --mem=90G
 
-#SBATCH -t 2-00:00
+#SBATCH -t 1-00:00
 
 #SBATCH --nice=10000
 

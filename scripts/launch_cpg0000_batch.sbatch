@@ -10,13 +10,13 @@
 
 #SBATCH --gres=gpu:1
 
-#SBATCH --qos=gpu_normal
+#SBATCH --qos=gpu_long
 
 #SBATCH -c 4
 
 #SBATCH --mem=90G
 
-#SBATCH -t 2-00:00
+#SBATCH -t 3-00:00
 
 #SBATCH --nice=10000
 

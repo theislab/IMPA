@@ -1,7 +1,7 @@
 # TASK NAME 
 task_name: bbbc021_all
 
-# IMAGE
+# NETWORK
 img_size: 128  
 latent_dim: 1024 
 hidden_dim: 512 
