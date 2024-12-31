@@ -75,7 +75,7 @@ save_every: 500
 eval_every: 500
 
 # PARAMETERS FOR CONDITION ENCODING 
-encode_rdkit: True
+encode_rdkit: False
 num_layers_mapping_net: 1
 
 # Lightning 
@@ -84,7 +84,7 @@ monitor: fid_transformations
 mode: min
 save_last: True
 offline: False
-project: cpg0000
+project: cpg0000_batch
 log_model: False
 accelerator: gpu 
 log_every_n_steps: 10

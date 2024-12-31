@@ -8,7 +8,6 @@ from torch.optim import Adam
 from pytorch_lightning import LightningModule
 
 from IMPA.checkpoint import CheckpointIO
-from IMPA.eval.eval import evaluate
 from IMPA.model import build_model
 from IMPA.utils import he_init, print_network, swap_attributes, debug_image
 
@@ -120,38 +119,24 @@ class IMPAmodule(LightningModule):
             y_mod = None 
         
         # Train the discriminator
-        if self.args.batch_correction:
-            d_loss, d_losses_latent = self._compute_d_loss(
-                x_real_ctrl, x_real_trt, y_org, y_mod, s_trg=s_trg1)
-        else:
-            d_loss, d_losses_latent = self._compute_d_loss(
-                x_real_ctrl, x_real_trt, y_trg, y_mod, s_trg=s_trg1)
-            
+        d_loss, d_losses_latent = self._compute_d_loss(
+            x_real_ctrl, x_real_trt, y_org, y_trg, y_mod, s_trg=s_trg1)
+
         discriminator_opt.zero_grad()
         self.manual_backward(d_loss)
         discriminator_opt.step()
         
-        if self.args.batch_correction:
-            # Train the generator
-            g_loss, g_losses_latent = self._compute_g_loss(
-                x_real_ctrl, y_org, y_mod, s_trg1=s_trg1, s_trg2=s_trg2)
-            style_encoder_opt.zero_grad()
-            generator_opt.zero_grad()
-            mapping_network_opt.zero_grad()   
-            self.manual_backward(g_loss)
-            style_encoder_opt.step()
-            generator_opt.step()
-            mapping_network_opt.step() 
-        else:
-            g_loss, g_losses_latent = self._compute_g_loss(
-                x_real_ctrl, y_trg, y_mod, s_trg1=s_trg1, s_trg2=s_trg2)
-            style_encoder_opt.zero_grad()
-            generator_opt.zero_grad()
-            mapping_network_opt.zero_grad()   
-            self.manual_backward(g_loss)
-            style_encoder_opt.step()
-            generator_opt.step()
-            mapping_network_opt.step() 
+        # Train the generator
+        g_loss, g_losses_latent = self._compute_g_loss(
+            x_real_ctrl, y_trg, y_mod, s_trg1=s_trg1, s_trg2=s_trg2)
+            
+        style_encoder_opt.zero_grad()
+        generator_opt.zero_grad()
+        mapping_network_opt.zero_grad()   
+        self.manual_backward(g_loss)
+        style_encoder_opt.step()
+        generator_opt.step()
+        mapping_network_opt.step() 
     
         # Decay weight for diversity sensitive loss (moves towards 0) - Decrease sought amount of diversity 
         if self.args.lambda_ds > 0:
@@ -195,7 +180,7 @@ class IMPAmodule(LightningModule):
         # Save model checkpoints
         self._save_checkpoint(step=self.current_epoch+1)        
     
-    def _compute_d_loss(self, x_real_ctrl, x_real_trt, y_org, y_mod, s_trg):
+    def _compute_d_loss(self, x_real_ctrl, x_real_trt, y_org, y_trg, y_mod, s_trg):
         """Compute the discriminator loss real batches
 
         Args:
@@ -208,9 +193,9 @@ class IMPAmodule(LightningModule):
         if not self.args.batch_correction:
             x_real_trt.requires_grad_()
             if self.args.multimodal:
-                out = self.discriminate(x_real_trt, y_org, y_mod, 3)
+                out = self.discriminate(x_real_trt, y_trg, y_mod, 3)
             else:
-                out = self.discriminate(x_real_trt, y_org, None, None)
+                out = self.discriminate(x_real_trt, y_trg, None, None)
         else:
             x_real_ctrl.requires_grad_()
             out = self.discriminate(x_real_ctrl, y_org, None, None)  # If batch correction, train discriminator on source images
@@ -231,11 +216,11 @@ class IMPAmodule(LightningModule):
         # Discriminator trained to predict transformed image as fake in its domain 
         if not self.args.batch_correction:
             if self.args.multimodal:
-                out = self.discriminate(x_fake, y_org, y_mod, 3)
+                out = self.discriminate(x_fake, y_trg, y_mod, 3)
             else:
-                out = self.discriminate(x_fake, y_org, None, None)
+                out = self.discriminate(x_fake, y_trg, None, None)
         else:
-            out = self.discriminate(x_fake, y_org, None, None)
+            out = self.discriminate(x_fake, y_trg, None, None)
             
         loss_fake = self._adv_loss(out, 0)
         loss = loss_real + loss_fake + self.args.lambda_reg * loss_reg 
@@ -264,10 +249,7 @@ class IMPAmodule(LightningModule):
         loss_adv = self._adv_loss(out, 1)
 
         # Encode the fake image and measure the distance from the encoded style
-        if not self.args.single_style:
-            s_pred = self.nets.style_encoder(x_fake, y_trg)
-        else:
-            s_pred = self.nets.style_encoder(x_fake)
+        s_pred = self.nets.style_encoder(x_fake)
 
         # Predict style back from image 
         loss_sty = torch.mean(torch.abs(s_pred - s_trg1))  
@@ -277,11 +259,7 @@ class IMPAmodule(LightningModule):
         x_fake2 = x_fake2.detach()
         loss_ds = torch.mean(torch.abs(x_fake - x_fake2))  # generate outputs as far as possible from each other 
             
-        # Cycle-consistency loss
-        if not self.args.single_style:
-            s_org = self.nets.style_encoder(x_real_ctrl, y_trg)
-        else:
-            s_org = self.nets.style_encoder(x_real_ctrl)
+        s_org = self.nets.style_encoder(x_real_ctrl)
 
         _, x_rec = self.nets.generator(x_fake, s_org)
         loss_cyc = torch.mean(torch.abs(x_rec - x_real_ctrl))  # Mean absolute error reconstructed versus real 
@@ -443,4 +421,4 @@ class IMPAmodule(LightningModule):
             return torch.cat(pred, dim=0)
         else:
             return self.nets.discriminator(X, y_mol, None)
-                
+        
