@@ -2,12 +2,12 @@
 
 # Image Perturbation Autoencoder (IMPA)
 
-**Image Perturbation Autoencoder** (IMPA) is a computer vision model designed for style transfer on images of cells subjected to various perturbations. By learning a structured perturbation space, IMPA enables style transfer by conditioning the latent space of an autoencoder. This approach allows the model to transform a given cell image into its predicted appearance under a specified perturbation.
+**Image Perturbation Autoencoder** (IMPA) is a model designed for style transfer on images of cells subjected to various perturbations. IMPA is a Generative Adversarial Network (GAN) based on an autoencoder model. Images of control cells are encoded into a high-dimensional latent space and decoded conditioned on a perturbation representation. The decoder's output is used to deceive a discriminator model into classifying the decoded cells as truly coming from the target perturbation. In this way, our approach allows us to predict how a control cell would look had it been perturbed by a given treatment. 
 
-The perturbation space is composed of:
+The perturbation can be designed as:
 
 - **Perturbation embeddings**: Representations capturing compound-specific physiochemical properties, such as drug characteristics.  
-- **Trainable embeddings**: Learned representations that are optimized in tandem with the model during training.
+- **Trainable embeddings**: Learned representations optimized in tandem with the model during training.
 
 Beyond style transfer, IMPA is also effective for batch correction. By training the model to harmonize cell images from different experimental sources, it can standardize data into a unified batch for downstream analysis.
 
