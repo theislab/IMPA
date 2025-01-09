@@ -31,7 +31,7 @@ pip install -e .
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
 
-* `checkpoint.py`: implements the util class for handling saving and loading checkpoints.
+* `checkpoint.py`: implements the util class for saving and loading checkpoints.
 * `main_hydra.py`: calls the `Solver` class and implements training supported by [hydra](https://hydra.cc/docs/1.3/intro/).
 * `model.py`: implements the neural network modules and initialization function.
 * `solver.py`: contains the `Solver` class implementing the model setup, data loading and training loop.
@@ -39,6 +39,24 @@ All files related to the model are stored in the  `IMPA` folder.
 * `eval/eval.py`: contains the evaluation script used during training by the `Solver` class.
 * `dataset/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
 * `dataset/data_utils.py`: implements utilfunctions for the data loader.
+
+## Set up
+
+Setting up the repository requires creating a project folder. 
+
+```
+cd IMPA
+mkdir project_folder
+```
+
+One can also create the project folder elsewhere, e.g. a directory with larger storage capacity, and create a symlink from the IMPA directory to the chosen project folder location:
+
+```
+cd IMPA
+ln -s path/to/storage/folder/ project_folder
+```
+
+Subsequently, download the data (and the model checkpoints) [here](https://zenodo.org/record/8307629). Unzip and move the dataset folder to `IMPA/project folder`. The checkpoints should be at `IMPA/checkpoints`.
  
 ## Train the models
 
@@ -57,8 +75,10 @@ sbatch training_config.sbatch
 
 And the script will be submitted automatically. 
 
-To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
+To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add path strings referencing the used directories).
 
+## Tutorials 
+Tutorials are available in the `IMPA/tutorials` folder as notebooks.
 
 ## Dataset and checkpoints
 Model checkpoints and pre-processed data are made available [here](https://zenodo.org/record/8307629).
