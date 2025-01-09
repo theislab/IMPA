@@ -10,6 +10,7 @@ from pytorch_lightning import LightningModule
 from IMPA.checkpoint import CheckpointIO
 from IMPA.model import build_model
 from IMPA.utils import he_init, print_network, swap_attributes, debug_image
+from IMPA.eval.eval import evaluate
 
 class IMPAmodule(LightningModule):
     def __init__(self, args, dest_dir, datamodule):
@@ -36,10 +37,10 @@ class IMPAmodule(LightningModule):
         self.n_mol = datamodule.n_mol
         latent_dim = datamodule.latent_dim
         
-        # If addition of an embedding specific for the condition 
+        # If addition of a learnable embedding specific for the condition 
         if self.args.multimodal and self.args.use_condition_embeddings and not self.batch_correction:
-            n_cat = len(self.args.modality_list)
-            self.condition_embedding_matrix = torch.nn.Embedding(n_cat, 
+            self.n_cat = len(self.args.modality_list)
+            self.condition_embedding_matrix = torch.nn.Embedding(self.n_cat, 
                                                                  self.args.condition_embedding_dimension).to(self.device).to(torch.float32) 
             
         # Get the nets
@@ -102,7 +103,7 @@ class IMPAmodule(LightningModule):
             x_real_ctrl, y_org, y_mod = batch['X'].to(self.device), batch['mols'], batch['y_id']
             x_real_trt = None
             y_org = y_org.long().to(self.device)
-            y_trg = swap_attributes(self.n_mol, y_org, self.device).long().to(self.device)
+            y_trg = swap_attributes(self.n_mol, y_org, self.device).long().to(self.device)  # Random shuffling of the attributes 
         else:
             x_real, y_trg, y_mod = batch['X'], batch['mols'], batch['y_id']
             x_real_ctrl, x_real_trt = x_real
@@ -110,9 +111,10 @@ class IMPAmodule(LightningModule):
             y_trg = y_trg.long().to(self.device)            
             y_org = None 
 
+        # Get the styles 
         if self.args.multimodal and not self.args.batch_correction:
-            x_real_trt, s_trg1, y_trg, y_mod = self.encode_label(x_real_trt, y_trg, y_mod, 3)
-            _, s_trg2, _, _ = self.encode_label(x_real_trt, y_trg, y_mod, 3)
+            x_real_trt, s_trg1, y_trg, y_mod = self.encode_label(x_real_trt, y_trg, y_mod, self.n_cat)
+            _, s_trg2, _, _ = self.encode_label(x_real_trt, y_trg, y_mod, self.n_cat)
         else:
             s_trg1 = self.encode_label(x_real_ctrl, y_trg, None, None)
             s_trg2 = self.encode_label(x_real_ctrl, y_trg, None, None)
@@ -155,16 +157,6 @@ class IMPAmodule(LightningModule):
         self.ckptios.append(CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims))
         
     def on_train_epoch_end(self):
-        # Scores on the validation images 
-        # metrics_dict = evaluate(self.nets,
-        #                             self.loader_test,
-        #                             self.device,
-        #                             self.args,
-        #                             self.embedding_matrix,
-        #                             self.args.batch_correction, 
-        #                             self.n_mol)
-        # self.log_dict(metrics_dict)
-        
         inputs_val = next(iter(self.loader_test)) 
         debug_image(self,
                     self.nets, 
@@ -193,7 +185,7 @@ class IMPAmodule(LightningModule):
         if not self.args.batch_correction:
             x_real_trt.requires_grad_()
             if self.args.multimodal:
-                out = self.discriminate(x_real_trt, y_trg, y_mod, 3)
+                out = self.discriminate(x_real_trt, y_trg, y_mod, self.n_cat)
             else:
                 out = self.discriminate(x_real_trt, y_trg, None, None)
         else:
@@ -216,7 +208,7 @@ class IMPAmodule(LightningModule):
         # Discriminator trained to predict transformed image as fake in its domain 
         if not self.args.batch_correction:
             if self.args.multimodal:
-                out = self.discriminate(x_fake, y_trg, y_mod, 3)
+                out = self.discriminate(x_fake, y_trg, y_mod, self.n_cat)
             else:
                 out = self.discriminate(x_fake, y_trg, None, None)
         else:
@@ -243,7 +235,7 @@ class IMPAmodule(LightningModule):
         
         # Try to deceive the discriminator 
         if self.args.multimodal and not self.args.batch_correction:
-            out = self.discriminate(x_fake, y_trg, y_mod, 3)
+            out = self.discriminate(x_fake, y_trg, y_mod, self.n_cat)
         else:
             out = self.discriminate(x_fake, y_trg, None, None)
         loss_adv = self._adv_loss(out, 1)

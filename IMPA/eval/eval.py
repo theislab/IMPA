@@ -10,7 +10,6 @@ from tqdm import tqdm
 from IMPA.utils import swap_attributes
 import torch.nn.functional as F
 
-
 def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_classes, channels=[0,1,2]):
     """Evaluate the model during training.
 
@@ -40,7 +39,7 @@ def evaluate(nets, loader, device, args, embedding_matrix, batch_correction, n_c
     
     if batch_correction:
         Y_org = []
-    if args.multimodal:
+    if args.multimodal and not batch_correction:
         Y_mod = []
 
     # Loop over single observations
