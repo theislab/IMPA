@@ -2,7 +2,7 @@
 
 # Image Perturbation Autoencoder (IMPA)
 
-**Image Perturbation Autoencoder** (IMPA) is a model designed for style transfer on images of cells subjected to various perturbations. IMPA is a Generative Adversarial Network (GAN) based on an autoencoder model. Images of control cells are encoded into a high-dimensional latent space and decoded conditioned on a perturbation representation. The decoder's output is used to deceive a discriminator model into classifying the decoded cells as truly coming from the target perturbation. In this way, our approach allows us to predict how a control cell would look had it been perturbed by a given treatment. 
+**Image Perturbation Autoencoder** (IMPA) is a model designed for style transfer on images of cells treated with various perturbations. IMPA is a Generative Adversarial Network (GAN) based on an autoencoder model. Images of control cells are encoded into a high-dimensional latent space and decoded conditioned on a perturbation representation. The decoder's output is used to deceive a discriminator model into classifying the decoded cells as truly coming from the target perturbation. In this way, our approach allows us to predict how a control cell would look had it been perturbed by a given treatment. 
 
 The perturbation can be designed as:
 
@@ -31,37 +31,34 @@ pip install -e .
 ## Codebase description 
 All files related to the model are stored in the  `IMPA` folder. 
 
-* `utils.py`: contains helper functions
-* `solver.py`: contains the `Solver` class implementing the model setup, data loading and training loop. 
-* `model.py`: implements the neural network modules and initialization function.
-* `main.py`: calls the `Solver` class and implements training supported by `seml` and `sacred`.
 * `checkpoint.py`: implements the util class for handling saving and loading checkpoints.
+* `main_hydra.py`: calls the `Solver` class and implements training supported by [hydra](https://hydra.cc/docs/1.3/intro/).
+* `model.py`: implements the neural network modules and initialization function.
+* `solver.py`: contains the `Solver` class implementing the model setup, data loading and training loop.
+* `utils.py`: contains helper functions.
 * `eval/eval.py`: contains the evaluation script used during training by the `Solver` class.
-* `data/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
-
+* `dataset/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
+* `dataset/data_utils.py`: implements utilfunctions for the data loader.
+ 
 ## Train the models
 
-We trained the models using the [seml](https://github.com/TUM-DAML/seml) framework. Configurations can be found in the `training_config` folder. IMPA can be trained both with and without the support of `seml`. This is possible via two independent main files:  
-* `main.py`: train with `seml` on the `slurm` scheduling system 
-* `main_not_seml.py`: train without `seml` on the `slurm` scheduling system via sbatch files
+We trained the model using a combination of [hydra](https://hydra.cc/docs/1.3/intro/) and [pytorch lightning](https://lightning.ai/docs/pytorch/stable/):
+* hydra: used to handle configurations and hyperparameter optimization.
+* pytorch lightning: used to set up the data loading, model training and logging.  
 
-Scripts to run the code without `seml` can be found in the `scripts` folder. In a terminal, enter:
+We configure model training and hyperparameter tuning in line with the requirements for the SLURM job manager. If SLURM is not present on the user's system, the scripts for launching training can be adapted to a normal bash session by removing the slurm syntax in the provided `sbatch` scripts.
+
+We provide training scripts for perturbation prediction and batch correction in the `script` folder. To run training on a selected task, launch the following command:
+
 ```
-sbatch training_config.yaml 
+conda activate IMPA
+sbatch training_config.sbatch
 ```
-And the script will be submitted automatically. The logs of the run will be saved in the `training_config/logs` folder. 
 
-For other scheduling systems the user may be required to apply minor modifications to the `main.py` file to accept custom configuration files. For training with `seml` we redirect the user to the [official page](https://github.com/TUM-DAML/seml) of the package.
-
-
+And the script will be submitted automatically. 
 
 To train the model with the provided yaml files, adapt the `.yaml` files to the experimental setup (*i.e.* add  path strings referencing the used directories).
 
 
 ## Dataset and checkpoints
-Datasets are available at:
-* BBBC021 https://bbbc.broadinstitute.org/BBBC021
-* BBBC025 https://bbbc.broadinstitute.org/BBBC025
-* RxRx1 https://www.kaggle.com/c/recursion-cellular-image-classification/overview/resources  
-  
 Model checkpoints and pre-processed data are made available [here](https://zenodo.org/record/8307629).
