@@ -1,5 +1,7 @@
 # Image Perturbation Autoencoder (IMPA)
 
+Official repository of the paper "Predicting cell morphological responses to perturbations using generative modeling". Find our manuscript [here](https://www.nature.com/articles/s41467-024-55707-8) on Nature Communications.
+
 **Image Perturbation Autoencoder** (IMPA) is a model designed for style transfer on images of cells treated with various perturbations. IMPA is a Generative Adversarial Network (GAN) based on an autoencoder model. Images of control cells are encoded into a high-dimensional latent space and decoded conditioned on a perturbation representation. The decoder's output is used to deceive a discriminator model into classifying the decoded cells as truly coming from the target perturbation. In this way, our approach allows us to predict how a control cell would look had it been perturbed by a given treatment. 
 
 The perturbation can be designed as:
@@ -38,7 +40,14 @@ All files related to the model are stored in the  `IMPA` folder.
 * `dataset/data_loader.py`: implements `torch` dataset and data loader wrappers around the image data.
 * `dataset/data_utils.py`: implements utilfunctions for the data loader.
 
-## Set up
+Additional folders are included in the repository.
+
+* `cellprofiler_feature_names`: contains the names of the CellProfiler features used for analysis in Fig. 1 of the manuscript.
+* `config_hydra`: contains the configuration setup for training the model for the various applications presented in the paper.
+* `embeddings`: contains the perturbation embeddings used for treatment representation in BBBC021 and cpg0000.
+* `scripts`: contains the scripts used to train the different models using the configurations in `config_hydra`.
+
+## Setup
 
 Setting up the repository requires creating a project folder. 
 
