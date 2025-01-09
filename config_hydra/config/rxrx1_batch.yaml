@@ -3,9 +3,9 @@ task_name: rxrx1_batch
 
 # NETWORK
 img_size: 96  
-latent_dim: 100  # The dimension of the Morgan fingerprints
+latent_dim: 100  # Condition embedding dimension 
 hidden_dim: 512 
-style_dim: 64 
+style_dim: 64  # Dimension of the style space
 stochastic: True 
 z_dimension: 10
 dim_in: 64 
@@ -18,30 +18,30 @@ lambda_ds: 1
 
 # TRAINING 
 total_epochs: 100
-ds_iter: 100000
-resume_iter: 0
+ds_iter: 100000  # Number of iterations over which the diversity loss weight is decreased
+resume_iter: 0  # Iteration for resuming training
 batch_size: 32
 val_batch_size: 20
-lr: 0.0001
-f_lr: 0.0001
+lr: 0.0001  # Model learning rate
+f_lr: 0.0001  # Perturbation encoder's learning rate
 beta1: 0
 beta2: 0.99
 weight_decay: 0.0001
 num_outs_per_domain: 10
-single_style: True
-ood_set: Null
-mol_list: Null
-balanced: False
+single_style: True  # If true, shared encoding space per condition
+ood_set: Null  # Set of held-out molecules 
+mol_list: Null  # Subset of molecules to train on 
 trainable_emb: True
 dataset_name: 'rxrx1'
 n_channels: 6
 num_workers: 6
 seed: 42  
-multimodal: False
-batch_correction: True
+multimodal: False  # True if multiple perturbation modalities
+batch_correction: True  # True if batch correction task 
 batch_key: BATCH
 n_mod: 1
 use_condition_embeddings: False
+add_controls: False   # True if controls are added to the perturbation prediction task (mapping controls to self)
 condition_embedding_dimension: null
 modality_list: 
   - Compound
@@ -55,9 +55,7 @@ embedding_path: Null
 experiment_directory: project_folder/experiments/
 sample_dir: sample   # Name of directory for sampled images 
 checkpoint_dir: checkpoint  # Name of directory for checkpoints
-basal_vs_real_folder: basal_vs_real
 naming_key: dataset_name
-embedding_folder: embeddings 
 resume_dir: ''
 
 # DATA HANDLEMENT 
