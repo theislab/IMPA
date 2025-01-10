@@ -38,10 +38,11 @@ class IMPAmodule(LightningModule):
         latent_dim = datamodule.latent_dim
         
         # If addition of a learnable embedding specific for the condition 
-        if self.args.multimodal and self.args.use_condition_embeddings and not self.batch_correction:
+        if self.args.multimodal and not self.args.batch_correction:
             self.n_cat = len(self.args.modality_list)
-            self.condition_embedding_matrix = torch.nn.Embedding(self.n_cat, 
-                                                                 self.args.condition_embedding_dimension).to(self.device).to(torch.float32) 
+            if self.args.use_condition_embeddings:
+                self.condition_embedding_matrix = torch.nn.Embedding(self.n_cat, 
+                                                                    self.args.condition_embedding_dimension).to(self.device).to(torch.float32) 
             
         # Get the nets
         self.nets = build_model(args, 
@@ -157,6 +158,16 @@ class IMPAmodule(LightningModule):
         self.ckptios.append(CheckpointIO(ospj(self.dest_dir, self.args.checkpoint_dir, '{:06d}_optims.ckpt'), **self.optims))
         
     def on_train_epoch_end(self):
+        # Scores on the validation images 
+        metrics_dict = evaluate(self.nets,
+                                    self.loader_test,
+                                    self.device,
+                                    self.args,
+                                    self.embedding_matrix,
+                                    self.args.batch_correction, 
+                                    self.n_mol)
+        self.log_dict(metrics_dict)
+
         inputs_val = next(iter(self.loader_test)) 
         debug_image(self,
                     self.nets, 

@@ -17,7 +17,7 @@ lambda_sty: 1
 lambda_ds: 1 
 
 # TRAINING 
-total_epochs: 100
+total_epochs: 2
 ds_iter: 200000  # Number of iterations over which the diversity loss weight is decreased
 resume_iter: 0  # Iteration for resuming training
 batch_size: 32
